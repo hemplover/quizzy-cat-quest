@@ -133,10 +133,10 @@ ${content}
     }
 
     const data = await response.json();
-    const content = data.choices[0].message.content;
+    const responseContent = data.choices[0].message.content;
     
     // Extract JSON from the response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error('Could not parse JSON from API response');
     }
@@ -236,10 +236,10 @@ ${JSON.stringify(formattedAnswers, null, 2)}
     }
 
     const data = await response.json();
-    const content = data.choices[0].message.content;
+    const responseContent = data.choices[0].message.content;
     
     // Extract JSON from the response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error('Could not parse JSON from API response');
     }
