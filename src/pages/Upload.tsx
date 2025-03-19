@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileUp, BookOpen, Settings, Sparkles, ArrowRight } from 'lucide-react';
 import FileUpload from '@/components/FileUpload';
 import CatTutor from '@/components/CatTutor';
 import { toast } from 'sonner';
+import { extractTextFromFile, generateQuiz, transformQuizQuestions } from '@/services/openaiService';
+import ApiKeyForm from '@/components/ApiKeyForm';
 
 const difficultyLevels = [
   { id: 'beginner', name: 'Beginner', description: 'Basic recall questions' },
@@ -26,10 +29,32 @@ const Upload = () => {
   const [numQuestions, setNumQuestions] = useState(10);
   const [isProcessing, setIsProcessing] = useState(false);
   const [catMessage, setCatMessage] = useState("Upload your notes or paste your text. I'll help create the perfect quiz!");
+  const [extractedText, setExtractedText] = useState<string | null>(null);
+  const [hasApiKey, setHasApiKey] = useState(false);
 
-  const handleFileUpload = (file: File) => {
+  useEffect(() => {
+    // Check if API key is already set
+    const key = localStorage.getItem('openai_api_key');
+    setHasApiKey(!!key);
+  }, []);
+
+  const handleApiKeySubmit = (key: string) => {
+    setHasApiKey(true);
+  };
+
+  const handleFileUpload = async (file: File) => {
     setSelectedFile(file);
     setCatMessage(`Good choice! "${file.name}" looks like interesting study material. Let's make a quiz from it!`);
+    
+    try {
+      // Extract text from the file
+      const text = await extractTextFromFile(file);
+      setExtractedText(text);
+      toast.success(`Successfully processed ${file.name}`);
+    } catch (error) {
+      console.error("Error extracting text from file:", error);
+      toast.error("Failed to process file. Please try again or paste text directly.");
+    }
   };
 
   const handleTextInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -56,24 +81,53 @@ const Upload = () => {
       return;
     }
 
+    // Check if we have an API key
+    if (!hasApiKey) {
+      toast.error("Please set your OpenAI API key first");
+      return;
+    }
+
     setCatMessage("Processing your materials... This is exciting! I'm creating challenging questions just for you.");
     setIsProcessing(true);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 2500));
+      // Determine which content to use
+      const contentToProcess = extractedText || textInput;
       
-      toast.success("Quiz created successfully!");
+      // Generate quiz using OpenAI
+      const generatedQuiz = await generateQuiz(contentToProcess);
       
-      sessionStorage.setItem('quizData', JSON.stringify({
-        source: selectedFile ? selectedFile.name : 'Text input',
-        difficulty,
-        questionTypes: selectedQuestionTypes,
-        numQuestions,
-        createdAt: new Date().toISOString()
-      }));
-      
-      navigate('/quiz');
+      if (generatedQuiz) {
+        // Transform the quiz to our app's format
+        const questions = transformQuizQuestions(generatedQuiz);
+        
+        // Store quiz in session storage
+        sessionStorage.setItem('quizQuestions', JSON.stringify(questions));
+        sessionStorage.setItem('quizData', JSON.stringify({
+          source: selectedFile ? selectedFile.name : 'Text input',
+          difficulty,
+          questionTypes: selectedQuestionTypes,
+          numQuestions,
+          createdAt: new Date().toISOString()
+        }));
+        
+        toast.success("Quiz created successfully!");
+        navigate('/quiz');
+      } else {
+        // If OpenAI failed, use mock data as fallback
+        sessionStorage.setItem('quizData', JSON.stringify({
+          source: selectedFile ? selectedFile.name : 'Text input',
+          difficulty,
+          questionTypes: selectedQuestionTypes,
+          numQuestions,
+          createdAt: new Date().toISOString()
+        }));
+        
+        toast.success("Quiz created with sample questions (API fallback)");
+        navigate('/quiz');
+      }
     } catch (error) {
+      console.error("Error creating quiz:", error);
       toast.error("Failed to create quiz. Please try again.");
       setCatMessage("Oops! Something went wrong. Let's try again, shall we?");
       setIsProcessing(false);
@@ -89,7 +143,12 @@ const Upload = () => {
             Upload your notes, documents, or paste text to generate personalized quiz questions
           </p>
         </div>
-        <CatTutor message={catMessage} emotion="thinking" />
+        <div className="flex flex-col items-end">
+          <CatTutor message={catMessage} emotion="thinking" />
+          <div className="mt-2">
+            <ApiKeyForm onKeySubmit={handleApiKeySubmit} />
+          </div>
+        </div>
       </div>
       
       <div className="glass-card p-6 rounded-xl mb-8">
