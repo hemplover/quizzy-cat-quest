@@ -97,7 +97,7 @@ const Upload = () => {
       // Generate quiz using OpenAI
       const generatedQuiz = await generateQuiz(contentToProcess);
       
-      if (generatedQuiz) {
+      if (generatedQuiz && generatedQuiz.quiz && generatedQuiz.quiz.length > 0) {
         // Transform the quiz to our app's format
         const questions = transformQuizQuestions(generatedQuiz);
         
@@ -107,24 +107,16 @@ const Upload = () => {
           source: selectedFile ? selectedFile.name : 'Text input',
           difficulty,
           questionTypes: selectedQuestionTypes,
-          numQuestions,
+          numQuestions: questions.length,
           createdAt: new Date().toISOString()
         }));
         
         toast.success("Quiz created successfully!");
         navigate('/quiz');
       } else {
-        // If OpenAI failed, use mock data as fallback
-        sessionStorage.setItem('quizData', JSON.stringify({
-          source: selectedFile ? selectedFile.name : 'Text input',
-          difficulty,
-          questionTypes: selectedQuestionTypes,
-          numQuestions,
-          createdAt: new Date().toISOString()
-        }));
-        
-        toast.success("Quiz created with sample questions (API fallback)");
-        navigate('/quiz');
+        setCatMessage("I couldn't create a good quiz from this content. Please provide more detailed study material.");
+        toast.error("Unable to generate quiz. Please provide more detailed content or try a different file.");
+        setIsProcessing(false);
       }
     } catch (error) {
       console.error("Error creating quiz:", error);

@@ -60,7 +60,7 @@ export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
         id: index,
         type: 'open-ended',
         question: q.domanda,
-        correctAnswer: '',
+        correctAnswer: q.risposta_corretta || '',
         explanation: ''
       };
     }
@@ -74,15 +74,28 @@ export const generateQuiz = async (content: string): Promise<GeneratedQuiz | nul
     if (!apiKey) {
       return null;
     }
+    
+    // Check if content is sufficient
+    if (content.trim().length < 200) {
+      toast.error("Il contenuto fornito è troppo breve per generare un quiz significativo. Fornisci più testo o carica un file più completo.");
+      return null;
+    }
 
-    const prompt = `Sei un tutor AI specializzato nella creazione di quiz personalizzati. Analizza il seguente materiale di studio e genera un quiz che valuti la comprensione dell'utente.
+    const prompt = `Sei un tutor AI specializzato nella creazione di quiz personalizzati. Analizza ATTENTAMENTE il seguente materiale di studio e genera un quiz che valuti SOLO ed ESCLUSIVAMENTE la comprensione dei concetti presenti nel testo fornito.
 
-### Requisiti:
-- Usa solo le informazioni presenti nel testo fornito.
-- Genera un quiz con:
+### IMPORTANTE:
+- Usa SOLO le informazioni ESPLICITAMENTE presenti nel testo fornito.
+- NON inventare concetti o fatti non menzionati nel documento.
+- Se il testo non contiene abbastanza informazioni per generare 6 domande di qualità, genera solo le domande possibili in base al contenuto disponibile.
+- Assicurati che ogni domanda sia direttamente collegabile a sezioni specifiche del testo fornito.
+
+### Requisiti per il quiz:
+- Genera un quiz con (se il contenuto è sufficiente):
   - 3 domande a scelta multipla (con 4 opzioni e una sola risposta corretta).
   - 2 domande vero/falso.
   - 1 domanda aperta.
+- Le domande devono verificare la comprensione di concetti REALMENTE presenti nel testo.
+- Per le domande a scelta multipla, tutte le opzioni devono essere plausibili e coerenti con il testo.
 - Il formato della risposta deve essere JSON.
 
 ### Testo da analizzare:
@@ -104,7 +117,8 @@ ${content}
     },
     {
       "tipo": "aperta",
-      "domanda": "Spiega il concetto di fotosintesi clorofilliana."
+      "domanda": "Spiega il concetto di fotosintesi clorofilliana.",
+      "risposta_corretta": "È il processo attraverso cui le piante convertono la luce solare in energia chimica, utilizzando acqua e anidride carbonica per produrre glucosio e ossigeno."
     }
   ]
 }`;
@@ -119,11 +133,15 @@ ${content}
         model: 'gpt-4o',
         messages: [
           {
+            role: 'system',
+            content: 'Sei un esperto educatore che crea quiz basati ESCLUSIVAMENTE sul contenuto fornito. Non aggiungere mai informazioni che non sono presenti nel testo originale.'
+          },
+          {
             role: 'user',
             content: prompt
           }
         ],
-        temperature: 0.7,
+        temperature: 0.5, // Reduced temperature for more focused outputs
         max_tokens: 2000
       })
     });
@@ -178,12 +196,13 @@ export const gradeQuiz = async (
       };
     });
 
-    const prompt = `Sei un AI correttore di quiz. L'utente ha completato il quiz e ha fornito le seguenti risposte. Confronta le risposte con le corrette e fornisci un punteggio e una spiegazione.
+    const prompt = `Sei un AI correttore di quiz. L'utente ha completato il quiz e ha fornito le seguenti risposte. Confronta le risposte con le corrette e fornisci un punteggio e una spiegazione dettagliata.
 
 ### Requisiti:
 - Correggi ogni risposta e assegna un punteggio da 0 a 1.
-- Se la risposta è errata, spiega perché.
-- Per la domanda aperta, genera una valutazione dettagliata.
+- Se la risposta è errata, spiega perché e qual è la risposta corretta.
+- Per la domanda aperta, genera una valutazione dettagliata basata sul contenuto della risposta.
+- Sii equo e costruttivo nei feedback.
 
 ### Domande e risposte corrette:
 ${JSON.stringify(formattedQuestions, null, 2)}
@@ -221,6 +240,10 @@ ${JSON.stringify(formattedAnswers, null, 2)}
       body: JSON.stringify({
         model: 'gpt-4o',
         messages: [
+          {
+            role: 'system',
+            content: 'Sei un educatore esperto che valuta le risposte a un quiz in modo equo e costruttivo.'
+          },
           {
             role: 'user',
             content: prompt
@@ -271,3 +294,4 @@ The mitochondrion (plural mitochondria) is a double-membrane-bound organelle fou
 
 The word "mitochondrion" comes from the Greek μίτος, mitos, "thread", and χονδρίον, chondrion, "granule" or "grain-like". Mitochondria are commonly between 0.75 and 3 μm in diameter but vary considerably in size and structure. Unless specifically stained, they are not visible. Mitochondrial biogenesis is in turn temporally coordinated with these cellular processes.`;
 };
+
