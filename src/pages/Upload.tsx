@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileUp, BookOpen, Settings, Sparkles, ArrowRight } from 'lucide-react';
@@ -26,7 +25,7 @@ const Upload = () => {
   const [selectedQuestionTypes, setSelectedQuestionTypes] = useState<string[]>(['multiple-choice', 'true-false']);
   const [numQuestions, setNumQuestions] = useState(10);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [catMessage, setCatMessage] = useState('Upload your notes or paste your text. I'll help create the perfect quiz!');
+  const [catMessage, setCatMessage] = useState("Upload your notes or paste your text. I'll help create the perfect quiz!");
 
   const handleFileUpload = (file: File) => {
     setSelectedFile(file);
@@ -51,7 +50,6 @@ const Upload = () => {
   };
 
   const handleCreateQuiz = async () => {
-    // Validate input
     if (!selectedFile && textInput.trim().length < 50) {
       toast.error("Please upload a file or enter more text to generate a quiz");
       setCatMessage("I need more material to work with! Please upload a file or add more text.");
@@ -61,15 +59,11 @@ const Upload = () => {
     setCatMessage("Processing your materials... This is exciting! I'm creating challenging questions just for you.");
     setIsProcessing(true);
 
-    // Simulate processing delay
     try {
-      // In a real app, you would send the file/text to an API
       await new Promise(resolve => setTimeout(resolve, 2500));
       
-      // Mock successful processing
       toast.success("Quiz created successfully!");
       
-      // Store mock data in session storage for the quiz page
       sessionStorage.setItem('quizData', JSON.stringify({
         source: selectedFile ? selectedFile.name : 'Text input',
         difficulty,
