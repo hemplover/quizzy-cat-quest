@@ -1,12 +1,29 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileUp, BookOpen, Settings, Sparkles, ArrowRight, FileText, CheckCircle2 } from 'lucide-react';
 import FileUpload from '@/components/FileUpload';
 import CatTutor from '@/components/CatTutor';
 import { toast } from 'sonner';
-import { extractTextFromFile, generateQuiz, transformQuizQuestions } from '@/services/openaiService';
+import { extractTextFromFile } from '@/services/openaiService';
+import { 
+  generateQuiz, 
+  transformQuizQuestions,
+  hasValidApiKey,
+  providerSupportsFileUpload,
+  processFile
+} from '@/services/quizService';
 import ApiKeyForm from '@/components/ApiKeyForm';
+import AIProviderSelector from '@/components/AIProviderSelector';
+import SubjectSelector from '@/components/SubjectSelector';
+import { 
+  AIProvider, 
+  getSelectedProvider 
+} from '@/services/aiProviderService';
+import {
+  getSubjects,
+  createDocument,
+  createQuiz as createQuizRecord
+} from '@/services/subjectService';
 
 const difficultyLevels = [
   { id: 'beginner', name: 'Beginner', description: 'Basic recall questions' },
@@ -33,15 +50,30 @@ const Upload = () => {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [isTextExtracted, setIsTextExtracted] = useState(false);
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
+  const [selectedAIProvider, setSelectedAIProvider] = useState<AIProvider>(getSelectedProvider());
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if API key is already set
-    const key = localStorage.getItem('openai_api_key');
-    setHasApiKey(!!key);
+    setHasApiKey(hasValidApiKey());
+    
+    const subjects = getSubjects();
+    if (subjects.length > 0 && !selectedSubject) {
+      setSelectedSubject(subjects[0].id);
+    }
   }, []);
 
-  const handleApiKeySubmit = (key: string) => {
+  const handleApiKeySubmit = (key: string, provider: AIProvider) => {
+    setSelectedAIProvider(provider);
     setHasApiKey(true);
+  };
+  
+  const handleProviderChange = (provider: AIProvider) => {
+    setSelectedAIProvider(provider);
+    setHasApiKey(hasValidApiKey());
+  };
+  
+  const handleSubjectChange = (subjectId: string) => {
+    setSelectedSubject(subjectId);
   };
 
   const handleFileUpload = async (file: File) => {
@@ -52,8 +84,7 @@ const Upload = () => {
     setIsProcessing(true);
     
     try {
-      // Extract text from the file
-      const text = await extractTextFromFile(file);
+      const text = await processFile(file);
       
       if (!text || text.trim().length < 100) {
         toast.error("Impossibile estrarre abbastanza testo dal file. Prova con un altro file o incolla il testo direttamente.");
@@ -114,9 +145,13 @@ const Upload = () => {
       return;
     }
 
-    // Check if we have an API key
+    if (!selectedSubject) {
+      toast.error("Please select a subject first");
+      return;
+    }
+
     if (!hasApiKey) {
-      toast.error("Please set your OpenAI API key first");
+      toast.error(`Please set your ${selectedAIProvider.toUpperCase()} API key first`);
       return;
     }
 
@@ -124,14 +159,28 @@ const Upload = () => {
     setIsGeneratingQuiz(true);
 
     try {
-      // Generate quiz using OpenAI
       const generatedQuiz = await generateQuiz(extractedText);
       
       if (generatedQuiz && generatedQuiz.quiz && generatedQuiz.quiz.length > 0) {
-        // Transform the quiz to our app's format
         const questions = transformQuizQuestions(generatedQuiz);
         
-        // Store quiz in session storage
+        if (selectedFile || textInput) {
+          const document = createDocument({
+            subjectId: selectedSubject,
+            name: selectedFile ? selectedFile.name : 'Text Input ' + new Date().toLocaleString(),
+            content: extractedText,
+            fileType: selectedFile ? selectedFile.type : 'text/plain',
+            fileSize: selectedFile ? selectedFile.size : new Blob([extractedText]).size
+          });
+          
+          createQuizRecord({
+            subjectId: selectedSubject,
+            documentId: document.id,
+            title: `Quiz on ${selectedFile ? selectedFile.name : 'Text Input'}`,
+            questions: questions
+          });
+        }
+        
         sessionStorage.setItem('quizQuestions', JSON.stringify(questions));
         sessionStorage.setItem('quizData', JSON.stringify({
           source: selectedFile ? selectedFile.name : 'Text input',
@@ -166,14 +215,30 @@ const Upload = () => {
           </p>
         </div>
         <div className="flex flex-col items-end">
-          <CatTutor message={catMessage} emotion={isProcessing ? "thinking" : isTextExtracted ? "happy" : "neutral"} />
-          <div className="mt-2">
-            <ApiKeyForm onKeySubmit={handleApiKeySubmit} />
-          </div>
+          <CatTutor 
+            message={catMessage} 
+            emotion={isProcessing ? "thinking" : isTextExtracted ? "happy" : "confused"} 
+          />
         </div>
       </div>
       
       <div className="glass-card p-6 rounded-xl mb-8">
+        <div className="grid md:grid-cols-2 gap-6 mb-6">
+          <AIProviderSelector 
+            onProviderChange={handleProviderChange} 
+          />
+          
+          <ApiKeyForm 
+            onKeySubmit={handleApiKeySubmit} 
+          />
+        </div>
+        
+        <SubjectSelector
+          selectedSubject={selectedSubject}
+          onSubjectChange={handleSubjectChange}
+          className="mb-6"
+        />
+        
         <div className="flex items-center gap-2 mb-4">
           <FileUp className="w-5 h-5 text-cat" />
           <h2 className="text-xl font-medium">Step 1: Upload Document or Paste Text</h2>
@@ -196,7 +261,7 @@ const Upload = () => {
             className="w-full h-40 p-4 border rounded-lg focus:ring-cat focus:border-cat focus:outline-none transition-colors"
             placeholder="Paste your study notes, text or content here..."
             value={textInput}
-            onChange={handleTextInputChange}
+            onChange={(e) => setTextInput(e.target.value)}
             disabled={isProcessing}
           ></textarea>
           

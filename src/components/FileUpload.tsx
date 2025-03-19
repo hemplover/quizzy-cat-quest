@@ -3,6 +3,8 @@ import React, { useState, useRef } from 'react';
 import { FileUp, X, File, FileText, Image, Film, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { providerSupportsFileUpload } from '@/services/quizService';
+import { getSelectedProvider } from '@/services/aiProviderService';
 
 interface FileUploadProps {
   onFileUpload: (file: File) => void;
@@ -20,6 +22,17 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [supportsFileUpload, setSupportsFileUpload] = useState(providerSupportsFileUpload());
+  const [selectedProvider, setSelectedProvider] = useState(getSelectedProvider());
+
+  // Update supported file types when the provider changes
+  React.useEffect(() => {
+    const provider = getSelectedProvider();
+    if (provider !== selectedProvider) {
+      setSelectedProvider(provider);
+      setSupportsFileUpload(providerSupportsFileUpload());
+    }
+  }, [selectedProvider]);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();

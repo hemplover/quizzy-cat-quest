@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Upload from "./pages/Upload";
 import Quiz from "./pages/Quiz";
 import Dashboard from "./pages/Dashboard";
+import SubjectManager from "./pages/SubjectManager";
 import NotFound from "./pages/NotFound";
 import Layout from "./components/Layout";
 
@@ -49,6 +50,14 @@ const App = () => (
             element={
               <Layout>
                 <Dashboard />
+              </Layout>
+            } 
+          />
+          <Route 
+            path="/subjects" 
+            element={
+              <Layout>
+                <SubjectManager />
               </Layout>
             } 
           />

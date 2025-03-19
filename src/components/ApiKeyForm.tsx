@@ -1,48 +1,96 @@
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Key, Check } from 'lucide-react';
+import { Settings, Key, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { 
+  AI_PROVIDERS, 
+  AIProvider,
+  getSelectedProvider 
+} from '@/services/aiProviderService';
+import AIProviderSelector from './AIProviderSelector';
 
 interface ApiKeyFormProps {
-  onKeySubmit: (key: string) => void;
+  onKeySubmit: (key: string, provider: AIProvider) => void;
+  className?: string;
 }
 
-const ApiKeyForm: React.FC<ApiKeyFormProps> = ({ onKeySubmit }) => {
-  const [apiKey, setApiKey] = useState('');
+const ApiKeyForm: React.FC<ApiKeyFormProps> = ({ 
+  onKeySubmit,
+  className
+}) => {
+  const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [isVisible, setIsVisible] = useState(false);
-  const [hasKey, setHasKey] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<AIProvider>(getSelectedProvider());
+  const [hasKeys, setHasKeys] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    // Check if key already exists in local storage
-    const storedKey = localStorage.getItem('openai_api_key');
-    if (storedKey) {
-      setHasKey(true);
-    }
+    // Check if keys already exist in local storage
+    const keysStatus: Record<string, boolean> = {};
+    const savedKeys: Record<string, string> = {};
+    
+    AI_PROVIDERS.forEach(provider => {
+      const storedKey = localStorage.getItem(provider.apiKeyName);
+      keysStatus[provider.id] = !!storedKey;
+      
+      if (storedKey) {
+        savedKeys[provider.id] = storedKey;
+      } else {
+        savedKeys[provider.id] = '';
+      }
+    });
+    
+    setHasKeys(keysStatus);
+    setApiKeys(savedKeys);
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const currentProvider = AI_PROVIDERS.find(p => p.id === selectedProvider);
+    if (!currentProvider) {
+      toast.error("Invalid provider selected");
+      return;
+    }
+    
+    const apiKey = apiKeys[selectedProvider];
     if (!apiKey || apiKey.trim().length < 10) {
-      toast.error("Please enter a valid API key");
+      toast.error(`Please enter a valid API key for ${currentProvider.name}`);
       return;
     }
 
-    // Store in localStorage for demo purposes
-    // In a real app, this should be handled server-side
-    localStorage.setItem('openai_api_key', apiKey);
-    onKeySubmit(apiKey);
-    setHasKey(true);
-    toast.success("API key saved successfully");
+    // Store in localStorage
+    localStorage.setItem(currentProvider.apiKeyName, apiKey);
+    
+    // Update has keys
+    setHasKeys({
+      ...hasKeys,
+      [selectedProvider]: true
+    });
+    
+    onKeySubmit(apiKey, selectedProvider);
+    toast.success(`${currentProvider.name} API key saved successfully`);
   };
 
-  if (!isVisible && hasKey) {
+  const handleProviderChange = (provider: AIProvider) => {
+    setSelectedProvider(provider);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>, provider: AIProvider) => {
+    setApiKeys({
+      ...apiKeys,
+      [provider]: e.target.value
+    });
+  };
+
+  if (!isVisible && Object.values(hasKeys).some(Boolean)) {
     return (
       <button
         onClick={() => setIsVisible(true)}
         className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
         <Settings className="w-3 h-3" />
-        <span>Change API Key</span>
+        <span>Manage API Keys</span>
       </button>
     );
   }
@@ -54,38 +102,52 @@ const ApiKeyForm: React.FC<ApiKeyFormProps> = ({ onKeySubmit }) => {
         className="cat-button-secondary text-sm"
       >
         <Settings className="w-4 h-4" />
-        Set OpenAI API Key
+        Set AI API Keys
       </button>
     );
   }
 
   return (
-    <div className="glass-card p-4 rounded-xl mb-4">
-      <div className="flex items-center gap-2 mb-3">
-        <Key className="w-4 h-4 text-cat" />
-        <h3 className="text-sm font-medium">OpenAI API Key</h3>
+    <div className={`glass-card p-4 rounded-xl mb-4 ${className}`}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Key className="w-4 h-4 text-cat" />
+          <h3 className="text-sm font-medium">AI Provider API Keys</h3>
+        </div>
+        <button 
+          type="button"
+          onClick={() => setIsVisible(false)}
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
+          Close
+        </button>
       </div>
+      
+      <AIProviderSelector 
+        onProviderChange={handleProviderChange} 
+        className="mb-4"
+      />
       
       <form onSubmit={handleSubmit} className="space-y-3">
         <p className="text-xs text-muted-foreground">
-          Enter your OpenAI API key to generate custom quizzes. For demo purposes, the key is stored in your browser. In a production app, this would be server-side.
+          Enter your API key for the selected provider. For demo purposes, the key is stored in your browser.
+          In a production app, this would be handled server-side.
         </p>
         
         <div className="relative">
-          <input
+          <Input
             type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="sk-..."
-            className="w-full p-2 text-sm border rounded focus:ring-cat focus:border-cat focus:outline-none"
+            value={apiKeys[selectedProvider] || ''}
+            onChange={(e) => handleInputChange(e, selectedProvider)}
+            placeholder={`${selectedProvider === 'openai' ? 'sk-...' : 'Enter API key'}`}
+            className="w-full text-sm focus:ring-cat focus:border-cat"
           />
-          <button
-            type="button"
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            onClick={() => setIsVisible(false)}
-          >
-            {hasKey ? <Check className="w-4 h-4 text-green-500" /> : null}
-          </button>
+          
+          {hasKeys[selectedProvider] && (
+            <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+              <Check className="w-4 h-4 text-green-500" />
+            </div>
+          )}
         </div>
         
         <div className="flex gap-2">
@@ -94,13 +156,6 @@ const ApiKeyForm: React.FC<ApiKeyFormProps> = ({ onKeySubmit }) => {
             className="cat-button-secondary text-xs py-1 px-3"
           >
             Save Key
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsVisible(false)}
-            className="text-xs text-muted-foreground hover:text-foreground"
-          >
-            Cancel
           </button>
         </div>
       </form>
