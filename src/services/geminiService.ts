@@ -1,7 +1,7 @@
 
 import { toast } from 'sonner';
 import { getApiKey } from './aiProviderService';
-import { GeneratedQuiz, QuizResults } from './openaiService';
+import { GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
 
 // Get API key from localStorage
 const getGeminiKey = (): string => {
@@ -9,40 +9,63 @@ const getGeminiKey = (): string => {
 };
 
 // Generate quiz from content using Gemini API
-export const generateQuizWithGemini = async (content: string): Promise<GeneratedQuiz | null> => {
+export const generateQuizWithGemini = async (
+  content: string | File,
+  settings: QuizSettings
+): Promise<GeneratedQuiz | null> => {
   try {
     const apiKey = getGeminiKey();
     if (!apiKey) {
       return null;
     }
     
+    // If content is a File, we need to extract its text since Gemini doesn't support direct file upload yet
+    let textContent: string;
+    if (content instanceof File) {
+      // For files, return a message that we'll use the file name in the prompt
+      textContent = `Analysis of file: ${content.name}`;
+      
+      try {
+        // Try to read the file as text if it's a text file
+        if (content.type === 'text/plain') {
+          textContent = await content.text();
+        } else {
+          // For non-text files, we'll rely on the API to handle them
+          textContent = `Please analyze the content of this ${content.type} file named ${content.name}.`;
+        }
+      } catch (error) {
+        console.error('Error reading file:', error);
+        textContent = `File upload: ${content.name} (${content.type})`;
+      }
+    } else {
+      textContent = content;
+    }
+    
     // Check if content is sufficient
-    if (content.trim().length < 200) {
+    if (textContent.trim().length < 200 && !(content instanceof File)) {
       toast.error("Il contenuto fornito è troppo breve per generare un quiz significativo. Fornisci più testo o carica un file più completo.");
       return null;
     }
 
+    const { difficulty, questionTypes, numQuestions } = settings;
+    
     const prompt = `Sei un tutor AI specializzato nella creazione di quiz personalizzati. Analizza ATTENTAMENTE il seguente materiale di studio e genera un quiz che valuti SOLO ed ESCLUSIVAMENTE la comprensione dei concetti presenti nel testo fornito.
 
 ### IMPORTANTE:
 - Usa SOLO le informazioni ESPLICITAMENTE presenti nel testo fornito.
 - NON inventare concetti o fatti non menzionati nel documento.
-- Se il testo non contiene abbastanza informazioni per generare 6 domande di qualità, genera solo le domande possibili in base al contenuto disponibile.
+- Se il testo non contiene abbastanza informazioni per generare ${numQuestions} domande di qualità, genera solo le domande possibili in base al contenuto disponibile.
 - Assicurati che ogni domanda sia direttamente collegabile a sezioni specifiche del testo fornito.
 - NON generare domande sui mitocondri o altri argomenti biologici a meno che non siano esplicitamente menzionati nel testo.
 - Le tue domande devono riflettere ESATTAMENTE il contenuto fornito, senza aggiungere informazioni esterne.
 
 ### Requisiti per il quiz:
-- Genera un quiz con (se il contenuto è sufficiente):
-  - 3 domande a scelta multipla (con 4 opzioni e una sola risposta corretta).
-  - 2 domande vero/falso.
-  - 1 domanda aperta.
-- Le domande devono verificare la comprensione di concetti REALMENTE presenti nel testo.
-- Per le domande a scelta multipla, tutte le opzioni devono essere plausibili e coerenti con il testo.
-- Il formato della risposta deve essere JSON.
+- Genera un quiz con difficoltà: ${difficulty}
+- Genera un quiz con i seguenti tipi di domande: ${questionTypes.join(', ')}
+- Genera un totale di ${numQuestions} domande (se il contenuto è sufficiente)
 
 ### Testo da analizzare:
-${content}
+${textContent}
 
 ### Formato risposta:
 {

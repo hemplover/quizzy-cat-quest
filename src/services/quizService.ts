@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { 
   AIProvider, 
@@ -62,11 +61,6 @@ export const generateQuiz = async (
     case 'openai':
       return generateOpenAIQuiz(content, settings);
     case 'gemini':
-      // For now, if it's a file and we're using Gemini, extract text
-      if (content instanceof File && !supportsFileUpload(provider)) {
-        const extractedText = await extractTextFromFile(content);
-        return generateQuizWithGemini(extractedText, settings);
-      }
       return generateQuizWithGemini(content, settings);
     case 'claude':
     case 'mistral':
