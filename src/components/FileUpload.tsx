@@ -11,13 +11,15 @@ interface FileUploadProps {
   accept?: string;
   maxSize?: number; // in MB
   className?: string;
+  showUploadButton?: boolean;
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({
   onFileUpload,
   accept = '.pdf,.doc,.docx,.ppt,.pptx,.txt,.jpg,.png',
   maxSize = 10, // 10MB default
-  className
+  className,
+  showUploadButton = true
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -126,33 +128,38 @@ const FileUpload: React.FC<FileUploadProps> = ({
       {!selectedFile ? (
         <div
           className={cn(
-            "border-2 border-dashed rounded-xl p-8 text-center transition-colors duration-200 cursor-pointer",
+            "border-2 border-dashed rounded-xl p-8 text-center transition-colors duration-200",
             isDragging 
               ? "border-cat bg-cat/5" 
               : "border-gray-300 hover:border-cat/50 hover:bg-gray-50",
+            showUploadButton ? "cursor-pointer" : "",
             className
           )}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={showUploadButton ? () => fileInputRef.current?.click() : undefined}
         >
           <div className="mx-auto w-12 h-12 rounded-full bg-cat/10 flex items-center justify-center mb-4">
             <FileUp className="w-6 h-6 text-cat" />
           </div>
           
-          <h3 className="text-lg font-medium mb-2">Drag and drop your file here</h3>
+          <h3 className="text-lg font-medium mb-2">
+            {showUploadButton ? "Drag and drop your file here" : "Drop your file here"}
+          </h3>
           <p className="text-sm text-muted-foreground mb-4">
             Support for {accept.replace(/\./g, '')} files.
             <br />Max size: {maxSize}MB
           </p>
           
-          <button 
-            type="button" 
-            className="cat-button-secondary text-sm py-2"
-          >
-            Select from computer
-          </button>
+          {showUploadButton && (
+            <button 
+              type="button" 
+              className="cat-button-secondary text-sm py-2"
+            >
+              Select from computer
+            </button>
+          )}
           
           <input
             type="file"

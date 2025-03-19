@@ -4,7 +4,8 @@ import {
   AIProvider, 
   getSelectedProvider, 
   getApiKey,
-  supportsFileUpload 
+  supportsFileUpload,
+  getDefaultModel
 } from './aiProviderService';
 import { 
   extractTextFromFile, 
@@ -15,29 +16,7 @@ import {
   generateQuizWithGemini,
   gradeQuizWithGemini
 } from './geminiService';
-
-// Types for quiz generation
-export interface QuizQuestion {
-  tipo: string;
-  domanda: string;
-  opzioni?: string[];
-  risposta_corretta: string;
-}
-
-export interface GeneratedQuiz {
-  quiz: QuizQuestion[];
-}
-
-export interface QuizResults {
-  risultati: Array<{
-    domanda: string;
-    risposta_utente: string | number;
-    corretto: boolean | string;
-    punteggio: number;
-    spiegazione: string;
-  }>;
-  punteggio_totale: number;
-}
+import { QuizQuestion, GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
 
 // Transform generated questions to our app format
 export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
@@ -73,14 +52,22 @@ export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
 };
 
 // Generate quiz based on the selected AI provider
-export const generateQuiz = async (content: string): Promise<GeneratedQuiz | null> => {
+export const generateQuiz = async (
+  content: string | File,
+  settings: QuizSettings
+): Promise<GeneratedQuiz | null> => {
   const provider = getSelectedProvider();
   
   switch (provider) {
     case 'openai':
-      return generateOpenAIQuiz(content);
+      return generateOpenAIQuiz(content, settings);
     case 'gemini':
-      return generateQuizWithGemini(content);
+      // For now, if it's a file and we're using Gemini, extract text
+      if (content instanceof File && !supportsFileUpload(provider)) {
+        const extractedText = await extractTextFromFile(content);
+        return generateQuizWithGemini(extractedText, settings);
+      }
+      return generateQuizWithGemini(content, settings);
     case 'claude':
     case 'mistral':
       toast.error(`Integration with ${provider} is coming soon!`);
@@ -125,16 +112,23 @@ export const providerSupportsFileUpload = (): boolean => {
   return supportsFileUpload();
 };
 
-// Process file based on AI provider capabilities
-export const processFile = async (file: File): Promise<string> => {
+// Process file based on AI provider capabilities - now returns the file directly 
+// if the provider supports direct file upload
+export const processFile = async (file: File): Promise<string | File> => {
   const provider = getSelectedProvider();
   
   if (supportsFileUpload(provider)) {
-    // For providers that support direct file processing, we'll just extract the text
-    // In a real app, we would handle direct file uploads to these providers
-    return extractTextFromFile(file);
+    // For providers that support direct file uploads, return the file directly
+    console.log(`Provider ${provider} supports direct file upload, passing file through`);
+    return file;
   } else {
-    // For providers that don't support file upload, we extract the text locally
+    // For providers that don't support file upload, extract the text locally
+    console.log(`Provider ${provider} doesn't support direct file upload, extracting text`);
     return extractTextFromFile(file);
   }
+};
+
+// Get the appropriate model to use based on provider
+export const getModelToUse = (): string => {
+  return getDefaultModel();
 };

@@ -9,6 +9,7 @@ import Upload from "./pages/Upload";
 import Quiz from "./pages/Quiz";
 import Dashboard from "./pages/Dashboard";
 import SubjectManager from "./pages/SubjectManager";
+import SubjectDetail from "./pages/SubjectDetail";
 import NotFound from "./pages/NotFound";
 import Layout from "./components/Layout";
 
@@ -58,6 +59,14 @@ const App = () => (
             element={
               <Layout>
                 <SubjectManager />
+              </Layout>
+            } 
+          />
+          <Route 
+            path="/subjects/:subjectId" 
+            element={
+              <Layout>
+                <SubjectDetail />
               </Layout>
             } 
           />

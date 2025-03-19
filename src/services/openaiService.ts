@@ -1,5 +1,6 @@
 
 import { toast } from 'sonner';
+import { QuizQuestion, GeneratedQuiz, QuizResults } from '@/types/quiz';
 
 // Get API key from localStorage
 const getOpenAIKey = (): string => {
@@ -10,29 +11,6 @@ const getOpenAIKey = (): string => {
   }
   return key;
 };
-
-// Types for quiz generation
-export interface QuizQuestion {
-  tipo: string;
-  domanda: string;
-  opzioni?: string[];
-  risposta_corretta: string;
-}
-
-export interface GeneratedQuiz {
-  quiz: QuizQuestion[];
-}
-
-export interface QuizResults {
-  risultati: Array<{
-    domanda: string;
-    risposta_utente: string | number;
-    corretto: boolean | string;
-    punteggio: number;
-    spiegazione: string;
-  }>;
-  punteggio_totale: number;
-}
 
 // Transform generated questions to our app format
 export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
@@ -67,57 +45,56 @@ export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
   });
 };
 
-// Helper to log the extracted text for debugging
-const logExtractedText = (text: string): void => {
-  console.log("Extracted text (first 500 chars):", text.substring(0, 500));
-  console.log("Text length:", text.length);
-}
-
 // Generate quiz from content
-export const generateQuiz = async (content: string): Promise<GeneratedQuiz | null> => {
+export const generateQuiz = async (
+  content: string | File, 
+  options: {
+    difficulty: string;
+    questionTypes: string[];
+    numQuestions: number;
+  }
+): Promise<GeneratedQuiz | null> => {
   try {
     const apiKey = getOpenAIKey();
     if (!apiKey) {
       return null;
     }
     
-    // Log extracted text to debug
-    logExtractedText(content);
+    // Initialize a base prompt that includes quiz settings
+    const { difficulty, questionTypes, numQuestions } = options;
     
-    // Check if content is sufficient
-    if (content.trim().length < 200) {
-      toast.error("Il contenuto fornito è troppo breve per generare un quiz significativo. Fornisci più testo o carica un file più completo.");
-      return null;
-    }
+    // Create a base system prompt with emphasis on content relevance
+    const systemPrompt = `Sei un esperto educatore che crea quiz basati ESCLUSIVAMENTE sul contenuto fornito. 
+Non aggiungere MAI informazioni che non sono presenti nel testo originale. 
+Se il testo fornito non è sufficientemente dettagliato o specifico, produci solo le domande che puoi giustificare direttamente dal testo. 
+NON INVENTARE FATTI O DOMANDE NON PRESENTI NEL TESTO.
 
-    const prompt = `Sei un tutor AI specializzato nella creazione di quiz personalizzati. Analizza ATTENTAMENTE il seguente materiale di studio e genera un quiz che valuti SOLO ed ESCLUSIVAMENTE la comprensione dei concetti presenti nel testo fornito.
+Difficoltà: ${difficulty}
+Tipi di domande: ${questionTypes.join(', ')}
+Numero di domande: ${numQuestions}`;
+
+    // Create the prompt based on whether we're using text or direct file upload
+    const userPrompt = `Sei un tutor AI specializzato nella creazione di quiz personalizzati. Analizza ATTENTAMENTE il materiale di studio e genera un quiz che valuti SOLO ed ESCLUSIVAMENTE la comprensione dei concetti presenti nel testo fornito.
 
 ### IMPORTANTE:
 - Usa SOLO le informazioni ESPLICITAMENTE presenti nel testo fornito.
 - NON inventare concetti o fatti non menzionati nel documento.
-- Se il testo non contiene abbastanza informazioni per generare 6 domande di qualità, genera solo le domande possibili in base al contenuto disponibile.
+- Se il testo non contiene abbastanza informazioni per generare ${numQuestions} domande di qualità, genera solo le domande possibili in base al contenuto disponibile.
 - Assicurati che ogni domanda sia direttamente collegabile a sezioni specifiche del testo fornito.
 - NON generare domande sui mitocondri o altri argomenti biologici a meno che non siano esplicitamente menzionati nel testo.
 - Le tue domande devono riflettere ESATTAMENTE il contenuto fornito, senza aggiungere informazioni esterne.
 
 ### Requisiti per il quiz:
-- Genera un quiz con (se il contenuto è sufficiente):
-  - 3 domande a scelta multipla (con 4 opzioni e una sola risposta corretta).
-  - 2 domande vero/falso.
-  - 1 domanda aperta.
-- Le domande devono verificare la comprensione di concetti REALMENTE presenti nel testo.
-- Per le domande a scelta multipla, tutte le opzioni devono essere plausibili e coerenti con il testo.
-- Il formato della risposta deve essere JSON.
+- Genera un quiz con difficoltà: ${difficulty}
+- Genera un quiz con i seguenti tipi di domande: ${questionTypes.join(', ')}
+- Genera un totale di ${numQuestions} domande (se il contenuto è sufficiente)
 
-### Testo da analizzare:
-${content}
-
-### Esempio di output:
+### Il formato della risposta deve essere JSON:
 {
   "quiz": [
     {
-      "tipo": "scelta_multipla",
-      "domanda": "Qual è il concetto principale discusso nel testo?",
+      "tipo": "scelta_multipla", 
+      "domanda": "Domanda basata direttamente sul testo",
       "opzioni": ["Opzione 1", "Opzione 2", "Opzione 3", "Opzione 4"],
       "risposta_corretta": "Opzione corretta presente nel testo"
     },
@@ -134,65 +111,161 @@ ${content}
   ]
 }`;
 
-    // Log the prompt for debugging
-    console.log("Sending prompt to OpenAI");
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: 'Sei un esperto educatore che crea quiz basati ESCLUSIVAMENTE sul contenuto fornito. Non aggiungere MAI informazioni che non sono presenti nel testo originale. Se il testo fornito non è sufficientemente dettagliato o specifico, produci solo le domande che puoi giustificare direttamente dal testo. NON INVENTARE FATTI O DOMANDE NON PRESENTI NEL TESTO.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.3, // Reduced temperature for more focused outputs
-        max_tokens: 2000
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("OpenAI API error:", errorData);
-      throw new Error(`OpenAI API returned ${response.status}: ${JSON.stringify(errorData)}`);
-    }
-
-    const data = await response.json();
-    console.log("OpenAI response received");
-    
-    const responseContent = data.choices[0].message.content;
-    console.log("Response content:", responseContent.substring(0, 200) + "...");
-    
-    // Extract JSON from the response
-    const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error("Could not parse JSON from API response");
-      throw new Error('Could not parse JSON from API response');
-    }
-    
-    try {
-      const parsedJson = JSON.parse(jsonMatch[0]) as GeneratedQuiz;
+    // If content is a File, send it directly to OpenAI
+    if (content instanceof File) {
+      console.log(`Sending file ${content.name} directly to OpenAI`);
       
-      // Validate that we have at least some questions
-      if (!parsedJson.quiz || parsedJson.quiz.length === 0) {
-        toast.error("Non è stato possibile generare domande dal testo fornito. Il contenuto potrebbe essere troppo breve o non specifico.");
-        return null;
+      // Create a FormData object to handle file uploads
+      const formData = new FormData();
+      
+      // First, upload the file to OpenAI
+      const fileUploadResponse = await fetch('https://api.openai.com/v1/files', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: formData
+      });
+      
+      // For vision models like GPT-4o, we need to encode file as base64
+      const fileArrayBuffer = await content.arrayBuffer();
+      const fileBase64 = btoa(
+        new Uint8Array(fileArrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+      );
+      
+      // Since direct file upload requires different handling, we'll use the vision API for simplicity
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini', // Using GPT-4o Mini as default
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: userPrompt },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:${content.type};base64,${fileBase64}`
+                  }
+                }
+              ]
+            }
+          ],
+          temperature: 0.3,
+          max_tokens: 2000
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("OpenAI API error:", errorData);
+        throw new Error(`OpenAI API returned ${response.status}: ${JSON.stringify(errorData)}`);
+      }
+
+      const data = await response.json();
+      console.log("OpenAI response received");
+      
+      const responseContent = data.choices[0].message.content;
+      console.log("Response content:", responseContent.substring(0, 200) + "...");
+      
+      // Extract JSON from the response
+      const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.error("Could not parse JSON from API response");
+        throw new Error('Could not parse JSON from API response');
       }
       
-      console.log(`Generated ${parsedJson.quiz.length} questions`);
-      return parsedJson;
-    } catch (parseError) {
-      console.error("Error parsing JSON:", parseError);
-      throw new Error('Error parsing quiz data from API response');
+      try {
+        const parsedJson = JSON.parse(jsonMatch[0]) as GeneratedQuiz;
+        
+        // Validate that we have at least some questions
+        if (!parsedJson.quiz || parsedJson.quiz.length === 0) {
+          toast.error("Non è stato possibile generare domande dal testo fornito. Il contenuto potrebbe essere troppo breve o non specifico.");
+          return null;
+        }
+        
+        console.log(`Generated ${parsedJson.quiz.length} questions`);
+        return parsedJson;
+      } catch (parseError) {
+        console.error("Error parsing JSON:", parseError);
+        throw new Error('Error parsing quiz data from API response');
+      }
+    } else {
+      // Text-based content flow
+      console.log("Sending text content to OpenAI");
+      
+      // Check if content is sufficient
+      if (content.trim().length < 200) {
+        toast.error("Il contenuto fornito è troppo breve per generare un quiz significativo. Fornisci più testo o carica un file più completo.");
+        return null;
+      }
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini', // Using GPT-4o Mini as default
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: userPrompt + `\n\n### Testo da analizzare:\n${content}`
+            }
+          ],
+          temperature: 0.3,
+          max_tokens: 2000
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("OpenAI API error:", errorData);
+        throw new Error(`OpenAI API returned ${response.status}: ${JSON.stringify(errorData)}`);
+      }
+
+      const data = await response.json();
+      console.log("OpenAI response received");
+      
+      const responseContent = data.choices[0].message.content;
+      console.log("Response content:", responseContent.substring(0, 200) + "...");
+      
+      // Extract JSON from the response
+      const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.error("Could not parse JSON from API response");
+        throw new Error('Could not parse JSON from API response');
+      }
+      
+      try {
+        const parsedJson = JSON.parse(jsonMatch[0]) as GeneratedQuiz;
+        
+        // Validate that we have at least some questions
+        if (!parsedJson.quiz || parsedJson.quiz.length === 0) {
+          toast.error("Non è stato possibile generare domande dal testo fornito. Il contenuto potrebbe essere troppo breve o non specifico.");
+          return null;
+        }
+        
+        console.log(`Generated ${parsedJson.quiz.length} questions`);
+        return parsedJson;
+      } catch (parseError) {
+        console.error("Error parsing JSON:", parseError);
+        throw new Error('Error parsing quiz data from API response');
+      }
     }
   } catch (error) {
     console.error('Error generating quiz:', error);
@@ -201,7 +274,7 @@ ${content}
   }
 };
 
-// Grade user answers
+// Grade quiz based on the selected AI provider
 export const gradeQuiz = async (
   questions: any[], 
   userAnswers: any[]
@@ -272,7 +345,7 @@ ${JSON.stringify(formattedAnswers, null, 2)}
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -309,7 +382,7 @@ ${JSON.stringify(formattedAnswers, null, 2)}
   }
 };
 
-// Extract text from files
+// Extract text from files - for compatibility with older code paths
 export const extractTextFromFile = async (file: File): Promise<string> => {
   console.log(`Extracting text from ${file.name}, type: ${file.type}`);
   
@@ -320,96 +393,6 @@ export const extractTextFromFile = async (file: File): Promise<string> => {
     return text;
   }
   
-  // Handle Word documents (.docx)
-  const fileExtension = file.name.split('.').pop()?.toLowerCase();
-  
-  if (fileExtension === 'docx') {
-    try {
-      // Since we can't directly extract text from DOCX in the browser,
-      // we'll use a workaround by sending the file to OpenAI and asking it to extract the text
-      const apiKey = getOpenAIKey();
-      if (!apiKey) {
-        throw new Error("API key not found");
-      }
-      
-      // Convert file to base64
-      const arrayBuffer = await file.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer);
-      let binary = '';
-      for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      const base64 = btoa(binary);
-      
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('model', 'gpt-4o');
-      
-      // First, try to upload the file to OpenAI
-      console.log("Uploading DOCX file to OpenAI for text extraction");
-      
-      // Since direct file upload and extraction is complex in the browser,
-      // we'll simulate the extraction with a placeholder for the demo
-      // In a production app, you would use a server-side solution
-      return `[Extracted text from ${file.name}]
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam auctor, nisl eget ultricies tincidunt, 
-nisl nisl aliquam nisl, eget aliquam nisl nisl eget nisl. Nullam auctor, nisl eget ultricies tincidunt,
-nisl nisl aliquam nisl, eget aliquam nisl nisl eget nisl.
-
-Il documento contiene informazioni importanti su argomenti specifici che possono essere utilizzati
-per generare domande pertinenti. Questo è un documento di esempio che contiene informazioni
-che dovrebbero essere utilizzate per generare un quiz. Le domande dovrebbero essere basate
-esclusivamente su questo contenuto.
-
-Alcuni concetti chiave:
-- Il primo concetto importante riguarda come si struttura un'applicazione web moderna
-- React è una libreria JavaScript per la creazione di interfacce utente
-- I componenti sono blocchi di costruzione riutilizzabili in React
-- Gli hook sono funzioni che permettono di utilizzare lo stato e altre funzionalità di React
-
-In un'applicazione React, i componenti vengono renderizzati in base allo stato. Quando lo stato
-cambia, React aggiorna automaticamente l'interfaccia utente. Questo paradigma è chiamato
-"reattivo" perché l'interfaccia reagisce ai cambiamenti di stato.`;
-    } catch (error) {
-      console.error("Error extracting text from DOCX:", error);
-      toast.error("Impossibile estrarre il testo dal file Word. Prova con un altro formato.");
-      return "";
-    }
-  }
-  
-  // Handle PDF files
-  if (fileExtension === 'pdf' || file.type === 'application/pdf') {
-    // In a real app, you'd use a PDF.js or a similar library
-    // For the demo, we'll return a placeholder
-    return `[Extracted text from ${file.name} PDF document]
-
-Questo è un documento PDF di esempio che contiene informazioni specifiche su cui basare il quiz.
-Il documento tratta diversi argomenti che possono essere utilizzati per generare domande pertinenti.
-
-Il testo estratto dal PDF contiene:
-- Informazioni sulla storia dell'informatica
-- Evoluzione dei linguaggi di programmazione
-- Concetti di programmazione orientata agli oggetti
-- Differenze tra programmazione funzionale e imperativa
-
-La programmazione orientata agli oggetti (OOP) è un paradigma di programmazione basato sul concetto
-di "oggetti", che possono contenere dati e codice: dati sotto forma di campi (spesso noti come attributi
-o proprietà) e codice sotto forma di procedure (spesso noti come metodi).
-
-I linguaggi di programmazione più diffusi che supportano l'OOP includono Java, C++, Python e JavaScript.
-Ogni linguaggio implementa i concetti di OOP in modo leggermente diverso, ma tutti condividono i principi
-fondamentali di incapsulamento, ereditarietà e polimorfismo.`;
-  }
-  
-  // Default fallback for other file types
-  toast.warning(`Estrazione testo da ${fileExtension} non completamente supportata. Risultati potrebbero variare.`);
-  return `Il file caricato (${file.name}) non è in un formato ottimale per l'estrazione del testo.
-Per ottenere i migliori risultati, prova a caricare un file di testo (.txt) o incolla direttamente il testo.
-
-Il seguente testo è un esempio estratto dal file, ma potrebbe non essere completo o accurato:
-
-Esempio di contenuto estratto dal file che dovrebbe essere utilizzato per generare domande specifiche.
-Il quiz dovrebbe includere domande sulla programmazione, sui linguaggi di programmazione e sui paradigmi
-di programmazione come la programmazione orientata agli oggetti e la programmazione funzionale.`;
+  // For other file types, return a placeholder that indicates direct file upload is preferred
+  return `This file (${file.name}) will be processed directly by the AI service for better results.`;
 };
