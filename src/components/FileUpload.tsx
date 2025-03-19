@@ -48,11 +48,14 @@ const FileUpload: React.FC<FileUploadProps> = ({
   };
 
   const validateAndSetFile = (file: File) => {
-    // Check file type
-    const fileType = file.type.split('/')[1];
-    const acceptedTypes = accept.split(',').map(type => type.trim().replace('.', ''));
+    // Extract file extension
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
     
-    if (!acceptedTypes.includes(fileType) && !acceptedTypes.includes('*')) {
+    // Check if the extension is in the accepted list
+    const acceptedExtensions = accept.split(',').map(type => 
+      type.trim().replace('.', '').toLowerCase());
+    
+    if (!acceptedExtensions.includes(fileExtension || '') && !acceptedExtensions.includes('*')) {
       toast.error(`Invalid file type. Please upload ${accept} files.`);
       return;
     }
