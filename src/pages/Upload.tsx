@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FileUp, BookOpen, Settings, Sparkles, ArrowRight, FileText, CheckCircle2, Pencil, AlertCircle } from 'lucide-react';
@@ -98,13 +97,13 @@ const Upload = () => {
   const handleApiKeySubmit = (key: string, provider: AIProvider) => {
     setSelectedAIProvider(provider);
     setHasApiKey(true);
-    setSupportsFileUpload(providerSupportsFileUpload(provider));
+    setSupportsFileUpload(providerSupportsFileUpload());
   };
   
   const handleProviderChange = (provider: AIProvider) => {
     setSelectedAIProvider(provider);
     setHasApiKey(hasValidApiKey());
-    setSupportsFileUpload(providerSupportsFileUpload(provider));
+    setSupportsFileUpload(providerSupportsFileUpload());
     
     // Reset selected model to provider's default
     const providerConfig = AI_PROVIDERS.find(p => p.id === provider);

@@ -112,8 +112,8 @@ export const hasValidApiKey = (): boolean => {
 };
 
 // Check if the provider supports file upload
-export const providerSupportsFileUpload = (): boolean => {
-  return supportsFileUpload();
+export const providerSupportsFileUpload = (provider?: AIProvider): boolean => {
+  return supportsFileUpload(provider);
 };
 
 // Process file based on AI provider capabilities - now returns the file directly 
