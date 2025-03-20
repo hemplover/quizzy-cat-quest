@@ -1,10 +1,11 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { FileUp, X, File, FileText, Image, Film, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { providerSupportsFileUpload } from '@/services/quizService';
 import { getSelectedProvider } from '@/services/aiProviderService';
+import { useLanguage } from '@/i18n/LanguageContext';
 
 interface FileUploadProps {
   onFileUpload: (file: File) => void;
@@ -17,10 +18,11 @@ interface FileUploadProps {
 const FileUpload: React.FC<FileUploadProps> = ({
   onFileUpload,
   accept = '.pdf,.doc,.docx,.ppt,.pptx,.txt,.jpg,.png',
-  maxSize = 10, // 10MB default
+  maxSize = 20, // Increased to 20MB
   className,
   showUploadButton = true
 }) => {
+  const { t } = useLanguage();
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -28,7 +30,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const [selectedProvider, setSelectedProvider] = useState(getSelectedProvider());
 
   // Update supported file types when the provider changes
-  React.useEffect(() => {
+  useEffect(() => {
     const provider = getSelectedProvider();
     if (provider !== selectedProvider) {
       setSelectedProvider(provider);
@@ -63,6 +65,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
   };
 
   const validateAndSetFile = (file: File) => {
+    console.log(`Validating file: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
+    
     // Extract file extension
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
     
@@ -72,18 +76,28 @@ const FileUpload: React.FC<FileUploadProps> = ({
     
     if (!acceptedExtensions.includes(fileExtension || '') && !acceptedExtensions.includes('*')) {
       toast.error(`Invalid file type. Please upload ${accept} files.`);
+      console.error(`Invalid file type: ${fileExtension}. Accepted types: ${acceptedExtensions.join(', ')}`);
       return;
     }
     
     // Check file size
     if (file.size > maxSize * 1024 * 1024) {
       toast.error(`File too large. Maximum size is ${maxSize}MB.`);
+      console.error(`File too large: ${file.size} bytes. Maximum size: ${maxSize * 1024 * 1024} bytes`);
       return;
+    }
+    
+    // Check if the current provider supports file uploads
+    if (!supportsFileUpload) {
+      toast.warning(t('fileUploadNotSupported'));
+      console.warn(`Provider ${selectedProvider} does not support direct file uploads`);
+      // Still set the file but with a warning
     }
     
     setSelectedFile(file);
     onFileUpload(file);
-    toast.success(`${file.name} selected successfully!`);
+    toast.success(`${file.name} ${t('selectedFileSuccess')}`);
+    console.log(`File selected successfully: ${file.name}`);
   };
 
   const clearSelectedFile = () => {
@@ -145,11 +159,11 @@ const FileUpload: React.FC<FileUploadProps> = ({
           </div>
           
           <h3 className="text-lg font-medium mb-2">
-            {showUploadButton ? "Drag and drop your file here" : "Drop your file here"}
+            {showUploadButton ? t('dragDropFile') : t('dropFileHere')}
           </h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Support for {accept.replace(/\./g, '')} files.
-            <br />Max size: {maxSize}MB
+            {t('supportFor')} {accept.replace(/\./g, '')} {t('files')}.
+            <br />{t('maxSize')} {maxSize}MB
           </p>
           
           {showUploadButton && (
@@ -157,7 +171,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
               type="button" 
               className="cat-button-secondary text-sm py-2"
             >
-              Select from computer
+              {t('selectFromComputer')}
             </button>
           )}
           

@@ -1,195 +1,123 @@
 
 import { toast } from 'sonner';
 
-// Types for AI provider configuration
 export type AIProvider = 'openai' | 'gemini' | 'claude' | 'mistral';
 
-export interface AIProviderConfig {
-  name: string;
+interface AIProviderConfig {
   id: AIProvider;
-  description: string;
+  name: string;
   icon: string;
-  apiKeyName: string;
+  description: string;
+  models: Array<{ id: string; name: string }>;
   defaultModel: string;
-  models: Array<{
-    id: string;
-    name: string;
-    description: string;
-    capabilities: string[];
-  }>;
+  apiKeyRequired: boolean;
   supportsFileUpload: boolean;
-  supportsedFileTypes: string[];
 }
 
-// Available AI providers
 export const AI_PROVIDERS: AIProviderConfig[] = [
   {
-    name: 'OpenAI',
     id: 'openai',
-    description: 'Powerful AI models from OpenAI including GPT-4o',
+    name: 'OpenAI',
     icon: '🤖',
-    apiKeyName: 'openai_api_key',
+    description: 'Powerful AI models for text and image understanding',
+    models: [
+      { id: 'gpt-4o', name: 'GPT-4o (File Upload Support)' },
+      { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
+    ],
     defaultModel: 'gpt-4o',
-    models: [
-      {
-        id: 'gpt-4o',
-        name: 'GPT-4o',
-        description: 'Most powerful model with vision capabilities',
-        capabilities: ['text', 'images', 'files']
-      },
-      {
-        id: 'gpt-4o-mini',
-        name: 'GPT-4o Mini',
-        description: 'Faster and more cost-effective',
-        capabilities: ['text', 'images', 'files']
-      }
-    ],
-    supportsFileUpload: true,
-    supportsedFileTypes: ['.pdf', '.docx', '.txt', '.jpg', '.png']
+    apiKeyRequired: true,
+    supportsFileUpload: true
   },
   {
-    name: 'Google Gemini',
     id: 'gemini',
-    description: 'Advanced AI from Google',
-    icon: '🌀',
-    apiKeyName: 'gemini_api_key',
+    name: 'Google Gemini',
+    icon: '🌐',
+    description: 'Google\'s multimodal AI system',
+    models: [
+      { id: 'gemini-pro', name: 'Gemini Pro' },
+    ],
     defaultModel: 'gemini-pro',
-    models: [
-      {
-        id: 'gemini-pro',
-        name: 'Gemini Pro',
-        description: 'High performance model for text',
-        capabilities: ['text', 'images', 'files']
-      },
-      {
-        id: 'gemini-pro-vision',
-        name: 'Gemini Pro Vision',
-        description: 'Supports analyzing images and text',
-        capabilities: ['text', 'images', 'files']
-      }
-    ],
-    supportsFileUpload: true,
-    supportsedFileTypes: ['.pdf', '.docx', '.txt', '.jpg', '.png']
+    apiKeyRequired: true,
+    supportsFileUpload: false
   },
   {
-    name: 'Anthropic Claude',
     id: 'claude',
-    description: 'Claude AI models from Anthropic',
+    name: 'Anthropic Claude',
     icon: '🧠',
-    apiKeyName: 'claude_api_key',
-    defaultModel: 'claude-3-opus',
+    description: 'Claude models prioritize safety and helpfulness',
     models: [
-      {
-        id: 'claude-3-opus',
-        name: 'Claude 3 Opus',
-        description: 'Most capable Claude model',
-        capabilities: ['text', 'images']
-      },
-      {
-        id: 'claude-3-sonnet',
-        name: 'Claude 3 Sonnet',
-        description: 'Balanced performance and speed',
-        capabilities: ['text', 'images']
-      },
-      {
-        id: 'claude-3-haiku',
-        name: 'Claude 3 Haiku',
-        description: 'Fastest and most compact Claude model',
-        capabilities: ['text', 'images']
-      }
+      { id: 'claude-3-opus', name: 'Claude 3 Opus' },
+      { id: 'claude-3-sonnet', name: 'Claude 3 Sonnet' },
+      { id: 'claude-3-haiku', name: 'Claude 3 Haiku' },
     ],
-    supportsFileUpload: false,
-    supportsedFileTypes: []
+    defaultModel: 'claude-3-sonnet',
+    apiKeyRequired: true,
+    supportsFileUpload: false
   },
   {
-    name: 'Mistral',
     id: 'mistral',
-    description: 'Powerful open models from Mistral',
-    icon: '🌬️',
-    apiKeyName: 'mistral_api_key',
-    defaultModel: 'mistral-large',
+    name: 'Mistral AI',
+    icon: '✨',
+    description: 'Open source large language models',
     models: [
-      {
-        id: 'mistral-large',
-        name: 'Mistral Large',
-        description: 'Mistral\'s most powerful model',
-        capabilities: ['text']
-      },
-      {
-        id: 'mistral-small',
-        name: 'Mistral Small',
-        description: 'Efficient model with good performance',
-        capabilities: ['text']
-      }
+      { id: 'mistral-large', name: 'Mistral Large' },
+      { id: 'mistral-medium', name: 'Mistral Medium' },
+      { id: 'mistral-small', name: 'Mistral Small' },
     ],
-    supportsFileUpload: false,
-    supportsedFileTypes: []
+    defaultModel: 'mistral-medium',
+    apiKeyRequired: true,
+    supportsFileUpload: false
   }
 ];
 
-// Get the currently selected AI provider
+// Get a provider configuration by ID
+export const getProviderConfig = (provider: AIProvider): AIProviderConfig | undefined => {
+  return AI_PROVIDERS.find(p => p.id === provider);
+};
+
+// Get the selected provider from localStorage or default to OpenAI
 export const getSelectedProvider = (): AIProvider => {
-  const provider = localStorage.getItem('selected_ai_provider') as AIProvider;
-  return provider || 'openai'; // Default to OpenAI
+  const savedProvider = localStorage.getItem('selected_provider');
+  if (!savedProvider) {
+    localStorage.setItem('selected_provider', 'openai');
+    return 'openai';
+  }
+  return savedProvider as AIProvider;
 };
 
-// Set the selected AI provider
+// Set the selected provider
 export const setSelectedProvider = (provider: AIProvider): void => {
-  localStorage.setItem('selected_ai_provider', provider);
+  localStorage.setItem('selected_provider', provider);
 };
 
-// Get API key for the specified provider
-export const getApiKey = (provider?: AIProvider): string => {
-  const providerToUse = provider || getSelectedProvider();
-  const providerConfig = AI_PROVIDERS.find(p => p.id === providerToUse);
-  
-  if (!providerConfig) {
-    toast.error(`Provider configuration not found for ${providerToUse}`);
-    return '';
-  }
-  
-  const key = localStorage.getItem(providerConfig.apiKeyName);
-  if (!key) {
-    toast.error(`API key not found for ${providerConfig.name}. Please set your API key.`);
-    return '';
-  }
-  
-  return key;
+// Get the API key for a provider
+export const getApiKey = (provider: AIProvider): string | null => {
+  return localStorage.getItem(`${provider}_api_key`);
 };
 
-// Get the default model for the specified provider
-export const getDefaultModel = (provider?: AIProvider): string => {
-  const providerToUse = provider || getSelectedProvider();
-  const providerConfig = AI_PROVIDERS.find(p => p.id === providerToUse);
-  
-  if (!providerConfig) {
-    return 'gpt-4o'; // Fallback to OpenAI's default
-  }
-  
-  return providerConfig.defaultModel;
+// Set the API key for a provider
+export const setApiKey = (provider: AIProvider, apiKey: string): void => {
+  localStorage.setItem(`${provider}_api_key`, apiKey);
+  toast.success(`${provider.toUpperCase()} API key saved successfully`);
+};
+
+// Get available models for the selected provider
+export const getAvailableModels = (provider?: AIProvider): Array<{ id: string; name: string }> => {
+  const selectedProvider = provider || getSelectedProvider();
+  const providerConfig = getProviderConfig(selectedProvider);
+  return providerConfig?.models || [];
 };
 
 // Check if the provider supports file upload
 export const supportsFileUpload = (provider?: AIProvider): boolean => {
-  const providerToUse = provider || getSelectedProvider();
-  const providerConfig = AI_PROVIDERS.find(p => p.id === providerToUse);
-  
-  if (!providerConfig) {
-    return false;
-  }
-  
-  return providerConfig.supportsFileUpload;
+  const selectedProvider = provider || getSelectedProvider();
+  const providerConfig = getProviderConfig(selectedProvider);
+  return providerConfig?.supportsFileUpload || false;
 };
 
-// Check if a file type is supported by the provider
-export const isSupportedFileType = (fileType: string, provider?: AIProvider): boolean => {
-  const providerToUse = provider || getSelectedProvider();
-  const providerConfig = AI_PROVIDERS.find(p => p.id === providerToUse);
-  
-  if (!providerConfig || !providerConfig.supportsFileUpload) {
-    return false;
-  }
-  
-  return providerConfig.supportsedFileTypes.some(type => 
-    fileType.toLowerCase().endsWith(type.toLowerCase()));
+// Get default model for the selected provider
+export const getDefaultModel = (provider?: AIProvider): string => {
+  const selectedProvider = provider || getSelectedProvider();
+  const providerConfig = getProviderConfig(selectedProvider);
+  return providerConfig?.defaultModel || 'gpt-4o';
 };

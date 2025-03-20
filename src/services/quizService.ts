@@ -52,7 +52,7 @@ export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
   });
 };
 
-// Generate quiz based on the selected AI provider
+// Generate quiz based on the selected AI provider with improved debugging
 export const generateQuiz = async (
   content: string | File,
   settings: QuizSettings
@@ -67,18 +67,35 @@ export const generateQuiz = async (
   
   console.log(`Settings:`, settings);
   
-  switch (provider) {
-    case 'openai':
-      return generateOpenAIQuiz(content, settings);
-    case 'gemini':
-      return generateQuizWithGemini(content, settings);
-    case 'claude':
-    case 'mistral':
-      toast.error(`Integration with ${provider} is coming soon!`);
+  try {
+    let result = null;
+    
+    switch (provider) {
+      case 'openai':
+        result = await generateOpenAIQuiz(content, settings);
+        break;
+      case 'gemini':
+        result = await generateQuizWithGemini(content, settings);
+        break;
+      case 'claude':
+      case 'mistral':
+        toast.error(`Integration with ${provider} is coming soon!`);
+        return null;
+      default:
+        toast.error('Unknown AI provider');
+        return null;
+    }
+    
+    if (!result || !result.quiz || result.quiz.length === 0) {
+      console.error('Failed to generate quiz: Empty or invalid response from API');
       return null;
-    default:
-      toast.error('Unknown AI provider');
-      return null;
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error generating quiz:', error);
+    toast.error(`Error generating quiz: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return null;
   }
 };
 
@@ -89,18 +106,24 @@ export const gradeQuiz = async (
 ): Promise<QuizResults | null> => {
   const provider = getSelectedProvider();
   
-  switch (provider) {
-    case 'openai':
-      return gradeOpenAIQuiz(questions, userAnswers);
-    case 'gemini':
-      return gradeQuizWithGemini(questions, userAnswers);
-    case 'claude':
-    case 'mistral':
-      toast.error(`Integration with ${provider} is coming soon!`);
-      return null;
-    default:
-      toast.error('Unknown AI provider');
-      return null;
+  try {
+    switch (provider) {
+      case 'openai':
+        return await gradeOpenAIQuiz(questions, userAnswers);
+      case 'gemini':
+        return await gradeQuizWithGemini(questions, userAnswers);
+      case 'claude':
+      case 'mistral':
+        toast.error(`Integration with ${provider} is coming soon!`);
+        return null;
+      default:
+        toast.error('Unknown AI provider');
+        return null;
+    }
+  } catch (error) {
+    console.error('Error grading quiz:', error);
+    toast.error(`Error grading quiz: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return null;
   }
 };
 
@@ -113,22 +136,32 @@ export const hasValidApiKey = (): boolean => {
 
 // Check if the provider supports file upload
 export const providerSupportsFileUpload = (provider?: AIProvider): boolean => {
-  return supportsFileUpload(provider);
+  return supportsFileUpload(provider || getSelectedProvider());
 };
 
 // Process file based on AI provider capabilities - now returns the file directly 
-// if the provider supports direct file upload
+// if the provider supports direct file upload with improved debugging
 export const processFile = async (file: File): Promise<string | File> => {
   const provider = getSelectedProvider();
   
-  if (supportsFileUpload(provider)) {
-    // For providers that support direct file uploads, return the file directly
-    console.log(`Provider ${provider} supports direct file upload, passing file through`);
-    return file;
-  } else {
-    // For providers that don't support file upload, extract the text locally
-    console.log(`Provider ${provider} doesn't support direct file upload, extracting text`);
-    return extractTextFromFile(file);
+  try {
+    console.log(`Processing file for ${provider}...`);
+    
+    if (supportsFileUpload(provider)) {
+      // For providers that support direct file uploads, return the file directly
+      console.log(`Provider ${provider} supports direct file upload, passing file through`);
+      return file;
+    } else {
+      // For providers that don't support file upload, extract the text locally
+      console.log(`Provider ${provider} doesn't support direct file upload, extracting text`);
+      const extractedText = await extractTextFromFile(file);
+      console.log(`Extracted text length: ${extractedText.length} characters`);
+      return extractedText;
+    }
+  } catch (error) {
+    console.error('Error processing file:', error);
+    toast.error(`Error processing file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw error;
   }
 };
 

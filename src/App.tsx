@@ -12,68 +12,71 @@ import SubjectManager from "./pages/SubjectManager";
 import SubjectDetail from "./pages/SubjectDetail";
 import NotFound from "./pages/NotFound";
 import Layout from "./components/Layout";
+import { LanguageProvider } from "./i18n/LanguageContext";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route 
-            path="/" 
-            element={
-              <Layout>
-                <Index />
-              </Layout>
-            } 
-          />
-          <Route 
-            path="/upload" 
-            element={
-              <Layout>
-                <Upload />
-              </Layout>
-            } 
-          />
-          <Route 
-            path="/quiz" 
-            element={
-              <Layout>
-                <Quiz />
-              </Layout>
-            } 
-          />
-          <Route 
-            path="/dashboard" 
-            element={
-              <Layout>
-                <Dashboard />
-              </Layout>
-            } 
-          />
-          <Route 
-            path="/subjects" 
-            element={
-              <Layout>
-                <SubjectManager />
-              </Layout>
-            } 
-          />
-          <Route 
-            path="/subjects/:subjectId" 
-            element={
-              <Layout>
-                <SubjectDetail />
-              </Layout>
-            } 
-          />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <LanguageProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route 
+              path="/" 
+              element={
+                <Layout>
+                  <Index />
+                </Layout>
+              } 
+            />
+            <Route 
+              path="/upload" 
+              element={
+                <Layout>
+                  <Upload />
+                </Layout>
+              } 
+            />
+            <Route 
+              path="/quiz" 
+              element={
+                <Layout>
+                  <Quiz />
+                </Layout>
+              } 
+            />
+            <Route 
+              path="/dashboard" 
+              element={
+                <Layout>
+                  <Dashboard />
+                </Layout>
+              } 
+            />
+            <Route 
+              path="/subjects" 
+              element={
+                <Layout>
+                  <SubjectManager />
+                </Layout>
+              } 
+            />
+            <Route 
+              path="/subjects/:subjectId" 
+              element={
+                <Layout>
+                  <SubjectDetail />
+                </Layout>
+              } 
+            />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </LanguageProvider>
   </QueryClientProvider>
 );
 
