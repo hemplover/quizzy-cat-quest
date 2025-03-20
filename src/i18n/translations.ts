@@ -69,7 +69,7 @@ export const translations: Translations = {
     quizCreatedSuccess: 'Quiz created successfully!',
     couldNotCreateQuiz: 'I couldn\'t create a good quiz from this content. Please provide more detailed study material.',
     unableToGenerateQuiz: 'Unable to generate quiz. Please provide more detailed content or try a different file.',
-    errorCreatingQuiz: 'Failed to create quiz. Please try again.',
+    errorCreatingQuizMsg: 'Failed to create quiz. Please try again.',
     quizCreationError: 'Oops! Something went wrong. Let\'s try again, shall we?',
     creatingQuizFor: 'Creating a quiz for {subject}',
     fileWillBeSent: 'The file will be sent directly to the AI for analysis. This provides the most accurate quiz generation.',
@@ -175,8 +175,7 @@ export const translations: Translations = {
     backToDashboard: 'Back to Dashboard',
     
     // Errors
-    errorProcessingFile: 'Error processing file',
-    errorCreatingQuiz: 'Error creating quiz',
+    errorProcessingFileMsg: 'Error processing file',
     errorLoadingQuiz: 'Error loading quiz',
     errorSavingQuiz: 'Error saving quiz',
   },
@@ -242,7 +241,7 @@ export const translations: Translations = {
     quizCreatedSuccess: 'Quiz creato con successo!',
     couldNotCreateQuiz: 'Non sono riuscito a creare un buon quiz da questo contenuto. Fornisci materiale di studio più dettagliato.',
     unableToGenerateQuiz: 'Impossibile generare il quiz. Fornisci contenuto più dettagliato o prova un file diverso.',
-    errorCreatingQuiz: 'Errore nella creazione del quiz. Riprova.',
+    errorCreatingQuizMsg: 'Errore nella creazione del quiz. Riprova.',
     quizCreationError: 'Ops! Qualcosa è andato storto. Riproviamo, va bene?',
     creatingQuizFor: 'Creazione di un quiz per {subject}',
     fileWillBeSent: 'Il file verrà inviato direttamente all\'IA per l\'analisi. Questo fornisce la generazione di quiz più accurata.',
@@ -348,8 +347,7 @@ export const translations: Translations = {
     backToDashboard: 'Torna alla Dashboard',
     
     // Errors
-    errorProcessingFile: 'Errore nell\'elaborazione del file',
-    errorCreatingQuiz: 'Errore nella creazione del quiz',
+    errorProcessingFileMsg: 'Errore nell\'elaborazione del file',
     errorLoadingQuiz: 'Errore nel caricamento del quiz',
     errorSavingQuiz: 'Errore nel salvataggio del quiz'
   },
@@ -415,7 +413,7 @@ export const translations: Translations = {
     quizCreatedSuccess: 'Quiz créé avec succès !',
     couldNotCreateQuiz: 'Je n\'ai pas pu créer un bon quiz à partir de ce contenu. Veuillez fournir du matériel d\'étude plus détaillé.',
     unableToGenerateQuiz: 'Impossible de générer le quiz. Veuillez fournir un contenu plus détaillé ou essayer un fichier différent.',
-    errorCreatingQuiz: 'Erreur lors de la création du quiz. Veuillez réessayer.',
+    errorCreatingQuizMsg: 'Erreur lors de la création du quiz. Veuillez réessayer.',
     quizCreationError: 'Oups! Quelque chose s\'est mal passé. Réessayons, d\'accord ?',
     creatingQuizFor: 'Création d\'un quiz pour {subject}',
     fileWillBeSent: 'Le fichier sera envoyé directement à l\'IA pour analyse. Cela fournit la génération de quiz la plus précise.',
@@ -521,8 +519,7 @@ export const translations: Translations = {
     backToDashboard: 'Retour au Tableau de Bord',
     
     // Errors
-    errorProcessingFile: 'Erreur lors du traitement du fichier',
-    errorCreatingQuiz: 'Erreur lors de la création du quiz',
+    errorProcessingFileMsg: 'Erreur lors du traitement du fichier',
     errorLoadingQuiz: 'Erreur lors du chargement du quiz',
     errorSavingQuiz: 'Erreur lors de l\'enregistrement du quiz'
   },
@@ -588,7 +585,7 @@ export const translations: Translations = {
     quizCreatedSuccess: 'Quiz erfolgreich erstellt!',
     couldNotCreateQuiz: 'Ich konnte aus diesem Inhalt kein gutes Quiz erstellen. Bitte stellen Sie detaillierteres Studienmaterial bereit.',
     unableToGenerateQuiz: 'Quiz konnte nicht generiert werden. Bitte stellen Sie detailliertere Inhalte bereit oder probieren Sie eine andere Datei aus.',
-    errorCreatingQuiz: 'Fehler beim Erstellen des Quiz. Bitte versuchen Sie es erneut.',
+    errorCreatingQuizMsg: 'Fehler beim Erstellen des Quiz. Bitte versuchen Sie es erneut.',
     quizCreationError: 'Hoppla! Etwas ist schiefgelaufen. Versuchen wir es noch einmal, okay?',
     creatingQuizFor: 'Erstellung eines Quiz für {subject}',
     fileWillBeSent: 'Die Datei wird zur Analyse direkt an die KI gesendet. Dies bietet die genaueste Quiz-Generierung.',
@@ -694,9 +691,9 @@ export const translations: Translations = {
     backToDashboard: 'Zurück zum Dashboard',
     
     // Errors
-    errorProcessingFile: 'Fehler bei der Verarbeitung der Datei',
-    errorCreatingQuiz: 'Fehler beim Erstellen des Quiz',
+    errorProcessingFileMsg: 'Fehler bei der Verarbeitung der Datei',
     errorLoadingQuiz: 'Fehler beim Laden des Quiz',
     errorSavingQuiz: 'Fehler beim Speichern des Quiz'
   }
 };
+
