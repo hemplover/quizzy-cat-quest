@@ -27,7 +27,7 @@ interface LanguageProviderProps {
 
 export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) => {
   const [language, setLanguageState] = useState<Language>(() => {
-    const savedLanguage = localStorage.getItem('app_language');
+    const savedLanguage = localStorage.getItem('quizzy_cat_language');
     return (savedLanguage as Language) || defaultLanguage;
   });
 
@@ -39,6 +39,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
         return translations['en'][key];
       }
       // Return the key itself if no translation found
+      console.warn(`Translation missing for key: ${key} in language: ${language}`);
       return key;
     }
     return translations[language][key];
@@ -46,14 +47,22 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
-    localStorage.setItem('app_language', lang);
+    localStorage.setItem('quizzy_cat_language', lang);
   };
 
   useEffect(() => {
     // Set document language attribute for accessibility
     document.documentElement.lang = language;
+    
     // Set document title with translated app name
-    document.title = t('appName');
+    const appName = t('appName');
+    document.title = appName;
+    
+    // Update any meta tags that might contain the app name
+    const metaDescription = document.querySelector('meta[name="description"]');
+    if (metaDescription) {
+      metaDescription.setAttribute('content', `${appName} - ${t('uploadSubtitle')}`);
+    }
   }, [language]);
 
   return (

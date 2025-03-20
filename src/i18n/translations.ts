@@ -23,6 +23,8 @@ export const translations: Translations = {
     close: 'Close',
     change: 'Change',
     characters: 'characters',
+    language: 'Language',
+    languageChanged: 'Language changed successfully',
     
     // Navigation
     home: 'Home',
@@ -54,7 +56,7 @@ export const translations: Translations = {
     processingFile: 'Processing "{file}"... This file will be sent directly to the API for analysis.',
     fileReadyForQuiz: 'File "{file}" ready for quiz generation',
     fileAnalysisReady: 'Great! "{file}" will be sent directly to the AI for analysis. You can now configure your quiz settings.',
-    errorProcessingFile: 'Failed to process file. Please try again or paste text directly.',
+    errorProcessingFileMsg: 'Failed to process file. Please try again or paste text directly.',
     fileProcessingError: 'Sorry, I had trouble processing that file. Could you try a different format or paste your text directly?',
     enoughText: 'That\'s a good amount of text! I can definitely create some challenging questions from this.',
     textProcessed: 'Great! I\'ve processed your text. You can now configure your quiz settings.',
@@ -175,9 +177,9 @@ export const translations: Translations = {
     backToDashboard: 'Back to Dashboard',
     
     // Errors
-    errorProcessingFileMsg: 'Error processing file',
+    errorProcessingFile: 'Error processing file',
     errorLoadingQuiz: 'Error loading quiz',
-    errorSavingQuiz: 'Error saving quiz',
+    errorSavingQuiz: 'Error saving quiz'
   },
   
   it: {
@@ -195,6 +197,8 @@ export const translations: Translations = {
     close: 'Chiudi',
     change: 'Cambia',
     characters: 'caratteri',
+    language: 'Lingua',
+    languageChanged: 'Lingua modificata con successo',
     
     // Navigation
     home: 'Home',
@@ -226,7 +230,7 @@ export const translations: Translations = {
     processingFile: 'Elaborazione di "{file}"... Questo file verrà inviato direttamente all\'API per l\'analisi.',
     fileReadyForQuiz: 'File "{file}" pronto per la generazione del quiz',
     fileAnalysisReady: 'Ottimo! "{file}" verrà inviato direttamente all\'IA per l\'analisi. Ora puoi configurare le impostazioni del tuo quiz.',
-    errorProcessingFile: 'Errore nell\'elaborazione del file. Riprova o incolla direttamente il testo.',
+    errorProcessingFileMsg: 'Errore nell\'elaborazione del file. Riprova o incolla direttamente il testo.',
     fileProcessingError: 'Mi dispiace, ho avuto problemi a elaborare quel file. Potresti provare un formato diverso o incollare direttamente il tuo testo?',
     enoughText: 'Questa è una buona quantità di testo! Posso sicuramente creare alcune domande stimolanti da questo.',
     textProcessed: 'Ottimo! Ho elaborato il tuo testo. Ora puoi configurare le impostazioni del tuo quiz.',
@@ -347,7 +351,7 @@ export const translations: Translations = {
     backToDashboard: 'Torna alla Dashboard',
     
     // Errors
-    errorProcessingFileMsg: 'Errore nell\'elaborazione del file',
+    errorProcessingFile: 'Errore nell\'elaborazione del file',
     errorLoadingQuiz: 'Errore nel caricamento del quiz',
     errorSavingQuiz: 'Errore nel salvataggio del quiz'
   },
@@ -367,6 +371,8 @@ export const translations: Translations = {
     close: 'Fermer',
     change: 'Changer',
     characters: 'caractères',
+    language: 'Langue',
+    languageChanged: 'Langue modifiée avec succès',
     
     // Navigation
     home: 'Accueil',
@@ -398,7 +404,7 @@ export const translations: Translations = {
     processingFile: 'Traitement de "{file}"... Ce fichier sera envoyé directement à l\'API pour analyse.',
     fileReadyForQuiz: 'Fichier "{file}" prêt pour la génération du quiz',
     fileAnalysisReady: 'Super ! "{file}" sera envoyé directement à l\'IA pour analyse. Vous pouvez maintenant configurer les paramètres de votre quiz.',
-    errorProcessingFile: 'Erreur lors du traitement du fichier. Veuillez réessayer ou coller directement le texte.',
+    errorProcessingFileMsg: 'Erreur lors du traitement du fichier. Veuillez réessayer ou coller directement le texte.',
     fileProcessingError: 'Désolé, j\'ai eu du mal à traiter ce fichier. Pourriez-vous essayer un format différent ou coller directement votre texte ?',
     enoughText: 'C\'est une bonne quantité de texte ! Je peux certainement créer des questions stimulantes à partir de cela.',
     textProcessed: 'Super ! J\'ai traité votre texte. Vous pouvez maintenant configurer les paramètres de votre quiz.',
@@ -519,7 +525,7 @@ export const translations: Translations = {
     backToDashboard: 'Retour au Tableau de Bord',
     
     // Errors
-    errorProcessingFileMsg: 'Erreur lors du traitement du fichier',
+    errorProcessingFile: 'Erreur lors du traitement du fichier',
     errorLoadingQuiz: 'Erreur lors du chargement du quiz',
     errorSavingQuiz: 'Erreur lors de l\'enregistrement du quiz'
   },
@@ -539,6 +545,8 @@ export const translations: Translations = {
     close: 'Schließen',
     change: 'Ändern',
     characters: 'Zeichen',
+    language: 'Sprache',
+    languageChanged: 'Sprache erfolgreich geändert',
     
     // Navigation
     home: 'Startseite',
@@ -570,7 +578,7 @@ export const translations: Translations = {
     processingFile: 'Verarbeitung von "{file}"... Diese Datei wird zur Analyse direkt an die API gesendet.',
     fileReadyForQuiz: 'Datei "{file}" bereit für die Quiz-Generierung',
     fileAnalysisReady: 'Großartig! "{file}" wird zur Analyse direkt an die KI gesendet. Sie können jetzt die Einstellungen für Ihr Quiz konfigurieren.',
-    errorProcessingFile: 'Fehler bei der Verarbeitung der Datei. Bitte versuchen Sie es erneut oder fügen Sie den Text direkt ein.',
+    errorProcessingFileMsg: 'Fehler bei der Verarbeitung der Datei. Bitte versuchen Sie es erneut oder fügen Sie den Text direkt ein.',
     fileProcessingError: 'Entschuldigung, ich hatte Schwierigkeiten, diese Datei zu verarbeiten. Könnten Sie ein anderes Format ausprobieren oder Ihren Text direkt einfügen?',
     enoughText: 'Das ist eine gute Menge an Text! Ich kann definitiv einige anspruchsvolle Fragen daraus erstellen.',
     textProcessed: 'Großartig! Ich habe Ihren Text verarbeitet. Sie können jetzt die Einstellungen für Ihr Quiz konfigurieren.',
@@ -691,9 +699,8 @@ export const translations: Translations = {
     backToDashboard: 'Zurück zum Dashboard',
     
     // Errors
-    errorProcessingFileMsg: 'Fehler bei der Verarbeitung der Datei',
+    errorProcessingFile: 'Fehler bei der Verarbeitung der Datei',
     errorLoadingQuiz: 'Fehler beim Laden des Quiz',
     errorSavingQuiz: 'Fehler beim Speichern des Quiz'
   }
 };
-

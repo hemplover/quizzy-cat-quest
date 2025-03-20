@@ -30,32 +30,43 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
   const [availableModels, setAvailableModels] = useState<Array<{id: string, name: string, description: string}>>([]);
   
   useEffect(() => {
-    const provider = getSelectedProvider();
-    const providerConfig = AI_PROVIDERS.find(p => p.id === provider);
-    
-    if (providerConfig) {
-      // Ensure all models have a description property
-      const modelsWithDescriptions = providerConfig.models.map(model => ({
-        id: model.id,
-        name: model.name,
-        description: model.description || `${model.name} model`
-      }));
+    const updateAvailableModels = () => {
+      const provider = getSelectedProvider();
+      const providerConfig = AI_PROVIDERS.find(p => p.id === provider);
       
-      setAvailableModels(modelsWithDescriptions);
-      
-      // Check if the currently selected model is valid for this provider
-      const validModel = modelsWithDescriptions.find(m => m.id === selectedModel);
-      if (!validModel) {
-        // If not valid, set to default model
-        const newModel = providerConfig.defaultModel;
-        setSelectedModel(newModel);
-        setModelToUse(newModel);
-        if (onModelChange) {
-          onModelChange(newModel);
+      if (providerConfig) {
+        // Ensure all models have a description property
+        const modelsWithDescriptions = providerConfig.models.map(model => ({
+          id: model.id,
+          name: model.name,
+          description: model.description || `${model.name} model`
+        }));
+        
+        setAvailableModels(modelsWithDescriptions);
+        
+        // Check if the currently selected model is valid for this provider
+        const validModel = modelsWithDescriptions.find(m => m.id === selectedModel);
+        if (!validModel && modelsWithDescriptions.length > 0) {
+          // If not valid, set to default model
+          const newModel = providerConfig.defaultModel;
+          setSelectedModel(newModel);
+          setModelToUse(newModel);
+          if (onModelChange) {
+            onModelChange(newModel);
+          }
         }
       }
-    }
-  }, [getSelectedProvider()]);
+    };
+
+    updateAvailableModels();
+    
+    // Add event listener for provider changes
+    window.addEventListener('provider-changed', updateAvailableModels);
+    
+    return () => {
+      window.removeEventListener('provider-changed', updateAvailableModels);
+    };
+  }, [selectedModel, onModelChange]);
 
   const handleModelChange = (modelId: string) => {
     setSelectedModel(modelId);
