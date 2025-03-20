@@ -1,3 +1,4 @@
+
 export type Language = 'en' | 'it' | 'fr' | 'de';
 
 export interface Translations {
@@ -63,7 +64,7 @@ export const translations: Translations = {
     provideContent: 'Please provide content to generate a quiz',
     needMaterialsForQuiz: 'I need some material to work with! Please upload a file or add more text.',
     selectSubject: 'Please select a subject first',
-    apiKeyRequired: 'Please set your {provider} API key first',
+    apiKeyRequiredMsg: 'Please set your {provider} API key first',
     processingMaterials: 'Processing your materials... This is exciting! I\'m creating challenging university-level questions based exactly on your content.',
     quizCreatedSuccess: 'Quiz created successfully!',
     couldNotCreateQuiz: 'I couldn\'t create a good quiz from this content. Please provide more detailed study material.',
@@ -236,7 +237,7 @@ export const translations: Translations = {
     provideContent: 'Fornisci contenuto per generare un quiz',
     needMaterialsForQuiz: 'Ho bisogno di materiale su cui lavorare! Carica un file o aggiungi più testo.',
     selectSubject: 'Seleziona prima una materia',
-    apiKeyRequired: 'Imposta prima la tua chiave API {provider}',
+    apiKeyRequiredMsg: 'Imposta prima la tua chiave API {provider}',
     processingMaterials: 'Elaborazione dei tuoi materiali... Questo è emozionante! Sto creando domande impegnative di livello universitario basate esattamente sul tuo contenuto.',
     quizCreatedSuccess: 'Quiz creato con successo!',
     couldNotCreateQuiz: 'Non sono riuscito a creare un buon quiz da questo contenuto. Fornisci materiale di studio più dettagliato.',
@@ -247,12 +248,110 @@ export const translations: Translations = {
     fileWillBeSent: 'Il file verrà inviato direttamente all\'IA per l\'analisi. Questo fornisce la generazione di quiz più accurata.',
     textContentReady: 'Il tuo contenuto di testo è pronto per la generazione del quiz. Configura le impostazioni qui sotto per personalizzare il tuo quiz.',
     documentLoaded: 'Ho caricato "{document}" per te. Ora puoi configurare le impostazioni del tuo quiz.',
-    pasteTextPlaceholder: 'Incolla qui i tuoi appunti di studio, testo o contenuto...',
     switchedToModel: 'Passato a {model}',
     aiModel: 'Modello IA',
     selectAIModel: 'Seleziona Modello IA',
     selectModelDesc: 'Seleziona un modello per generare il tuo quiz',
     usingModel: 'Utilizzo di <span class="font-medium">{model}</span> per generare domande di quiz di livello universitario.',
+    
+    // Difficulty levels
+    beginner: 'Principiante',
+    intermediate: 'Intermedio',
+    advanced: 'Avanzato',
+    basicRecall: 'Domande di richiamo base',
+    applicationConcepts: 'Applicazione di concetti',
+    analysisSynthesis: 'Analisi e sintesi',
+    
+    // Question types
+    multipleChoice: 'Scelta Multipla',
+    trueFalse: 'Vero/Falso',
+    openEnded: 'Risposta Aperta',
+    
+    // Dashboard
+    recentQuizzes: 'Quiz Recenti',
+    skillsProgress: 'Progressi delle Competenze',
+    quickActions: 'Azioni Rapide',
+    areasToImprove: 'Aree da Migliorare',
+    createNewQuiz: 'Crea Nuovo Quiz',
+    continueLearning: 'Continua ad Apprendere',
+    viewAllQuizzes: 'Visualizza Tutti i Quiz',
+    viewAllSubjects: 'Visualizza Tutte le Materie',
+    yourTopSubjects: 'Le Tue Materie Principali',
+    welcomeBack: 'Bentornato su Quizzy Cat!',
+    dashboardSubtitle: 'Monitora i tuoi progressi, rivedi i quiz passati e creane di nuovi',
+    noRecentQuizzes: 'Nessun quiz recente trovato',
+    takeYourFirstQuiz: 'Fai il tuo primo quiz per vedere i risultati qui',
+    averageScore: 'Punteggio Medio',
+    quizzesCompleted: 'Quiz Completati',
+    subjectsStudied: 'Materie Studiate',
+    questionsAnswered: 'Domande Risposte',
+    
+    // Subjects
+    subjectManager: 'Gestore Materie',
+    subjectManagerSubtitle: 'Crea, modifica e gestisci le tue materie e i documenti e quiz associati',
+    newSubject: 'Nuova Materia',
+    subjectName: 'Nome Materia',
+    subjectDescription: 'Descrizione',
+    icon: 'Icona',
+    color: 'Colore',
+    documents: 'Documenti',
+    noSubjectsFound: 'Nessuna materia trovata',
+    createYourFirstSubject: 'Crea la Tua Prima Materia',
+    addDocument: 'Aggiungi Documento',
+    noDocumentsFound: 'Nessun documento trovato in questa materia',
+    addYourFirstDocument: 'Aggiungi il Tuo Primo Documento',
+    
+    // Toast messages
+    subjectCreated: 'Materia creata con successo',
+    subjectUpdated: 'Materia aggiornata con successo',
+    subjectDeleted: 'Materia eliminata con successo',
+    documentDeleted: 'Documento eliminato con successo',
+    quizDeleted: 'Quiz eliminato con successo',
+    
+    // File upload
+    dragDropFile: 'Trascina e rilascia il tuo file qui',
+    dropFileHere: 'Rilascia il tuo file qui',
+    selectFromComputer: 'Seleziona dal computer',
+    maxSize: 'Dimensione massima:',
+    supportFor: 'Supporto per',
+    files: 'file',
+    fileUploadNotSupported: 'Caricamento File Non Supportato',
+    fileUploadNotSupportedMsg: 'Il provider IA selezionato non supporta caricamenti diretti di file. Passa a OpenAI o incolla direttamente il tuo testo.',
+    selectedFileSuccess: 'selezionato con successo!',
+    
+    // AI Providers
+    selectAIProvider: 'Seleziona Provider IA',
+    openai: 'OpenAI',
+    gemini: 'Google Gemini',
+    claude: 'Anthropic Claude',
+    mistral: 'Mistral AI',
+    apiKey: 'Chiave API',
+    enterApiKey: 'Inserisci la tua chiave API',
+    apiKeyRequired: 'Chiave API richiesta',
+    
+    // Models
+    selectModel: 'Seleziona Modello',
+    defaultModel: 'Modello Predefinito',
+    
+    // Quiz page
+    questionOf: 'Domanda {current} di {total}',
+    submitAnswer: 'Invia Risposta',
+    reviewQuiz: 'Rivedi Quiz',
+    quizResults: 'Risultati Quiz',
+    correctAnswers: 'Risposte Corrette',
+    incorrectAnswers: 'Risposte Errate',
+    yourAnswer: 'La Tua Risposta',
+    correctAnswer: 'Risposta Corretta',
+    explanation: 'Spiegazione',
+    score: 'Punteggio',
+    retakeQuiz: 'Rifai il Quiz',
+    backToDashboard: 'Torna alla Dashboard',
+    
+    // Errors
+    errorProcessingFile: 'Errore nell\'elaborazione del file',
+    errorCreatingQuiz: 'Errore nella creazione del quiz',
+    errorLoadingQuiz: 'Errore nel caricamento del quiz',
+    errorSavingQuiz: 'Errore nel salvataggio del quiz'
   },
   
   fr: {
@@ -311,7 +410,7 @@ export const translations: Translations = {
     provideContent: 'Veuillez fournir du contenu pour générer un quiz',
     needMaterialsForQuiz: 'J\'ai besoin de matériel pour travailler ! Veuillez télécharger un fichier ou ajouter plus de texte.',
     selectSubject: 'Veuillez d\'abord sélectionner une matière',
-    apiKeyRequired: 'Veuillez d\'abord définir votre clé API {provider}',
+    apiKeyRequiredMsg: 'Veuillez d\'abord définir votre clé API {provider}',
     processingMaterials: 'Traitement de vos documents... C\'est passionnant ! Je crée des questions de niveau universitaire stimulantes basées exactement sur votre contenu.',
     quizCreatedSuccess: 'Quiz créé avec succès !',
     couldNotCreateQuiz: 'Je n\'ai pas pu créer un bon quiz à partir de ce contenu. Veuillez fournir du matériel d\'étude plus détaillé.',
@@ -322,12 +421,110 @@ export const translations: Translations = {
     fileWillBeSent: 'Le fichier sera envoyé directement à l\'IA pour analyse. Cela fournit la génération de quiz la plus précise.',
     textContentReady: 'Votre contenu textuel est prêt pour la génération du quiz. Configurez les paramètres ci-dessous pour personnaliser votre quiz.',
     documentLoaded: 'J\'ai chargé "{document}" pour vous. Vous pouvez maintenant configurer les paramètres de votre quiz.',
-    pasteTextPlaceholder: 'Collez ici vos notes d\'étude, texte ou contenu...',
     switchedToModel: 'Basculé vers {model}',
     aiModel: 'Modèle IA',
     selectAIModel: 'Sélectionner un Modèle IA',
     selectModelDesc: 'Sélectionnez un modèle pour générer votre quiz',
     usingModel: 'Utilisation de <span class="font-medium">{model}</span> pour générer des questions de quiz de niveau universitaire.',
+    
+    // Difficulty levels
+    beginner: 'Débutant',
+    intermediate: 'Intermédiaire',
+    advanced: 'Avancé',
+    basicRecall: 'Questions de rappel de base',
+    applicationConcepts: 'Application de concepts',
+    analysisSynthesis: 'Analyse et synthèse',
+    
+    // Question types
+    multipleChoice: 'Choix Multiple',
+    trueFalse: 'Vrai/Faux',
+    openEnded: 'Réponse Ouverte',
+    
+    // Dashboard
+    recentQuizzes: 'Quiz Récents',
+    skillsProgress: 'Progression des Compétences',
+    quickActions: 'Actions Rapides',
+    areasToImprove: 'Domaines à Améliorer',
+    createNewQuiz: 'Créer Nouveau Quiz',
+    continueLearning: 'Continuer l\'Apprentissage',
+    viewAllQuizzes: 'Voir Tous les Quiz',
+    viewAllSubjects: 'Voir Toutes les Matières',
+    yourTopSubjects: 'Vos Matières Principales',
+    welcomeBack: 'Bienvenue sur Quizzy Cat !',
+    dashboardSubtitle: 'Suivez votre progression, révisez les quiz passés et créez-en de nouveaux',
+    noRecentQuizzes: 'Aucun quiz récent trouvé',
+    takeYourFirstQuiz: 'Faites votre premier quiz pour voir vos résultats ici',
+    averageScore: 'Score Moyen',
+    quizzesCompleted: 'Quiz Terminés',
+    subjectsStudied: 'Matières Étudiées',
+    questionsAnswered: 'Questions Répondues',
+    
+    // Subjects
+    subjectManager: 'Gestionnaire de Matières',
+    subjectManagerSubtitle: 'Créez, modifiez et gérez vos matières et les documents et quiz associés',
+    newSubject: 'Nouvelle Matière',
+    subjectName: 'Nom de la Matière',
+    subjectDescription: 'Description',
+    icon: 'Icône',
+    color: 'Couleur',
+    documents: 'Documents',
+    noSubjectsFound: 'Aucune matière trouvée',
+    createYourFirstSubject: 'Créez Votre Première Matière',
+    addDocument: 'Ajouter Document',
+    noDocumentsFound: 'Aucun document trouvé dans cette matière',
+    addYourFirstDocument: 'Ajoutez Votre Premier Document',
+    
+    // Toast messages
+    subjectCreated: 'Matière créée avec succès',
+    subjectUpdated: 'Matière mise à jour avec succès',
+    subjectDeleted: 'Matière supprimée avec succès',
+    documentDeleted: 'Document supprimé avec succès',
+    quizDeleted: 'Quiz supprimé avec succès',
+    
+    // File upload
+    dragDropFile: 'Glissez et déposez votre fichier ici',
+    dropFileHere: 'Déposez votre fichier ici',
+    selectFromComputer: 'Sélectionner depuis l\'ordinateur',
+    maxSize: 'Taille maximale:',
+    supportFor: 'Support pour',
+    files: 'fichiers',
+    fileUploadNotSupported: 'Téléchargement de Fichier Non Pris en Charge',
+    fileUploadNotSupportedMsg: 'Le fournisseur d\'IA sélectionné ne prend pas en charge les téléchargements directs de fichiers. Veuillez passer à OpenAI ou coller directement votre texte.',
+    selectedFileSuccess: 'sélectionné avec succès !',
+    
+    // AI Providers
+    selectAIProvider: 'Sélectionner Fournisseur d\'IA',
+    openai: 'OpenAI',
+    gemini: 'Google Gemini',
+    claude: 'Anthropic Claude',
+    mistral: 'Mistral AI',
+    apiKey: 'Clé API',
+    enterApiKey: 'Entrez votre clé API',
+    apiKeyRequired: 'Clé API requise',
+    
+    // Models
+    selectModel: 'Sélectionner Modèle',
+    defaultModel: 'Modèle Par Défaut',
+    
+    // Quiz page
+    questionOf: 'Question {current} sur {total}',
+    submitAnswer: 'Soumettre Réponse',
+    reviewQuiz: 'Réviser Quiz',
+    quizResults: 'Résultats du Quiz',
+    correctAnswers: 'Réponses Correctes',
+    incorrectAnswers: 'Réponses Incorrectes',
+    yourAnswer: 'Votre Réponse',
+    correctAnswer: 'Réponse Correcte',
+    explanation: 'Explication',
+    score: 'Score',
+    retakeQuiz: 'Refaire le Quiz',
+    backToDashboard: 'Retour au Tableau de Bord',
+    
+    // Errors
+    errorProcessingFile: 'Erreur lors du traitement du fichier',
+    errorCreatingQuiz: 'Erreur lors de la création du quiz',
+    errorLoadingQuiz: 'Erreur lors du chargement du quiz',
+    errorSavingQuiz: 'Erreur lors de l\'enregistrement du quiz'
   },
   
   de: {
@@ -386,7 +583,7 @@ export const translations: Translations = {
     provideContent: 'Bitte stellen Sie Inhalte bereit, um ein Quiz zu generieren',
     needMaterialsForQuiz: 'Ich brauche Material zum Arbeiten! Bitte laden Sie eine Datei hoch oder fügen Sie mehr Text hinzu.',
     selectSubject: 'Bitte wählen Sie zuerst ein Fach aus',
-    apiKeyRequired: 'Bitte legen Sie zuerst Ihren {provider} API-Schlüssel fest',
+    apiKeyRequiredMsg: 'Bitte legen Sie zuerst Ihren {provider} API-Schlüssel fest',
     processingMaterials: 'Verarbeitung Ihrer Materialien... Das ist aufregend! Ich erstelle anspruchsvolle Fragen auf Universitätsniveau, die genau auf Ihren Inhalt zugeschnitten sind.',
     quizCreatedSuccess: 'Quiz erfolgreich erstellt!',
     couldNotCreateQuiz: 'Ich konnte aus diesem Inhalt kein gutes Quiz erstellen. Bitte stellen Sie detaillierteres Studienmaterial bereit.',
@@ -397,12 +594,109 @@ export const translations: Translations = {
     fileWillBeSent: 'Die Datei wird zur Analyse direkt an die KI gesendet. Dies bietet die genaueste Quiz-Generierung.',
     textContentReady: 'Ihr Textinhalt ist bereit für die Quiz-Generierung. Konfigurieren Sie die Einstellungen unten, um Ihr Quiz anzupassen.',
     documentLoaded: 'Ich habe "{document}" für Sie geladen. Sie können jetzt die Einstellungen für Ihr Quiz konfigurieren.',
-    pasteTextPlaceholder: 'Fügen Sie hier Ihre Studiennotizen, Text oder Inhalt ein...',
     switchedToModel: 'Zu {model} gewechselt',
     aiModel: 'KI-Modell',
     selectAIModel: 'KI-Modell auswählen',
     selectModelDesc: 'Wählen Sie ein Modell zur Generierung Ihres Quiz',
     usingModel: 'Verwendung von <span class="font-medium">{model}</span> zur Generierung von Quiz-Fragen auf Universitätsniveau.',
+    
+    // Difficulty levels
+    beginner: 'Anfänger',
+    intermediate: 'Fortgeschritten',
+    advanced: 'Experte',
+    basicRecall: 'Grundlegende Erinnerungsfragen',
+    applicationConcepts: 'Anwendung von Konzepten',
+    analysisSynthesis: 'Analyse und Synthese',
+    
+    // Question types
+    multipleChoice: 'Multiple Choice',
+    trueFalse: 'Wahr/Falsch',
+    openEnded: 'Offene Fragen',
+    
+    // Dashboard
+    recentQuizzes: 'Aktuelle Quizze',
+    skillsProgress: 'Lernfortschritt',
+    quickActions: 'Schnellaktionen',
+    areasToImprove: 'Verbesserungsbereiche',
+    createNewQuiz: 'Neues Quiz erstellen',
+    continueLearning: 'Lernen fortsetzen',
+    viewAllQuizzes: 'Alle Quizze anzeigen',
+    viewAllSubjects: 'Alle Fächer anzeigen',
+    yourTopSubjects: 'Ihre Top-Fächer',
+    welcomeBack: 'Willkommen zurück bei Quizzy Cat!',
+    dashboardSubtitle: 'Verfolgen Sie Ihren Fortschritt, überprüfen Sie vergangene Quizze und erstellen Sie neue',
+    noRecentQuizzes: 'Keine aktuellen Quizze gefunden',
+    takeYourFirstQuiz: 'Machen Sie Ihr erstes Quiz, um Ihre Ergebnisse hier zu sehen',
+    averageScore: 'Durchschnittliche Punktzahl',
+    quizzesCompleted: 'Abgeschlossene Quizze',
+    subjectsStudied: 'Studierte Fächer',
+    questionsAnswered: 'Beantwortete Fragen',
+    
+    // Subjects
+    subjectManager: 'Fach-Manager',
+    subjectManagerSubtitle: 'Erstellen, bearbeiten und verwalten Sie Ihre Fächer und zugehörigen Dokumente und Quizze',
+    newSubject: 'Neues Fach',
+    subjectName: 'Fachname',
+    subjectDescription: 'Beschreibung',
+    icon: 'Symbol',
+    color: 'Farbe',
+    documents: 'Dokumente',
+    noSubjectsFound: 'Keine Fächer gefunden',
+    createYourFirstSubject: 'Erstellen Sie Ihr erstes Fach',
+    addDocument: 'Dokument hinzufügen',
+    noDocumentsFound: 'Keine Dokumente in diesem Fach gefunden',
+    addYourFirstDocument: 'Fügen Sie Ihr erstes Dokument hinzu',
+    
+    // Toast messages
+    subjectCreated: 'Fach erfolgreich erstellt',
+    subjectUpdated: 'Fach erfolgreich aktualisiert',
+    subjectDeleted: 'Fach erfolgreich gelöscht',
+    documentDeleted: 'Dokument erfolgreich gelöscht',
+    quizDeleted: 'Quiz erfolgreich gelöscht',
+    
+    // File upload
+    dragDropFile: 'Ziehen Sie Ihre Datei hierher',
+    dropFileHere: 'Legen Sie Ihre Datei hier ab',
+    selectFromComputer: 'Vom Computer auswählen',
+    maxSize: 'Maximale Größe:',
+    supportFor: 'Unterstützung für',
+    files: 'Dateien',
+    fileUploadNotSupported: 'Datei-Upload nicht unterstützt',
+    fileUploadNotSupportedMsg: 'Der ausgewählte KI-Anbieter unterstützt keine direkten Datei-Uploads. Bitte wechseln Sie zu OpenAI oder fügen Sie Ihren Text direkt ein.',
+    selectedFileSuccess: 'erfolgreich ausgewählt!',
+    
+    // AI Providers
+    selectAIProvider: 'KI-Anbieter auswählen',
+    openai: 'OpenAI',
+    gemini: 'Google Gemini',
+    claude: 'Anthropic Claude',
+    mistral: 'Mistral AI',
+    apiKey: 'API-Schlüssel',
+    enterApiKey: 'Geben Sie Ihren API-Schlüssel ein',
+    apiKeyRequired: 'API-Schlüssel erforderlich',
+    
+    // Models
+    selectModel: 'Modell auswählen',
+    defaultModel: 'Standardmodell',
+    
+    // Quiz page
+    questionOf: 'Frage {current} von {total}',
+    submitAnswer: 'Antwort abschicken',
+    reviewQuiz: 'Quiz überprüfen',
+    quizResults: 'Quiz-Ergebnisse',
+    correctAnswers: 'Richtige Antworten',
+    incorrectAnswers: 'Falsche Antworten',
+    yourAnswer: 'Ihre Antwort',
+    correctAnswer: 'Richtige Antwort',
+    explanation: 'Erklärung',
+    score: 'Punktzahl',
+    retakeQuiz: 'Quiz wiederholen',
+    backToDashboard: 'Zurück zum Dashboard',
+    
+    // Errors
+    errorProcessingFile: 'Fehler bei der Verarbeitung der Datei',
+    errorCreatingQuiz: 'Fehler beim Erstellen des Quiz',
+    errorLoadingQuiz: 'Fehler beim Laden des Quiz',
+    errorSavingQuiz: 'Fehler beim Speichern des Quiz'
   }
 };
-
