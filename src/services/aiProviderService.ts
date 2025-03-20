@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 
 export type AIProvider = 'openai' | 'gemini' | 'claude' | 'mistral';
@@ -8,10 +7,11 @@ interface AIProviderConfig {
   name: string;
   icon: string;
   description: string;
-  models: Array<{ id: string; name: string }>;
+  models: Array<{ id: string; name: string; description: string }>;
   defaultModel: string;
   apiKeyRequired: boolean;
   supportsFileUpload: boolean;
+  apiKeyName: string;
 }
 
 export const AI_PROVIDERS: AIProviderConfig[] = [
@@ -21,12 +21,13 @@ export const AI_PROVIDERS: AIProviderConfig[] = [
     icon: '🤖',
     description: 'Powerful AI models for text and image understanding',
     models: [
-      { id: 'gpt-4o', name: 'GPT-4o (File Upload Support)' },
-      { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
+      { id: 'gpt-4o', name: 'GPT-4o (File Upload Support)', description: 'High performance model with file upload support' },
+      { id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: 'Faster and more affordable version' },
     ],
     defaultModel: 'gpt-4o',
     apiKeyRequired: true,
-    supportsFileUpload: true
+    supportsFileUpload: true,
+    apiKeyName: 'openai_api_key'
   },
   {
     id: 'gemini',
@@ -34,11 +35,12 @@ export const AI_PROVIDERS: AIProviderConfig[] = [
     icon: '🌐',
     description: 'Google\'s multimodal AI system',
     models: [
-      { id: 'gemini-pro', name: 'Gemini Pro' },
+      { id: 'gemini-pro', name: 'Gemini Pro', description: 'Google\'s advanced language model' },
     ],
     defaultModel: 'gemini-pro',
     apiKeyRequired: true,
-    supportsFileUpload: false
+    supportsFileUpload: false,
+    apiKeyName: 'gemini_api_key'
   },
   {
     id: 'claude',
@@ -46,13 +48,14 @@ export const AI_PROVIDERS: AIProviderConfig[] = [
     icon: '🧠',
     description: 'Claude models prioritize safety and helpfulness',
     models: [
-      { id: 'claude-3-opus', name: 'Claude 3 Opus' },
-      { id: 'claude-3-sonnet', name: 'Claude 3 Sonnet' },
-      { id: 'claude-3-haiku', name: 'Claude 3 Haiku' },
+      { id: 'claude-3-opus', name: 'Claude 3 Opus', description: 'Most capable Claude model' },
+      { id: 'claude-3-sonnet', name: 'Claude 3 Sonnet', description: 'Balanced capability and speed' },
+      { id: 'claude-3-haiku', name: 'Claude 3 Haiku', description: 'Fastest Claude model' },
     ],
     defaultModel: 'claude-3-sonnet',
     apiKeyRequired: true,
-    supportsFileUpload: false
+    supportsFileUpload: false,
+    apiKeyName: 'claude_api_key'
   },
   {
     id: 'mistral',
@@ -60,13 +63,14 @@ export const AI_PROVIDERS: AIProviderConfig[] = [
     icon: '✨',
     description: 'Open source large language models',
     models: [
-      { id: 'mistral-large', name: 'Mistral Large' },
-      { id: 'mistral-medium', name: 'Mistral Medium' },
-      { id: 'mistral-small', name: 'Mistral Small' },
+      { id: 'mistral-large', name: 'Mistral Large', description: 'Most powerful Mistral model' },
+      { id: 'mistral-medium', name: 'Mistral Medium', description: 'Balanced performance model' },
+      { id: 'mistral-small', name: 'Mistral Small', description: 'Efficient and fast model' },
     ],
     defaultModel: 'mistral-medium',
     apiKeyRequired: true,
-    supportsFileUpload: false
+    supportsFileUpload: false,
+    apiKeyName: 'mistral_api_key'
   }
 ];
 
@@ -102,7 +106,7 @@ export const setApiKey = (provider: AIProvider, apiKey: string): void => {
 };
 
 // Get available models for the selected provider
-export const getAvailableModels = (provider?: AIProvider): Array<{ id: string; name: string }> => {
+export const getAvailableModels = (provider?: AIProvider): Array<{ id: string; name: string; description: string }> => {
   const selectedProvider = provider || getSelectedProvider();
   const providerConfig = getProviderConfig(selectedProvider);
   return providerConfig?.models || [];

@@ -32,6 +32,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
     const providerConfig = AI_PROVIDERS.find(p => p.id === provider);
     
     if (providerConfig) {
+      // Make sure to use models with description property
       setAvailableModels(providerConfig.models);
       
       // Check if the currently selected model is valid for this provider

@@ -1,4 +1,3 @@
-
 import { QuizSettings } from '@/types/quiz';
 import { getApiKey, getSelectedProvider } from './aiProviderService';
 import { getSelectedModel } from './quizService';
@@ -63,7 +62,7 @@ const readFileAsBinary = (file: File): Promise<string> => {
 
 // Generate quiz using OpenAI
 export const generateQuiz = async (
-  content: string | File,
+  inputContent: string | File,
   settings: QuizSettings
 ): Promise<any> => {
   const apiKey = getApiKey('openai');
@@ -128,12 +127,12 @@ ${settings.numQuestions}
 }`;
 
     // If the content is a File and the model supports vision (like gpt-4o)
-    if (content instanceof File && (model === 'gpt-4o' || model === 'gpt-4o-mini')) {
+    if (inputContent instanceof File && (model === 'gpt-4o' || model === 'gpt-4o-mini')) {
       console.log(`Processing file upload for vision-capable model: ${model}`);
       
       // For supported file types, create a multipart/form-data request
-      if (['image/jpeg', 'image/png', 'image/gif', 'application/pdf'].includes(content.type)) {
-        console.log(`Preparing multipart request for ${content.type} file`);
+      if (['image/jpeg', 'image/png', 'image/gif', 'application/pdf'].includes(inputContent.type)) {
+        console.log(`Preparing multipart request for ${inputContent.type} file`);
         
         // Create FormData
         formData = new FormData();
@@ -149,12 +148,12 @@ ${settings.numQuestions}
             content: [
               {
                 type: "text",
-                text: `Please create a quiz based on the content of this ${content.type.split('/')[1]} file. Make ${settings.numQuestions} questions with ${settings.difficulty} difficulty.`
+                text: `Please create a quiz based on the content of this ${inputContent.type.split('/')[1]} file. Make ${settings.numQuestions} questions with ${settings.difficulty} difficulty.`
               },
               {
                 type: "image_url",
                 image_url: {
-                  url: `data:${content.type};base64,${await fileToBase64(content)}`
+                  url: `data:${inputContent.type};base64,${await fileToBase64(inputContent)}`
                 }
               }
             ]
@@ -176,9 +175,9 @@ ${settings.numQuestions}
           body: formData
         });
       } else {
-        console.log(`Using JSON request for ${content.type} file`);
+        console.log(`Using JSON request for ${inputContent.type} file`);
         // For other file types, extract text and send it normally
-        const text = await extractTextFromFile(content);
+        const text = await extractTextFromFile(inputContent);
         
         messages = [
           {
@@ -187,7 +186,7 @@ ${settings.numQuestions}
           },
           {
             role: "user",
-            content: `Please create a quiz based on the following content from a ${content.type} file: \n\n${text}`
+            content: `Please create a quiz based on the following content from a ${inputContent.type} file: \n\n${text}`
           }
         ];
         
@@ -211,7 +210,7 @@ ${settings.numQuestions}
       // For text content or models without vision capabilities
       console.log('Processing text content');
       
-      let textContent = typeof content === 'string' ? content : await extractTextFromFile(content);
+      let textContent = typeof inputContent === 'string' ? inputContent : await extractTextFromFile(inputContent);
       
       messages = [
         {
@@ -251,20 +250,20 @@ ${settings.numQuestions}
     console.log('OpenAI API response:', data);
     
     // Extract the content from the response
-    const content = data.choices[0].message.content;
+    const responseContent = data.choices[0].message.content;
     
     try {
       // Parse the response as JSON
-      const parsedQuiz = JSON.parse(content);
+      const parsedQuiz = JSON.parse(responseContent);
       console.log('Successfully parsed quiz:', parsedQuiz);
       return parsedQuiz;
     } catch (parseError) {
       console.error('Error parsing quiz JSON:', parseError);
-      console.error('Raw content:', content);
+      console.error('Raw content:', responseContent);
       
       // Try to extract JSON from the text
-      const jsonMatch = content.match(/```json\n([\s\S]*)\n```/) || 
-                         content.match(/\{[\s\S]*\}/);
+      const jsonMatch = responseContent.match(/```json\n([\s\S]*)\n```/) || 
+                         responseContent.match(/\{[\s\S]*\}/);
       
       if (jsonMatch) {
         try {
