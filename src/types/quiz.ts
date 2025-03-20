@@ -1,12 +1,14 @@
 
 export interface QuizQuestion {
+  id?: number;
+  type?: string;
   tipo?: string;
-  domanda?: string;
   question?: string;
-  opzioni?: string[];
+  domanda?: string;
   options?: string[];
-  risposta_corretta?: string;
-  correct_answer?: string;
+  opzioni?: string[];
+  risposta_corretta?: string | boolean;
+  correct_answer?: string | boolean;
   spiegazione?: string;
   explanation?: string;
 }

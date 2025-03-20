@@ -1,3 +1,4 @@
+
 import { toast } from 'sonner';
 import { 
   AIProvider, 
@@ -27,7 +28,7 @@ export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
     
     return generatedQuiz.quiz.map((q, index) => {
       // First check for English format fields
-      if (q.type === 'multiple_choice' || q.type === 'multiple-choice' || q.tipo === 'scelta_multipla') {
+      if ((q.type === 'multiple_choice' || q.type === 'multiple-choice' || q.tipo === 'scelta_multipla')) {
         // Handle multiple choice questions
         const options = q.options || q.opzioni || [];
         const correctAnswer = q.correct_answer || q.risposta_corretta || '';
@@ -41,10 +42,11 @@ export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
           correctAnswer: correctIndex >= 0 ? correctIndex : 0,
           explanation: q.explanation || q.spiegazione || ''
         };
-      } else if (q.type === 'true_false' || q.type === 'true-false' || q.tipo === 'vero_falso') {
+      } else if ((q.type === 'true_false' || q.type === 'true-false' || q.tipo === 'vero_falso')) {
         // Handle true/false questions
         const correctAnswer = q.correct_answer || q.risposta_corretta || '';
-        const isTrue = correctAnswer === 'True' || correctAnswer === 'Vero' || correctAnswer === true;
+        const isTrue = correctAnswer === 'True' || correctAnswer === 'Vero' || 
+                       (typeof correctAnswer === 'boolean' && correctAnswer === true);
         
         return {
           id: index,
