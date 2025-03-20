@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FileUp, BookOpen, Settings, Sparkles, ArrowRight, FileText, CheckCircle2, Pencil } from 'lucide-react';
+import { FileUp, BookOpen, Settings, Sparkles, ArrowRight, FileText, CheckCircle2, Pencil, AlertCircle } from 'lucide-react';
 import FileUpload from '@/components/FileUpload';
 import CatTutor from '@/components/CatTutor';
 import { toast } from 'sonner';
@@ -11,20 +11,24 @@ import {
   hasValidApiKey,
   providerSupportsFileUpload,
   processFile,
-  getModelToUse
+  getModelToUse,
+  getSelectedModel
 } from '@/services/quizService';
 import ApiKeyForm from '@/components/ApiKeyForm';
 import AIProviderSelector from '@/components/AIProviderSelector';
+import ModelSelector from '@/components/ModelSelector';
 import SubjectSelector from '@/components/SubjectSelector';
 import { 
   AIProvider, 
-  getSelectedProvider 
+  getSelectedProvider,
+  AI_PROVIDERS
 } from '@/services/aiProviderService';
 import {
   getSubjects,
   createDocument,
   createQuiz as createQuizRecord,
-  getSubjectById
+  getSubjectById,
+  initializeSubjectsIfNeeded
 } from '@/services/subjectService';
 import { QuizSettings } from '@/types/quiz';
 
@@ -59,12 +63,18 @@ const Upload = () => {
   const [isReadyToGenerateQuiz, setIsReadyToGenerateQuiz] = useState(false);
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
   const [selectedAIProvider, setSelectedAIProvider] = useState<AIProvider>(getSelectedProvider());
+  const [selectedModel, setSelectedModel] = useState<string>(getSelectedModel());
   const [selectedSubject, setSelectedSubject] = useState<string | null>(initialSubjectId);
   const [uploadStep, setUploadStep] = useState<'choose' | 'content' | 'settings'>('choose');
   const [subjectName, setSubjectName] = useState<string>('');
+  const [supportsFileUpload, setSupportsFileUpload] = useState(providerSupportsFileUpload());
   
   useEffect(() => {
     setHasApiKey(hasValidApiKey());
+    setSupportsFileUpload(providerSupportsFileUpload());
+    
+    // Initialize subjects if needed
+    initializeSubjectsIfNeeded();
     
     const subjects = getSubjects();
     if (subjects.length > 0 && !selectedSubject) {
@@ -88,11 +98,23 @@ const Upload = () => {
   const handleApiKeySubmit = (key: string, provider: AIProvider) => {
     setSelectedAIProvider(provider);
     setHasApiKey(true);
+    setSupportsFileUpload(providerSupportsFileUpload(provider));
   };
   
   const handleProviderChange = (provider: AIProvider) => {
     setSelectedAIProvider(provider);
     setHasApiKey(hasValidApiKey());
+    setSupportsFileUpload(providerSupportsFileUpload(provider));
+    
+    // Reset selected model to provider's default
+    const providerConfig = AI_PROVIDERS.find(p => p.id === provider);
+    if (providerConfig) {
+      setSelectedModel(providerConfig.defaultModel);
+    }
+  };
+  
+  const handleModelChange = (model: string) => {
+    setSelectedModel(model);
   };
   
   const handleSubjectChange = (subjectId: string) => {
@@ -105,31 +127,23 @@ const Upload = () => {
 
   const handleFileUpload = async (file: File) => {
     setSelectedFile(file);
+    
+    if (!supportsFileUpload) {
+      toast.error(`The selected AI provider does not support direct file uploads.`);
+      setCatMessage(`I'm sorry, but ${selectedAIProvider} doesn't support direct file uploads. Please choose a different provider or paste text directly.`);
+      return;
+    }
+    
     setCatMessage(`Processing "${file.name}"... This file will be sent directly to the API for analysis.`);
     setIsProcessing(true);
     
     try {
-      // Now we'll just set the file directly as the processed content
-      // The API will handle the text extraction
-      const processed = await processFile(file);
-      
-      if (!processed) {
-        toast.error("Failed to process file. Please try again or paste text directly.");
-        setCatMessage("I couldn't process that file. Please try another one or paste text directly.");
-        setIsProcessing(false);
-        return;
-      }
-      
-      setProcessedContent(processed);
+      // Direct file upload
+      setProcessedContent(file);
       setIsReadyToGenerateQuiz(true);
       setIsProcessing(false);
-      toast.success(`Successfully processed ${file.name}`);
-      
-      if (processed instanceof File) {
-        setCatMessage(`Great! "${file.name}" will be sent directly to the AI for analysis. You can now configure your quiz settings.`);
-      } else {
-        setCatMessage(`Great! I've extracted the text from "${file.name}". You can now configure your quiz settings.`);
-      }
+      toast.success(`File "${file.name}" ready for quiz generation`);
+      setCatMessage(`Great! "${file.name}" will be sent directly to the AI for analysis. You can now configure your quiz settings.`);
       
       // Move to settings step
       setUploadStep('settings');
@@ -193,17 +207,21 @@ const Upload = () => {
       return;
     }
 
-    setCatMessage("Processing your materials... This is exciting! I'm creating challenging questions based exactly on your content.");
+    setCatMessage("Processing your materials... This is exciting! I'm creating challenging university-level questions based exactly on your content.");
     setIsGeneratingQuiz(true);
     
     // Create quiz settings object to pass to the API
     const quizSettings: QuizSettings = {
       difficulty,
       questionTypes: selectedQuestionTypes,
-      numQuestions
+      numQuestions,
+      model: selectedModel
     };
 
     try {
+      console.log("Generating quiz with settings:", quizSettings);
+      console.log("Content type:", typeof processedContent);
+      
       const generatedQuiz = await generateQuiz(processedContent, quizSettings);
       
       if (generatedQuiz && generatedQuiz.quiz && generatedQuiz.quiz.length > 0) {
@@ -232,7 +250,8 @@ const Upload = () => {
           difficulty,
           questionTypes: selectedQuestionTypes,
           numQuestions: questions.length,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          model: selectedModel
         }));
         
         toast.success("Quiz created successfully!");
@@ -299,11 +318,29 @@ const Upload = () => {
             />
           </div>
           
-          <SubjectSelector
-            selectedSubject={selectedSubject}
-            onSubjectChange={handleSubjectChange}
-            className="mb-6"
-          />
+          <div className="grid md:grid-cols-2 gap-6 mb-6">
+            <SubjectSelector
+              selectedSubject={selectedSubject}
+              onSubjectChange={handleSubjectChange}
+            />
+            
+            <ModelSelector 
+              onModelChange={handleModelChange}
+            />
+          </div>
+          
+          {!supportsFileUpload && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg mb-6 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <h4 className="font-medium text-amber-800">File Upload Not Supported</h4>
+                <p className="text-sm text-amber-700">
+                  The selected AI provider does not support direct file uploads. 
+                  Please switch to OpenAI or paste your text directly.
+                </p>
+              </div>
+            </div>
+          )}
           
           <div className="flex items-center gap-2 mb-4">
             <FileUp className="w-5 h-5 text-cat" />
@@ -390,7 +427,7 @@ const Upload = () => {
             </div>
             
             <p className="text-sm text-muted-foreground mb-3">
-              {processedContent instanceof File 
+              {selectedFile 
                 ? "The file will be sent directly to the AI for analysis. This provides the most accurate quiz generation."
                 : "Your text content is ready for quiz generation. Configure the settings below to customize your quiz."}
             </p>
@@ -468,7 +505,7 @@ const Upload = () => {
                 
                 <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
                   <p className="text-xs text-blue-700">
-                    Using <span className="font-medium">{getModelToUse()}</span> to generate your quiz.
+                    Using <span className="font-medium">{selectedModel}</span> to generate university-level quiz questions.
                   </p>
                 </div>
               </div>

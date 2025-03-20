@@ -1,6 +1,7 @@
 
 import { toast } from 'sonner';
-import { QuizQuestion, GeneratedQuiz, QuizResults } from '@/types/quiz';
+import { QuizQuestion, GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
+import { getSelectedModel } from './quizService';
 
 // Get API key from localStorage
 const getOpenAIKey = (): string => {
@@ -15,31 +16,32 @@ const getOpenAIKey = (): string => {
 // Transform generated questions to our app format
 export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
   return generatedQuiz.quiz.map((q, index) => {
-    if (q.tipo === 'scelta_multipla') {
+    if (q.tipo === 'scelta_multipla' || q.tipo === 'multiple_choice') {
       return {
         id: index,
         type: 'multiple-choice',
-        question: q.domanda,
-        options: q.opzioni || [],
-        correctAnswer: q.opzioni?.indexOf(q.risposta_corretta) || 0,
-        explanation: ''
+        question: q.domanda || q.question,
+        options: q.opzioni || q.options || [],
+        correctAnswer: q.opzioni ? q.opzioni.indexOf(q.risposta_corretta) : 
+                      (q.options ? q.options.indexOf(q.correct_answer) : 0),
+        explanation: q.spiegazione || q.explanation || ''
       };
-    } else if (q.tipo === 'vero_falso') {
+    } else if (q.tipo === 'vero_falso' || q.tipo === 'true_false') {
       return {
         id: index,
         type: 'true-false',
-        question: q.domanda,
-        options: ['Vero', 'Falso'],
-        correctAnswer: q.risposta_corretta === 'Vero' ? 0 : 1,
-        explanation: ''
+        question: q.domanda || q.question,
+        options: ['True', 'False'],
+        correctAnswer: (q.risposta_corretta === 'Vero' || q.correct_answer === 'True') ? 0 : 1,
+        explanation: q.spiegazione || q.explanation || ''
       };
     } else {
       return {
         id: index,
         type: 'open-ended',
-        question: q.domanda,
-        correctAnswer: q.risposta_corretta || '',
-        explanation: ''
+        question: q.domanda || q.question,
+        correctAnswer: q.risposta_corretta || q.correct_answer || '',
+        explanation: q.spiegazione || q.explanation || ''
       };
     }
   });
@@ -48,11 +50,7 @@ export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
 // Generate quiz from content
 export const generateQuiz = async (
   content: string | File, 
-  options: {
-    difficulty: string;
-    questionTypes: string[];
-    numQuestions: number;
-  }
+  settings: QuizSettings
 ): Promise<GeneratedQuiz | null> => {
   try {
     const apiKey = getOpenAIKey();
@@ -60,72 +58,70 @@ export const generateQuiz = async (
       return null;
     }
     
+    // Get the selected model
+    const selectedModel = getSelectedModel();
+    console.log(`Using OpenAI model: ${selectedModel}`);
+    
     // Initialize a base prompt that includes quiz settings
-    const { difficulty, questionTypes, numQuestions } = options;
+    const { difficulty, questionTypes, numQuestions } = settings;
     
     // Create a base system prompt with emphasis on content relevance
-    const systemPrompt = `Sei un esperto educatore che crea quiz basati ESCLUSIVAMENTE sul contenuto fornito. 
-Non aggiungere MAI informazioni che non sono presenti nel testo originale. 
-Se il testo fornito non è sufficientemente dettagliato o specifico, produci solo le domande che puoi giustificare direttamente dal testo. 
-NON INVENTARE FATTI O DOMANDE NON PRESENTI NEL TESTO.
+    const systemPrompt = `You are a university professor responsible for creating exams for students. Based only on the provided study material, generate a realistic university-level exam.
 
-Difficoltà: ${difficulty}
-Tipi di domande: ${questionTypes.join(', ')}
-Numero di domande: ${numQuestions}`;
+### Rules:
+- Only use information from the provided document.
+- Do not create generic or overly simplistic questions.
+- Structure the quiz like a real university exam.
+- Ensure a variety of question types according to user's selection.
+- Adjust difficulty level to: ${difficulty}
+- The quiz must feel like an official test, not a casual practice exercise.
+- Total questions requested: ${numQuestions}
+- Do NOT invent facts that are not in the document.`;
 
     // Create the prompt based on whether we're using text or direct file upload
-    const userPrompt = `Sei un tutor AI specializzato nella creazione di quiz personalizzati. Analizza ATTENTAMENTE il materiale di studio e genera un quiz che valuti SOLO ed ESCLUSIVAMENTE la comprensione dei concetti presenti nel testo fornito.
+    const userPrompt = `Create a university-level exam with ${numQuestions} questions based EXCLUSIVELY on the provided study material.
 
-### IMPORTANTE:
-- Usa SOLO le informazioni ESPLICITAMENTE presenti nel testo fornito.
-- NON inventare concetti o fatti non menzionati nel documento.
-- Se il testo non contiene abbastanza informazioni per generare ${numQuestions} domande di qualità, genera solo le domande possibili in base al contenuto disponibile.
-- Assicurati che ogni domanda sia direttamente collegabile a sezioni specifiche del testo fornito.
-- NON generare domande sui mitocondri o altri argomenti biologici a meno che non siano esplicitamente menzionati nel testo.
-- Le tue domande devono riflettere ESATTAMENTE il contenuto fornito, senza aggiungere informazioni esterne.
+### Question Types Requested:
+${questionTypes.map(type => `- ${type}`).join('\n')}
 
-### Requisiti per il quiz:
-- Genera un quiz con difficoltà: ${difficulty}
-- Genera un quiz con i seguenti tipi di domande: ${questionTypes.join(', ')}
-- Genera un totale di ${numQuestions} domande (se il contenuto è sufficiente)
+### Difficulty Level:
+${difficulty} (${difficulty === 'beginner' ? 'Basic questions testing recall' : 
+                 difficulty === 'intermediate' ? 'Questions testing application of concepts' : 
+                 'Advanced questions testing analysis and critical thinking'})
 
-### Il formato della risposta deve essere JSON:
+### Important Guidelines:
+- Only use information explicitly present in the provided content.
+- Do not invent or assume information not present in the material.
+- Create university-level, professional exam questions.
+- If the content doesn't have enough information for ${numQuestions} questions, create as many quality questions as possible.
+
+### Format Your Response as JSON:
 {
   "quiz": [
     {
-      "tipo": "scelta_multipla", 
-      "domanda": "Domanda basata direttamente sul testo",
-      "opzioni": ["Opzione 1", "Opzione 2", "Opzione 3", "Opzione 4"],
-      "risposta_corretta": "Opzione corretta presente nel testo"
+      "tipo": "multiple_choice",
+      "question": "Specific question from the document",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correct_answer": "Option that's correct based on document"
     },
     {
-      "tipo": "vero_falso",
-      "domanda": "Affermazione basata direttamente sul testo fornito.",
-      "risposta_corretta": "Vero o Falso in base al testo"
+      "tipo": "true_false",
+      "question": "Statement based directly on document content",
+      "correct_answer": "True or False based on document"
     },
     {
-      "tipo": "aperta",
-      "domanda": "Domanda su un concetto specifico presente nel testo.",
-      "risposta_corretta": "Risposta che si riferisce direttamente a contenuti del testo."
+      "tipo": "open_ended",
+      "question": "Question requiring explanation from document",
+      "correct_answer": "Model/reference answer based on document content"
     }
   ]
-}`;
+}
+
+Now, create a university exam based on the following study material:`;
 
     // If content is a File, send it directly to OpenAI
     if (content instanceof File) {
       console.log(`Sending file ${content.name} directly to OpenAI`);
-      
-      // Create a FormData object to handle file uploads
-      const formData = new FormData();
-      
-      // First, upload the file to OpenAI
-      const fileUploadResponse = await fetch('https://api.openai.com/v1/files', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: formData
-      });
       
       // For vision models like GPT-4o, we need to encode file as base64
       const fileArrayBuffer = await content.arrayBuffer();
@@ -133,36 +129,40 @@ Numero di domande: ${numQuestions}`;
         new Uint8Array(fileArrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
       );
       
-      // Since direct file upload requires different handling, we'll use the vision API for simplicity
+      // Set up the request
+      const requestBody = {
+        model: selectedModel,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: userPrompt },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:${content.type};base64,${fileBase64}`
+                }
+              }
+            ]
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 4000 // Increased token limit for better responses
+      };
+      
+      console.log('Making API request with file content...');
+      
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
         },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini', // Using GPT-4o Mini as default
-          messages: [
-            {
-              role: 'system',
-              content: systemPrompt
-            },
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: userPrompt },
-                {
-                  type: 'image_url',
-                  image_url: {
-                    url: `data:${content.type};base64,${fileBase64}`
-                  }
-                }
-              ]
-            }
-          ],
-          temperature: 0.3,
-          max_tokens: 2000
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
@@ -174,22 +174,26 @@ Numero di domande: ${numQuestions}`;
       const data = await response.json();
       console.log("OpenAI response received");
       
+      // Log the first part of the response for debugging
       const responseContent = data.choices[0].message.content;
-      console.log("Response content:", responseContent.substring(0, 200) + "...");
+      console.log("Response content (first 200 chars):", responseContent.substring(0, 200) + "...");
       
       // Extract JSON from the response
       const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         console.error("Could not parse JSON from API response");
+        console.log("Full response:", responseContent);
         throw new Error('Could not parse JSON from API response');
       }
       
       try {
-        const parsedJson = JSON.parse(jsonMatch[0]) as GeneratedQuiz;
+        const parsedJson = JSON.parse(jsonMatch[0]);
         
         // Validate that we have at least some questions
         if (!parsedJson.quiz || parsedJson.quiz.length === 0) {
-          toast.error("Non è stato possibile generare domande dal testo fornito. Il contenuto potrebbe essere troppo breve o non specifico.");
+          console.error("No questions generated in the response");
+          console.log("Full response content:", responseContent);
+          toast.error("Non è stato possibile generare domande dal contenuto fornito. Il contenuto potrebbe essere troppo breve o non specifico.");
           return null;
         }
         
@@ -197,6 +201,7 @@ Numero di domande: ${numQuestions}`;
         return parsedJson;
       } catch (parseError) {
         console.error("Error parsing JSON:", parseError);
+        console.log("Content that failed to parse:", jsonMatch[0]);
         throw new Error('Error parsing quiz data from API response');
       }
     } else {
@@ -209,27 +214,31 @@ Numero di domande: ${numQuestions}`;
         return null;
       }
 
+      const requestBody = {
+        model: selectedModel,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt
+          },
+          {
+            role: 'user',
+            content: userPrompt + `\n\n### Study Material:\n${content}`
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 4000 // Increased token limit for better responses
+      };
+      
+      console.log('Making API request with text content...');
+
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
         },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini', // Using GPT-4o Mini as default
-          messages: [
-            {
-              role: 'system',
-              content: systemPrompt
-            },
-            {
-              role: 'user',
-              content: userPrompt + `\n\n### Testo da analizzare:\n${content}`
-            }
-          ],
-          temperature: 0.3,
-          max_tokens: 2000
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
@@ -242,20 +251,23 @@ Numero di domande: ${numQuestions}`;
       console.log("OpenAI response received");
       
       const responseContent = data.choices[0].message.content;
-      console.log("Response content:", responseContent.substring(0, 200) + "...");
+      console.log("Response content (first 200 chars):", responseContent.substring(0, 200) + "...");
       
       // Extract JSON from the response
       const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         console.error("Could not parse JSON from API response");
+        console.log("Full response:", responseContent);
         throw new Error('Could not parse JSON from API response');
       }
       
       try {
-        const parsedJson = JSON.parse(jsonMatch[0]) as GeneratedQuiz;
+        const parsedJson = JSON.parse(jsonMatch[0]);
         
         // Validate that we have at least some questions
         if (!parsedJson.quiz || parsedJson.quiz.length === 0) {
+          console.error("No questions generated in the response");
+          console.log("Full response content:", responseContent);
           toast.error("Non è stato possibile generare domande dal testo fornito. Il contenuto potrebbe essere troppo breve o non specifico.");
           return null;
         }
@@ -264,6 +276,7 @@ Numero di domande: ${numQuestions}`;
         return parsedJson;
       } catch (parseError) {
         console.error("Error parsing JSON:", parseError);
+        console.log("Content that failed to parse:", jsonMatch[0]);
         throw new Error('Error parsing quiz data from API response');
       }
     }
@@ -285,6 +298,9 @@ export const gradeQuiz = async (
       return null;
     }
 
+    // Get the selected model - using simpler model for grading to save tokens
+    const selectedModel = 'gpt-4o-mini';
+
     // Format the questions and answers for the API
     const formattedQuestions = questions.map(q => {
       return {
@@ -303,39 +319,35 @@ export const gradeQuiz = async (
       };
     });
 
-    const prompt = `Sei un AI correttore di quiz. L'utente ha completato il quiz e ha fornito le seguenti risposte. Confronta le risposte con le corrette e fornisci un punteggio e una spiegazione dettagliata.
+    const prompt = `You are a university professor grading student exams. The student has completed the quiz below, and you need to provide a fair and detailed assessment.
 
-### Requisiti:
-- Correggi ogni risposta e assegna un punteggio da 0 a 1.
-- Se la risposta è errata, spiega perché e qual è la risposta corretta.
-- Per la domanda aperta, genera una valutazione dettagliata basata sul contenuto della risposta.
-- Sii equo e costruttivo nei feedback.
+### Grading Rules:
+- Evaluate each answer with academic rigor.
+- Assign a score from 0 to 1 for each question (partial credit allowed for partial answers).
+- Provide detailed, constructive feedback for each answer.
+- Be particularly thorough when grading open-ended responses.
+- Explain why answers are wrong when they are, and what the correct answer should be.
 
-### Domande e risposte corrette:
+### Exam Questions and Correct Answers:
 ${JSON.stringify(formattedQuestions, null, 2)}
 
-### Risposte dell'utente:
+### Student's Answers:
 ${JSON.stringify(formattedAnswers, null, 2)}
 
-### Esempio di output:
+### Response Format (JSON):
 {
   "risultati": [
     {
-      "domanda": "Qual è la funzione principale dei mitocondri?",
-      "risposta_utente": "Sintesi proteine",
-      "corretto": false,
-      "punteggio": 0,
-      "spiegazione": "I mitocondri producono energia, non sintetizzano proteine."
+      "domanda": "Question from the exam",
+      "risposta_utente": "Student's answer",
+      "corretto": boolean or "Partially Correct",
+      "punteggio": number (0-1),
+      "spiegazione": "Detailed feedback explaining the evaluation"
     },
-    {
-      "domanda": "Spiega il concetto di fotosintesi clorofilliana.",
-      "risposta_utente": "Le piante assorbono la luce solare per crescere.",
-      "corretto": "Parzialmente",
-      "punteggio": 0.5,
-      "spiegazione": "Corretto in parte, ma manca la spiegazione della trasformazione della luce in energia chimica."
-    }
+    // Additional question results...
   ],
-  "punteggio_totale": 3.5
+  "punteggio_totale": sum of all scores,
+  "feedback_generale": "Overall assessment of the student's performance"
 }`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -345,11 +357,11 @@ ${JSON.stringify(formattedAnswers, null, 2)}
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: selectedModel,
         messages: [
           {
             role: 'system',
-            content: 'Sei un educatore esperto che valuta le risposte a un quiz in modo equo e costruttivo.'
+            content: 'You are a university professor providing detailed and fair assessment of student exam answers.'
           },
           {
             role: 'user',
@@ -362,7 +374,8 @@ ${JSON.stringify(formattedAnswers, null, 2)}
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API returned ${response.status}`);
+      const errorData = await response.json();
+      throw new Error(`OpenAI API returned ${response.status}: ${JSON.stringify(errorData)}`);
     }
 
     const data = await response.json();
@@ -371,10 +384,18 @@ ${JSON.stringify(formattedAnswers, null, 2)}
     // Extract JSON from the response
     const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
+      console.error("Could not parse JSON from API response");
+      console.log("Full response:", responseContent);
       throw new Error('Could not parse JSON from API response');
     }
     
-    return JSON.parse(jsonMatch[0]) as QuizResults;
+    try {
+      return JSON.parse(jsonMatch[0]) as QuizResults;
+    } catch (parseError) {
+      console.error("Error parsing JSON:", parseError);
+      console.log("Content that failed to parse:", jsonMatch[0]);
+      throw new Error('Error parsing quiz results from API response');
+    }
   } catch (error) {
     console.error('Error grading quiz:', error);
     toast.error('Failed to grade quiz with AI. Using basic grading instead.');

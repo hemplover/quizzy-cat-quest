@@ -1,3 +1,4 @@
+
 import { toast } from 'sonner';
 import { 
   AIProvider, 
@@ -20,31 +21,32 @@ import { QuizQuestion, GeneratedQuiz, QuizResults, QuizSettings } from '@/types/
 // Transform generated questions to our app format
 export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
   return generatedQuiz.quiz.map((q, index) => {
-    if (q.tipo === 'scelta_multipla') {
+    if (q.tipo === 'scelta_multipla' || q.tipo === 'multiple_choice') {
       return {
         id: index,
         type: 'multiple-choice',
-        question: q.domanda,
-        options: q.opzioni || [],
-        correctAnswer: q.opzioni?.indexOf(q.risposta_corretta) || 0,
-        explanation: ''
+        question: q.domanda || q.question,
+        options: q.opzioni || q.options || [],
+        correctAnswer: q.opzioni ? q.opzioni.indexOf(q.risposta_corretta) : 
+                     (q.options ? q.options.indexOf(q.correct_answer) : 0),
+        explanation: q.spiegazione || q.explanation || ''
       };
-    } else if (q.tipo === 'vero_falso') {
+    } else if (q.tipo === 'vero_falso' || q.tipo === 'true_false') {
       return {
         id: index,
         type: 'true-false',
-        question: q.domanda,
-        options: ['Vero', 'Falso'],
-        correctAnswer: q.risposta_corretta === 'Vero' ? 0 : 1,
-        explanation: ''
+        question: q.domanda || q.question,
+        options: ['True', 'False'],
+        correctAnswer: (q.risposta_corretta === 'Vero' || q.correct_answer === 'True') ? 0 : 1,
+        explanation: q.spiegazione || q.explanation || ''
       };
     } else {
       return {
         id: index,
         type: 'open-ended',
-        question: q.domanda,
-        correctAnswer: q.risposta_corretta || '',
-        explanation: ''
+        question: q.domanda || q.question,
+        correctAnswer: q.risposta_corretta || q.correct_answer || '',
+        explanation: q.spiegazione || q.explanation || ''
       };
     }
   });
@@ -56,6 +58,14 @@ export const generateQuiz = async (
   settings: QuizSettings
 ): Promise<GeneratedQuiz | null> => {
   const provider = getSelectedProvider();
+  console.log(`Generating quiz with provider: ${provider}`);
+  console.log(`Content type: ${typeof content}`);
+  
+  if (content instanceof File) {
+    console.log(`File name: ${content.name}, type: ${content.type}, size: ${content.size} bytes`);
+  }
+  
+  console.log(`Settings:`, settings);
   
   switch (provider) {
     case 'openai':
@@ -125,4 +135,20 @@ export const processFile = async (file: File): Promise<string | File> => {
 // Get the appropriate model to use based on provider
 export const getModelToUse = (): string => {
   return getDefaultModel();
+};
+
+// Set the specific model to use
+export const setModelToUse = (model: string): void => {
+  localStorage.setItem('selected_model', model);
+};
+
+// Get the selected model 
+export const getSelectedModel = (): string => {
+  const savedModel = localStorage.getItem('selected_model');
+  if (!savedModel) {
+    const defaultModel = getDefaultModel();
+    localStorage.setItem('selected_model', defaultModel);
+    return defaultModel;
+  }
+  return savedModel;
 };

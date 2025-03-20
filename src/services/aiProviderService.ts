@@ -29,18 +29,18 @@ export const AI_PROVIDERS: AIProviderConfig[] = [
     description: 'Powerful AI models from OpenAI including GPT-4o',
     icon: '🤖',
     apiKeyName: 'openai_api_key',
-    defaultModel: 'gpt-4o-mini',
+    defaultModel: 'gpt-4o',
     models: [
-      {
-        id: 'gpt-4o-mini',
-        name: 'GPT-4o Mini',
-        description: 'Faster and more cost-effective',
-        capabilities: ['text', 'images', 'files']
-      },
       {
         id: 'gpt-4o',
         name: 'GPT-4o',
         description: 'Most powerful model with vision capabilities',
+        capabilities: ['text', 'images', 'files']
+      },
+      {
+        id: 'gpt-4o-mini',
+        name: 'GPT-4o Mini',
+        description: 'Faster and more cost-effective',
         capabilities: ['text', 'images', 'files']
       }
     ],
@@ -163,7 +163,7 @@ export const getDefaultModel = (provider?: AIProvider): string => {
   const providerConfig = AI_PROVIDERS.find(p => p.id === providerToUse);
   
   if (!providerConfig) {
-    return 'gpt-4o-mini'; // Fallback to OpenAI's default
+    return 'gpt-4o'; // Fallback to OpenAI's default
   }
   
   return providerConfig.defaultModel;
