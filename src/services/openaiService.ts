@@ -1,3 +1,4 @@
+
 import { QuizSettings } from '@/types/quiz';
 import { getApiKey, getSelectedProvider } from './aiProviderService';
 import { getSelectedModel } from './quizService';
@@ -177,7 +178,7 @@ ${settings.numQuestions}
       } else {
         console.log(`Using JSON request for ${inputContent.type} file`);
         // For other file types, extract text and send it normally
-        const text = await extractTextFromFile(inputContent);
+        const textFromFile = await extractTextFromFile(inputContent);
         
         messages = [
           {
@@ -186,7 +187,7 @@ ${settings.numQuestions}
           },
           {
             role: "user",
-            content: `Please create a quiz based on the following content from a ${inputContent.type} file: \n\n${text}`
+            content: `Please create a quiz based on the following content from a ${inputContent.type} file: \n\n${textFromFile}`
           }
         ];
         
@@ -210,7 +211,7 @@ ${settings.numQuestions}
       // For text content or models without vision capabilities
       console.log('Processing text content');
       
-      let textContent = typeof inputContent === 'string' ? inputContent : await extractTextFromFile(inputContent);
+      let textToProcess = typeof inputContent === 'string' ? inputContent : await extractTextFromFile(inputContent);
       
       messages = [
         {
@@ -219,7 +220,7 @@ ${settings.numQuestions}
         },
         {
           role: "user",
-          content: `Please create a quiz based on the following content: \n\n${textContent}`
+          content: `Please create a quiz based on the following content: \n\n${textToProcess}`
         }
       ];
       
@@ -343,17 +344,17 @@ export const gradeQuiz = async (questions: any[], userAnswers: any[]): Promise<a
     console.log('Grading response:', data);
     
     // Extract the content from the response
-    const content = data.choices[0].message.content;
+    const responseText = data.choices[0].message.content;
     
     try {
       // Parse the response as JSON
-      return JSON.parse(content);
+      return JSON.parse(responseText);
     } catch (error) {
       console.error('Error parsing grading JSON:', error);
       
       // Try to extract JSON from the text
-      const jsonMatch = content.match(/```json\n([\s\S]*)\n```/) || 
-                         content.match(/\{[\s\S]*\}/);
+      const jsonMatch = responseText.match(/```json\n([\s\S]*)\n```/) || 
+                         responseText.match(/\{[\s\S]*\}/);
       
       if (jsonMatch) {
         const extractedJson = jsonMatch[1] || jsonMatch[0];

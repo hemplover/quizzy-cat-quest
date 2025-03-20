@@ -52,6 +52,8 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
   useEffect(() => {
     // Set document language attribute for accessibility
     document.documentElement.lang = language;
+    // Set document title with translated app name
+    document.title = t('appName');
   }, [language]);
 
   return (

@@ -14,6 +14,7 @@ import {
 } from '@/services/aiProviderService';
 import { getSelectedModel, setModelToUse } from '@/services/quizService';
 import { toast } from 'sonner';
+import { useLanguage } from '@/i18n/LanguageContext';
 
 interface ModelSelectorProps {
   className?: string;
@@ -24,6 +25,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
   className,
   onModelChange
 }) => {
+  const { t } = useLanguage();
   const [selectedModel, setSelectedModel] = useState<string>(getSelectedModel());
   const [availableModels, setAvailableModels] = useState<Array<{id: string, name: string, description: string}>>([]);
   
@@ -32,11 +34,17 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
     const providerConfig = AI_PROVIDERS.find(p => p.id === provider);
     
     if (providerConfig) {
-      // Make sure to use models with description property
-      setAvailableModels(providerConfig.models);
+      // Ensure all models have a description property
+      const modelsWithDescriptions = providerConfig.models.map(model => ({
+        id: model.id,
+        name: model.name,
+        description: model.description || `${model.name} model`
+      }));
+      
+      setAvailableModels(modelsWithDescriptions);
       
       // Check if the currently selected model is valid for this provider
-      const validModel = providerConfig.models.find(m => m.id === selectedModel);
+      const validModel = modelsWithDescriptions.find(m => m.id === selectedModel);
       if (!validModel) {
         // If not valid, set to default model
         const newModel = providerConfig.defaultModel;
@@ -59,7 +67,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
     
     const model = availableModels.find(m => m.id === modelId);
     if (model) {
-      toast.success(`Switched to ${model.name}`);
+      toast.success(t('switchedToModel').replace('{model}', model.name));
     }
   };
 
@@ -67,12 +75,12 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
     <div className={className}>
       <div className="flex items-center gap-2 mb-2">
         <Sparkles className="w-4 h-4 text-cat" />
-        <h3 className="text-sm font-medium">AI Model</h3>
+        <h3 className="text-sm font-medium">{t('aiModel')}</h3>
       </div>
       
       <Select value={selectedModel} onValueChange={handleModelChange}>
         <SelectTrigger className="w-full">
-          <SelectValue placeholder="Select AI Model" />
+          <SelectValue placeholder={t('selectAIModel')} />
         </SelectTrigger>
         <SelectContent>
           {availableModels.map((model) => (
@@ -87,7 +95,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
       </Select>
       
       <p className="text-xs text-muted-foreground mt-1">
-        {availableModels.find(m => m.id === selectedModel)?.description || 'Select a model to generate your quiz'}
+        {availableModels.find(m => m.id === selectedModel)?.description || t('selectModelDesc')}
       </p>
     </div>
   );
