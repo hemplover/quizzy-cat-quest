@@ -1,10 +1,8 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { FileUp, X, File, FileText, Image, Film, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { providerSupportsFileUpload } from '@/services/quizService';
-import { getSelectedProvider } from '@/services/aiProviderService';
+import { supportsFileUpload, getSelectedProvider } from '@/services/aiProviderService';
 import { useLanguage } from '@/i18n/LanguageContext';
 
 interface FileUploadProps {
@@ -26,7 +24,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [supportsFileUpload, setSupportsFileUpload] = useState(providerSupportsFileUpload());
+  const [supportsUpload, setSupportsUpload] = useState(supportsFileUpload());
   const [selectedProvider, setSelectedProvider] = useState(getSelectedProvider());
 
   // Update supported file types when the provider changes
@@ -34,7 +32,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
     const provider = getSelectedProvider();
     if (provider !== selectedProvider) {
       setSelectedProvider(provider);
-      setSupportsFileUpload(providerSupportsFileUpload());
+      setSupportsUpload(supportsFileUpload());
     }
   }, [selectedProvider]);
 
@@ -88,7 +86,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
     }
     
     // Check if the current provider supports file uploads
-    if (!supportsFileUpload) {
+    if (!supportsUpload) {
       toast.warning(t('fileUploadNotSupported'));
       console.warn(`Provider ${selectedProvider} does not support direct file uploads`);
       // Still set the file but with a warning
