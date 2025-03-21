@@ -4,35 +4,38 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Upload, FileText, BarChart3, Cat } from 'lucide-react';
 import CatTutor from '@/components/CatTutor';
 import { cn } from '@/lib/utils';
-
-const featuresData = [
-  {
-    icon: <FileText className="w-6 h-6 text-cat" />,
-    title: "AI Quiz Generation",
-    description: "Upload your study materials and our AI will create personalized quizzes tailored to your content."
-  },
-  {
-    icon: <Cat className="w-6 h-6 text-cat" />,
-    title: "Feline Tutor",
-    description: "Study with our intelligent and ironic cat tutor that provides feedback with a touch of humor."
-  },
-  {
-    icon: <BarChart3 className="w-6 h-6 text-cat" />,
-    title: "Progress Tracking",
-    description: "Track your progress and identify weak areas to focus your study efforts efficiently."
-  }
-];
-
-const levelsData = [
-  { name: "Scholarly Kitten", xp: "0 XP", description: "Just starting out on your learning journey" },
-  { name: "Curious Cat", xp: "100 XP", description: "Building knowledge and asking good questions" },
-  { name: "Clever Feline", xp: "500 XP", description: "Mastering concepts and connecting ideas" },
-  { name: "Academic Tabby", xp: "1000 XP", description: "Applying knowledge in complex scenarios" },
-  { name: "Wisdom Tiger", xp: "2500 XP", description: "Teaching others and mastering difficult subjects" }
-];
+import { useLanguage } from '@/i18n/LanguageContext';
 
 const Index = () => {
+  const { t } = useLanguage();
   const [currentLevel, setCurrentLevel] = useState(0);
+
+  // Multilingual data for features and levels
+  const featuresData = [
+    {
+      icon: <FileText className="w-6 h-6 text-cat" />,
+      title: t('aiQuizGeneration'),
+      description: t('aiQuizGenerationDesc')
+    },
+    {
+      icon: <Cat className="w-6 h-6 text-cat" />,
+      title: t('felineTutor'),
+      description: t('felineTutorDesc')
+    },
+    {
+      icon: <BarChart3 className="w-6 h-6 text-cat" />,
+      title: t('progressTracking'),
+      description: t('progressTrackingDesc')
+    }
+  ];
+
+  const levelsData = [
+    { name: t('scholarlyKitten'), xp: "0 XP", description: t('scholarlyKittenDesc') },
+    { name: t('curiousCat'), xp: "100 XP", description: t('curiousCatDesc') },
+    { name: t('cleverFeline'), xp: "500 XP", description: t('cleverFelineDesc') },
+    { name: t('academicTabby'), xp: "1000 XP", description: t('academicTabbyDesc') },
+    { name: t('wisdomTiger'), xp: "2500 XP", description: t('wisdomTigerDesc') }
+  ];
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -49,22 +52,21 @@ const Index = () => {
         <div className="grid md:grid-cols-2 gap-8 items-center">
           <div className="space-y-6">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
-              Learn Smarter with Your <span className="animated-gradient-text">Feline Tutor</span>
+              {t('heroTitle')} <span className="animated-gradient-text">{t('heroTitleHighlight')}</span>
             </h1>
             
             <p className="text-lg text-muted-foreground">
-              Upload your notes and let our AI create personalized quizzes. 
-              Study with style, earn XP, and level up with the help of your cat friend.
+              {t('heroSubtitle')}
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <Link to="/upload" className="cat-button">
                 <Upload className="w-5 h-5" /> 
-                Upload Your Materials
+                {t('uploadMaterials')}
               </Link>
               
               <Link to="/dashboard" className="cat-button-secondary">
-                See How It Works
+                {t('seeHowItWorks')}
                 <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
@@ -75,14 +77,14 @@ const Index = () => {
             <div className="glass-card p-8 rounded-2xl relative">
               <div className="absolute -top-6 right-8">
                 <CatTutor
-                  message="Hi there! I'm your feline tutor. Let me help you ace those exams!"
+                  message={t('tutorWelcomeMessage')}
                   withSpeechBubble={true}
                   emotion="happy"
                 />
               </div>
               
               <div className="pt-8 pb-2">
-                <h3 className="text-lg font-medium mb-4">Your Learning Journey</h3>
+                <h3 className="text-lg font-medium mb-4">{t('learningJourney')}</h3>
                 
                 <div className="space-y-6 mt-8">
                   {levelsData.map((level, index) => (
@@ -115,9 +117,9 @@ const Index = () => {
       {/* Features Section */}
       <section>
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-4">How QuizzyPurr Works</h2>
+          <h2 className="text-3xl font-bold mb-4">{t('howItWorks')}</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Our intelligent cat-powered platform makes studying effective and surprisingly fun
+            {t('platformDescription')}
           </p>
         </div>
         
@@ -142,15 +144,14 @@ const Index = () => {
         <div className="absolute inset-0 bg-gradient-to-br from-cat/30 to-primary/5 opacity-20"></div>
         
         <div className="relative z-10 max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-4">Ready to Start Learning with Your Cat Tutor?</h2>
+          <h2 className="text-3xl font-bold mb-4">{t('readyToStart')}</h2>
           <p className="text-lg text-muted-foreground mb-8">
-            Upload your study materials and let our AI generate personalized quiz questions. 
-            Rise through the ranks from Scholarly Kitten to Wisdom Tiger!
+            {t('ctaDescription')}
           </p>
           
           <Link to="/upload" className="cat-button inline-flex">
             <Upload className="w-5 h-5" /> 
-            Upload Your Materials
+            {t('uploadMaterials')}
           </Link>
         </div>
       </section>

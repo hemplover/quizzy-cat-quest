@@ -31,7 +31,11 @@ export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
       if ((q.type === 'multiple_choice' || q.type === 'multiple-choice' || q.tipo === 'scelta_multipla')) {
         // Handle multiple choice questions
         const options = q.options || q.opzioni || [];
-        const correctAnswer = q.correct_answer || q.risposta_corretta || '';
+        let correctAnswer = q.correct_answer || q.risposta_corretta || '';
+        // Convert boolean to string if needed
+        if (typeof correctAnswer === 'boolean') {
+          correctAnswer = correctAnswer.toString();
+        }
         const correctIndex = Array.isArray(options) ? options.indexOf(correctAnswer) : 0;
         
         return {

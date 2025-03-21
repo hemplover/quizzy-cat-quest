@@ -81,7 +81,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <div className="w-8 h-8 rounded-lg bg-cat flex items-center justify-center text-white font-bold text-xl">
                 Q
               </div>
-              {!isSidebarCollapsed && <span className="font-bold text-lg">QuizAI</span>}
+              {!isSidebarCollapsed && <span className="font-bold text-lg">{t('appName')}</span>}
             </div>
             
             <button
@@ -156,7 +156,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="w-8 h-8 rounded-lg bg-cat flex items-center justify-center text-white font-bold text-xl">
               Q
             </div>
-            <span className="font-bold text-lg">QuizAI</span>
+            <span className="font-bold text-lg">{t('appName')}</span>
           </div>
           
           <LanguageSwitcher />

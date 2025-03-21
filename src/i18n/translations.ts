@@ -34,6 +34,44 @@ export const translations: Translations = {
     subjects: 'Subjects',
     quizzes: 'Quizzes',
     
+    // Homepage
+    heroTitle: 'Learn Smarter with Your',
+    heroTitleHighlight: 'Feline Tutor',
+    heroSubtitle: 'Upload your notes and let our AI create personalized quizzes. Study with style, earn XP, and level up with the help of your cat friend.',
+    uploadMaterials: 'Upload Your Materials',
+    seeHowItWorks: 'See How It Works',
+    tutorWelcomeMessage: 'Hi there! I\'m your feline tutor. Let me help you ace those exams!',
+    learningJourney: 'Your Learning Journey',
+    howItWorks: 'How Quizzy Cat Works',
+    platformDescription: 'Our intelligent cat-powered platform makes studying effective and surprisingly fun',
+    readyToStart: 'Ready to Start Learning with Your Cat Tutor?',
+    ctaDescription: 'Upload your study materials and let our AI generate personalized quiz questions. Rise through the ranks from Scholarly Kitten to Wisdom Tiger!',
+    
+    // Features
+    aiQuizGeneration: 'AI Quiz Generation',
+    aiQuizGenerationDesc: 'Upload your study materials and our AI will create personalized quizzes tailored to your content.',
+    felineTutor: 'Feline Tutor',
+    felineTutorDesc: 'Study with our intelligent and ironic cat tutor that provides feedback with a touch of humor.',
+    progressTracking: 'Progress Tracking',
+    progressTrackingDesc: 'Track your progress and identify weak areas to focus your study efforts efficiently.',
+    
+    // XP Levels
+    scholarlyKitten: 'Scholarly Kitten',
+    scholarlyKittenDesc: 'Just starting out on your learning journey',
+    curiousCat: 'Curious Cat',
+    curiousCatDesc: 'Building knowledge and asking good questions',
+    cleverFeline: 'Clever Feline',
+    cleverFelineDesc: 'Mastering concepts and connecting ideas',
+    academicTabby: 'Academic Tabby',
+    academicTabbyDesc: 'Applying knowledge in complex scenarios',
+    wisdomTiger: 'Wisdom Tiger',
+    wisdomTigerDesc: 'Teaching others and mastering difficult subjects',
+    
+    // XP Bar
+    experienceProgress: 'Experience Progress',
+    currentLevel: 'Current Level',
+    toNextLevel: 'to next level',
+    
     // Upload page
     uploadTitle: 'Create Quiz',
     uploadSubtitle: 'Upload materials or paste text to generate quiz questions',
@@ -207,6 +245,44 @@ export const translations: Translations = {
     dashboard: 'Dashboard',
     subjects: 'Materie',
     quizzes: 'Quiz',
+    
+    // Homepage
+    heroTitle: 'Impara in Modo Intelligente con il Tuo',
+    heroTitleHighlight: 'Tutor Felino',
+    heroSubtitle: 'Carica i tuoi appunti e lascia che la nostra IA crei quiz personalizzati. Studia con stile, guadagna XP, e sali di livello con l\'aiuto del tuo amico gatto.',
+    uploadMaterials: 'Carica i Tuoi Materiali',
+    seeHowItWorks: 'Vedi Come Funziona',
+    tutorWelcomeMessage: 'Ciao! Sono il tuo tutor felino. Lascia che ti aiuti a superare quegli esami!',
+    learningJourney: 'Il Tuo Percorso di Apprendimento',
+    howItWorks: 'Come Funziona Quizzy Cat',
+    platformDescription: 'La nostra piattaforma intelligente alimentata da gatti rende lo studio efficace e sorprendentemente divertente',
+    readyToStart: 'Pronto a Iniziare a Imparare con il Tuo Tutor Felino?',
+    ctaDescription: 'Carica i tuoi materiali di studio e lascia che la nostra IA generi domande di quiz personalizzate. Sali di rango da Gattino Studioso a Tigre della Saggezza!',
+    
+    // Features
+    aiQuizGeneration: 'Generazione Quiz con IA',
+    aiQuizGenerationDesc: 'Carica i tuoi materiali di studio e la nostra IA creerà quiz personalizzati adattati al tuo contenuto.',
+    felineTutor: 'Tutor Felino',
+    felineTutorDesc: 'Studia con il nostro tutor gatto intelligente e ironico che fornisce feedback con un tocco di umorismo.',
+    progressTracking: 'Monitoraggio Progressi',
+    progressTrackingDesc: 'Tieni traccia dei tuoi progressi e identifica le aree deboli per concentrare i tuoi sforzi di studio in modo efficiente.',
+    
+    // XP Levels
+    scholarlyKitten: 'Gattino Studioso',
+    scholarlyKittenDesc: 'Stai appena iniziando il tuo percorso di apprendimento',
+    curiousCat: 'Gatto Curioso',
+    curiousCatDesc: 'Costruisci conoscenza e fai buone domande',
+    cleverFeline: 'Felino Intelligente',
+    cleverFelineDesc: 'Padroneggi concetti e colleghi idee',
+    academicTabby: 'Gatto Accademico',
+    academicTabbyDesc: 'Applichi conoscenza in scenari complessi',
+    wisdomTiger: 'Tigre della Saggezza',
+    wisdomTigerDesc: 'Insegni agli altri e padroneggi materie difficili',
+    
+    // XP Bar
+    experienceProgress: 'Progresso Esperienza',
+    currentLevel: 'Livello Attuale',
+    toNextLevel: 'al prossimo livello',
     
     // Upload page
     uploadTitle: 'Crea Quiz',

@@ -20,6 +20,36 @@ import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/lib/utils';
 import CreateSubjectModal from '@/components/CreateSubjectModal';
 import { getSubjects, getQuizzesBySubjectId, getSubjectById } from '@/services/subjectService';
+import XPBar from '@/components/XPBar';
+
+// XP levels data
+const xpLevels = [
+  { name: 'Scholarly Kitten', minXP: 0, maxXP: 100 },
+  { name: 'Curious Cat', minXP: 100, maxXP: 500 },
+  { name: 'Clever Feline', minXP: 500, maxXP: 1000 },
+  { name: 'Academic Tabby', minXP: 1000, maxXP: 2500 },
+  { name: 'Wisdom Tiger', minXP: 2500, maxXP: 5000 }
+];
+
+// Get level based on XP
+const getLevelInfo = (xp: number) => {
+  let currentLevel = xpLevels[0];
+  let nextLevel = xpLevels[1];
+  
+  for (let i = 0; i < xpLevels.length; i++) {
+    if (xp >= xpLevels[i].minXP) {
+      currentLevel = xpLevels[i];
+      nextLevel = xpLevels[i + 1] || xpLevels[i];
+    } else {
+      break;
+    }
+  }
+  
+  return {
+    current: currentLevel,
+    next: nextLevel
+  };
+};
 
 const Dashboard = () => {
   const { t } = useLanguage();
@@ -42,6 +72,10 @@ const Dashboard = () => {
     loadSubjects();
   }, []);
 
+  // Calculate level information
+  const levelInfo = getLevelInfo(userXP);
+  const nextLevelXP = levelInfo.next.minXP;
+  
   // Load all subjects from localStorage
   const loadSubjects = () => {
     const loadedSubjects = getSubjects();
@@ -101,6 +135,17 @@ const Dashboard = () => {
             </div>
             
             <CatTutor emotion="happy" withSpeechBubble={false} />
+          </div>
+          
+          {/* XP Progress Bar */}
+          <div className="mb-6">
+            <h3 className="font-medium mb-2">{t('experienceProgress')}</h3>
+            <XPBar 
+              currentXP={userXP} 
+              nextLevelXP={nextLevelXP}
+              level={t(levelInfo.current.name.toLowerCase().replace(' ', ''))}
+              nextLevel={t(levelInfo.next.name.toLowerCase().replace(' ', ''))}
+            />
           </div>
           
           {quizResults.length > 0 ? (
@@ -292,9 +337,9 @@ const Dashboard = () => {
           ) : (
             <div className="text-center py-8">
               <Award className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="font-medium text-gray-600 mb-2">{t('noSubjectsFound')}</h3>
+              <h3 className="font-medium text-gray-600 mb-2">{t('noRecentQuizzes')}</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                {t('createYourFirstSubject')}
+                {t('takeYourFirstQuiz')}
               </p>
               <Link to="/upload" className="cat-button-secondary inline-flex">
                 <Upload className="w-4 h-4 mr-2" />
