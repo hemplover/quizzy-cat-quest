@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FileUp, BookOpen, Settings, Sparkles, ArrowRight, FileText, CheckCircle2, Pencil, AlertCircle } from 'lucide-react';
@@ -132,6 +131,7 @@ const Upload = () => {
     }
   };
 
+  // Modifica: utilizza processFile per preparare il file prima di inviarlo all'API
   const handleFileUpload = async (file: File) => {
     setSelectedFile(file);
     
@@ -145,8 +145,8 @@ const Upload = () => {
     setIsProcessing(true);
     
     try {
-      // Direct file upload
-      setProcessedContent(file);
+      const processed = await processFile(file);
+      setProcessedContent(processed);
       setIsReadyToGenerateQuiz(true);
       setIsProcessing(false);
       toast.success(t('fileReadyForQuiz').replace('{file}', file.name));
