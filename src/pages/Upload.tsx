@@ -1,15 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FileUp, BookOpen, Settings, Sparkles, ArrowRight, FileText, CheckCircle2, Pencil, AlertCircle } from 'lucide-react';
-import FileUpload from '@/components/FileUpload';
+import { BookOpen, Settings, Sparkles, ArrowRight, FileText, CheckCircle2, Pencil, AlertCircle } from 'lucide-react';
 import CatTutor from '@/components/CatTutor';
 import { toast } from 'sonner';
 import { 
   generateQuiz, 
   transformQuizQuestions,
   hasValidApiKey,
-  providerSupportsFileUpload,
-  processFile,
   getModelToUse,
   getSelectedModel
 } from '@/services/quizService';
@@ -42,29 +40,26 @@ const Upload = () => {
   const initialSubjectId = queryParams.get('subject');
   const documentId = queryParams.get('document');
   
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [textInput, setTextInput] = useState('');
   const [difficulty, setDifficulty] = useState('intermediate');
   const [selectedQuestionTypes, setSelectedQuestionTypes] = useState<string[]>(['multiple-choice', 'true-false']);
   const [numQuestions, setNumQuestions] = useState(10);
   const [isProcessing, setIsProcessing] = useState(false);
   const [catMessage, setCatMessage] = useState(t('uploadInstructions'));
-  const [processedContent, setProcessedContent] = useState<string | File | null>(null);
+  const [processedContent, setProcessedContent] = useState<string | null>(null);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [isReadyToGenerateQuiz, setIsReadyToGenerateQuiz] = useState(false);
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
   const [selectedAIProvider, setSelectedAIProvider] = useState<AIProvider>(getSelectedProvider());
   const [selectedModel, setSelectedModel] = useState<string>(getSelectedModel());
   const [selectedSubject, setSelectedSubject] = useState<string | null>(initialSubjectId);
-  const [uploadStep, setUploadStep] = useState<'choose' | 'content' | 'settings'>('choose');
+  const [uploadStep, setUploadStep] = useState<'content' | 'settings'>('content');
   const [subjectName, setSubjectName] = useState<string>('');
-  const [supportsFileUpload, setSupportsFileUpload] = useState(providerSupportsFileUpload());
   const [documentName, setDocumentName] = useState<string>('');
   
-  // Restore file or text from a previously uploaded document
+  // Restore text from a previously uploaded document
   useEffect(() => {
     setHasApiKey(hasValidApiKey());
-    setSupportsFileUpload(providerSupportsFileUpload());
     
     // Initialize subjects if needed
     initializeSubjectsIfNeeded();
@@ -104,13 +99,11 @@ const Upload = () => {
   const handleApiKeySubmit = (key: string, provider: AIProvider) => {
     setSelectedAIProvider(provider);
     setHasApiKey(true);
-    setSupportsFileUpload(providerSupportsFileUpload());
   };
   
   const handleProviderChange = (provider: AIProvider) => {
     setSelectedAIProvider(provider);
     setHasApiKey(hasValidApiKey());
-    setSupportsFileUpload(providerSupportsFileUpload());
     
     // Reset selected model to provider's default
     const providerConfig = AI_PROVIDERS.find(p => p.id === provider);
@@ -131,43 +124,12 @@ const Upload = () => {
     }
   };
 
-  // Modifica: utilizza processFile per preparare il file prima di inviarlo all'API
-  const handleFileUpload = async (file: File) => {
-    setSelectedFile(file);
-    
-    if (!supportsFileUpload) {
-      toast.error(t('fileUploadNotSupported'));
-      setCatMessage(t('fileUploadNotSupportedMsg'));
-      return;
-    }
-    
-    setCatMessage(t('processingFile').replace('{file}', file.name));
-    setIsProcessing(true);
-    
-    try {
-      const processed = await processFile(file);
-      setProcessedContent(processed);
-      setIsReadyToGenerateQuiz(true);
-      setIsProcessing(false);
-      toast.success(t('fileReadyForQuiz').replace('{file}', file.name));
-      setCatMessage(t('fileAnalysisReady').replace('{file}', file.name));
-      
-      // Move to settings step
-      setUploadStep('settings');
-    } catch (error) {
-      console.error("Error processing file:", error);
-      toast.error(t('errorProcessingFile'));
-      setCatMessage(t('fileProcessingError'));
-      setIsProcessing(false);
-    }
-  };
-
   const handleTextInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setTextInput(e.target.value);
     setProcessedContent(null);
     setIsReadyToGenerateQuiz(false);
     
-    if (e.target.value.length > 200 && !selectedFile) {
+    if (e.target.value.length > 200) {
       setCatMessage(t('enoughText'));
     }
   };
@@ -234,26 +196,26 @@ const Upload = () => {
       if (generatedQuiz && generatedQuiz.quiz && generatedQuiz.quiz.length > 0) {
         const questions = transformQuizQuestions(generatedQuiz);
         
-        if (selectedFile || textInput) {
+        if (textInput) {
           const document = createDocument({
             subjectId: selectedSubject,
-            name: selectedFile ? selectedFile.name : documentName || 'Text Input ' + new Date().toLocaleString(),
-            content: typeof processedContent === 'string' ? processedContent : 'File Content (Stored as reference)',
-            fileType: selectedFile ? selectedFile.type : 'text/plain',
-            fileSize: selectedFile ? selectedFile.size : new Blob([textInput]).size
+            name: documentName || 'Text Input ' + new Date().toLocaleString(),
+            content: processedContent,
+            fileType: 'text/plain',
+            fileSize: new Blob([textInput]).size
           });
           
           createQuizRecord({
             subjectId: selectedSubject,
             documentId: document.id,
-            title: `Quiz on ${selectedFile ? selectedFile.name : documentName || 'Text Input'}`,
+            title: `Quiz on ${documentName || 'Text Input'}`,
             questions: questions
           });
         }
         
         sessionStorage.setItem('quizQuestions', JSON.stringify(questions));
         sessionStorage.setItem('quizData', JSON.stringify({
-          source: selectedFile ? selectedFile.name : documentName || 'Text input',
+          source: documentName || 'Text input',
           difficulty,
           questionTypes: selectedQuestionTypes,
           numQuestions: questions.length,
@@ -294,9 +256,9 @@ const Upload = () => {
     <div className="max-w-4xl mx-auto">
       <div className="flex justify-between items-start mb-8">
         <div>
-          <h1 className="text-3xl font-bold mb-2">{t('uploadTitle')}</h1>
+          <h1 className="text-3xl font-bold mb-2">{t('createQuiz')}</h1>
           <p className="text-muted-foreground">
-            {subjectName ? t('creatingQuizFor').replace('{subject}', subjectName) : t('uploadSubtitle')}
+            {subjectName ? t('creatingQuizFor').replace('{subject}', subjectName) : t('enterTextToCreateQuiz')}
           </p>
         </div>
         <div className="flex flex-col items-end">
@@ -311,10 +273,10 @@ const Upload = () => {
         <div className="relative flex items-center">
           <div className="flex-grow border-t border-gray-300"></div>
           <div className="mx-4 flex items-center">
-            <div className={`w-8 h-8 flex items-center justify-center rounded-full mr-2 ${uploadStep === 'choose' ? 'bg-cat text-white' : 'bg-gray-200'}`}>
+            <div className={`w-8 h-8 flex items-center justify-center rounded-full mr-2 ${uploadStep === 'content' ? 'bg-cat text-white' : 'bg-gray-200'}`}>
               1
             </div>
-            <span className={`text-sm font-medium ${uploadStep === 'choose' ? 'text-cat' : 'text-gray-500'}`}>{t('chooseSource')}</span>
+            <span className={`text-sm font-medium ${uploadStep === 'content' ? 'text-cat' : 'text-gray-500'}`}>{t('enterContent')}</span>
           </div>
           <div className="flex-grow border-t border-gray-300"></div>
           <div className="mx-4 flex items-center">
@@ -327,7 +289,7 @@ const Upload = () => {
         </div>
       </div>
       
-      {uploadStep === 'choose' && (
+      {uploadStep === 'content' && (
         <div className="glass-card p-6 rounded-xl mb-8">
           <div className="grid md:grid-cols-2 gap-6 mb-6">
             <AIProviderSelector 
@@ -347,31 +309,6 @@ const Upload = () => {
             
             <ModelSelector 
               onModelChange={handleModelChange}
-            />
-          </div>
-          
-          {!supportsFileUpload && (
-            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg mb-6 flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <h4 className="font-medium text-amber-800">{t('fileUploadNotSupported')}</h4>
-                <p className="text-sm text-amber-700">
-                  {t('fileUploadNotSupportedMsg')}
-                </p>
-              </div>
-            </div>
-          )}
-          
-          <div className="flex items-center gap-2 mb-4">
-            <FileUp className="w-5 h-5 text-cat" />
-            <h2 className="text-xl font-medium">{t('uploadDocument')}</h2>
-          </div>
-          
-          <div className="mb-6">
-            <FileUpload 
-              onFileUpload={handleFileUpload} 
-              accept=".pdf,.doc,.docx,.txt"
-              showUploadButton={true}
             />
           </div>
           
@@ -416,27 +353,21 @@ const Upload = () => {
             <div className="flex items-center justify-between p-4 rounded-lg border bg-gray-50 mb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-white rounded-full border">
-                  {selectedFile ? (
-                    <FileText className="w-5 h-5 text-cat" />
-                  ) : (
-                    <Pencil className="w-5 h-5 text-cat" />
-                  )}
+                  <Pencil className="w-5 h-5 text-cat" />
                 </div>
                 <div>
                   <h3 className="font-medium">
-                    {selectedFile ? selectedFile.name : documentName || t('textInput')}
+                    {documentName || t('textInput')}
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    {selectedFile ? 
-                      `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB` : 
-                      `${textInput.length} ${t('characters')}`}
+                    {`${textInput.length} ${t('characters')}`}
                   </p>
                 </div>
               </div>
               
               <button 
                 onClick={() => {
-                  setUploadStep('choose');
+                  setUploadStep('content');
                   setProcessedContent(null);
                   setIsReadyToGenerateQuiz(false);
                 }}
@@ -447,9 +378,7 @@ const Upload = () => {
             </div>
             
             <p className="text-sm text-muted-foreground mb-3">
-              {selectedFile 
-                ? t('fileWillBeSent')
-                : t('textContentReady')}
+              {t('textContentReady')}
             </p>
           </div>
           
@@ -534,7 +463,7 @@ const Upload = () => {
           
           <div className="flex justify-end gap-3">
             <button
-              onClick={() => setUploadStep('choose')}
+              onClick={() => setUploadStep('content')}
               className="cat-button-secondary"
             >
               {t('back')}

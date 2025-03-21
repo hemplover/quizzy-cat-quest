@@ -1,14 +1,11 @@
-
 import { toast } from 'sonner';
 import { 
   AIProvider, 
   getSelectedProvider, 
   getApiKey,
-  supportsFileUpload,
   getDefaultModel
 } from './aiProviderService';
 import { 
-  extractTextFromFile, 
   generateQuiz as generateOpenAIQuiz,
   gradeQuiz as gradeOpenAIQuiz 
 } from './openaiService';
@@ -79,17 +76,13 @@ export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
 
 // Generate quiz based on the selected AI provider with improved filtering by question type
 export const generateQuiz = async (
-  content: string | File,
+  content: string,
   settings: QuizSettings
 ): Promise<GeneratedQuiz | null> => {
   const provider = getSelectedProvider();
   console.log(`Generating quiz with provider: ${provider}`);
   console.log(`Content type: ${typeof content}`);
   console.log(`Selected question types:`, settings.questionTypes);
-  
-  if (content instanceof File) {
-    console.log(`File name: ${content.name}, type: ${content.type}, size: ${content.size} bytes`);
-  }
   
   try {
     let result = null;
@@ -228,36 +221,6 @@ export const hasValidApiKey = (): boolean => {
   return !!apiKey;
 };
 
-// Check if the provider supports file upload
-export const providerSupportsFileUpload = (provider?: AIProvider): boolean => {
-  return supportsFileUpload(provider || getSelectedProvider());
-};
-
-// Process file based on AI provider capabilities
-export const processFile = async (file: File): Promise<string | File> => {
-  const provider = getSelectedProvider();
-  
-  try {
-    console.log(`Processing file for ${provider}...`);
-    
-    if (supportsFileUpload(provider)) {
-      // For providers that support direct file uploads, return the file directly
-      console.log(`Provider ${provider} supports direct file upload, passing file through`);
-      return file;
-    } else {
-      // For providers that don't support file upload, extract the text locally
-      console.log(`Provider ${provider} doesn't support direct file upload, extracting text`);
-      const extractedText = await extractTextFromFile(file);
-      console.log(`Extracted text length: ${extractedText.length} characters`);
-      return extractedText;
-    }
-  } catch (error) {
-    console.error('Error processing file:', error);
-    toast.error(`Error processing file: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    throw error;
-  }
-};
-
 // Get the appropriate model to use based on provider
 export const getModelToUse = (): string => {
   return getDefaultModel();
@@ -279,31 +242,29 @@ export const getSelectedModel = (): string => {
   return savedModel;
 };
 
-// Save the most recently uploaded file for the current subject
-export const saveRecentFile = (subjectId: string, fileData: {
+// Save the most recently uploaded text for the current subject
+export const saveRecentText = (subjectId: string, textData: {
   name: string;
-  type: string;
-  content: string | ArrayBuffer;
+  content: string;
 }): void => {
   try {
-    // Store file data keyed by subject ID
-    const fileKey = `recent_file_${subjectId}`;
-    localStorage.setItem(fileKey, JSON.stringify(fileData));
-    console.log(`Saved recent file for subject ${subjectId}`);
+    // Store text data keyed by subject ID
+    const textKey = `recent_text_${subjectId}`;
+    localStorage.setItem(textKey, JSON.stringify(textData));
+    console.log(`Saved recent text for subject ${subjectId}`);
   } catch (error) {
-    console.error('Error saving recent file:', error);
+    console.error('Error saving recent text:', error);
   }
 };
 
-// Get the most recently uploaded file for the current subject
-export const getRecentFile = (subjectId: string): {
+// Get the most recently uploaded text for the current subject
+export const getRecentText = (subjectId: string): {
   name: string;
-  type: string;
-  content: string | ArrayBuffer;
+  content: string;
 } | null => {
   try {
-    const fileKey = `recent_file_${subjectId}`;
-    const storedData = localStorage.getItem(fileKey);
+    const textKey = `recent_text_${subjectId}`;
+    const storedData = localStorage.getItem(textKey);
     
     if (!storedData) {
       return null;
@@ -311,7 +272,7 @@ export const getRecentFile = (subjectId: string): {
     
     return JSON.parse(storedData);
   } catch (error) {
-    console.error('Error retrieving recent file:', error);
+    console.error('Error retrieving recent text:', error);
     return null;
   }
 };

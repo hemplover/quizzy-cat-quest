@@ -1,10 +1,9 @@
 
 import { getApiKey } from './aiProviderService';
 import { GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
-import { extractTextFromFile } from './openaiService';
 
 export const generateQuizWithGemini = async (
-  content: string | File,
+  content: string,
   settings: QuizSettings
 ): Promise<GeneratedQuiz> => {
   const apiKey = getApiKey('gemini');
@@ -13,11 +12,6 @@ export const generateQuizWithGemini = async (
   }
   
   try {
-    // Extract text from file if content is a File
-    const textContent = typeof content === 'string' 
-      ? content 
-      : await extractTextFromFile(content);
-    
     // Prepare prompt for Gemini
     const prompt = `You are a university professor responsible for creating exams for students. Based only on the provided study material, generate a realistic university-level exam.
 
@@ -37,7 +31,7 @@ ${settings.questionTypes.map(type => `- ${type}`).join('\n')}
 ${settings.numQuestions}
 
 ### Study Material:
-${textContent}
+${content}
 
 ### Output Format (JSON):
 {
