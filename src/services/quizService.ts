@@ -5,15 +5,8 @@ import {
   getApiKey,
   getDefaultModel
 } from './aiProviderService';
-import { 
-  generateQuiz as generateOpenAIQuiz,
-  gradeQuiz as gradeOpenAIQuiz 
-} from './openaiService';
-import {
-  generateQuizWithGemini,
-  gradeQuizWithGemini
-} from './geminiService';
 import { QuizQuestion, GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
+import { supabase } from '@/integrations/supabase/client';
 
 // Transform generated questions to our app format with improved reliability
 export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
@@ -74,7 +67,7 @@ export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
   }
 };
 
-// Generate quiz based on the selected AI provider with improved filtering by question type
+// Generate quiz using Supabase Edge Function
 export const generateQuiz = async (
   content: string,
   settings: QuizSettings
@@ -85,25 +78,22 @@ export const generateQuiz = async (
   console.log(`Selected question types:`, settings.questionTypes);
   
   try {
-    let result = null;
+    // Call the edge function for quiz generation
+    const { data, error } = await supabase.functions.invoke('generate-quiz', {
+      body: {
+        content,
+        settings,
+        provider
+      }
+    });
     
-    switch (provider) {
-      case 'openai':
-        result = await generateOpenAIQuiz(content, settings);
-        break;
-      case 'gemini':
-        result = await generateQuizWithGemini(content, settings);
-        break;
-      case 'claude':
-      case 'mistral':
-        toast.error(`Integration with ${provider} is coming soon!`);
-        return null;
-      default:
-        toast.error('Unknown AI provider');
-        return null;
+    if (error) {
+      console.error('Error calling generate-quiz function:', error);
+      toast.error(`Error generating quiz: ${error.message}`);
+      return null;
     }
     
-    if (!result || !result.quiz || result.quiz.length === 0) {
+    if (!data || !data.quiz || data.quiz.length === 0) {
       console.error('Failed to generate quiz: Empty or invalid response from API');
       return null;
     }
@@ -118,8 +108,8 @@ export const generateQuiz = async (
       
       // Only keep questions of the selected types
       const filteredQuiz = {
-        ...result,
-        quiz: result.quiz.filter(q => {
+        ...data,
+        quiz: data.quiz.filter(q => {
           // Get the question type, checking both .type and .tipo fields
           const questionType = q.type || q.tipo || '';
           
@@ -133,13 +123,13 @@ export const generateQuiz = async (
       // If we filtered out all questions, use the original result
       if (filteredQuiz.quiz.length === 0) {
         console.warn('Filtering removed all questions, using original result');
-        return result;
+        return data;
       }
       
       return filteredQuiz;
     }
     
-    return result;
+    return data;
   } catch (error) {
     console.error('Error generating quiz:', error);
     toast.error(`Error generating quiz: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -147,7 +137,7 @@ export const generateQuiz = async (
   }
 };
 
-// Grade quiz based on the selected AI provider
+// Grade quiz using Supabase Edge Function
 export const gradeQuiz = async (
   questions: any[], 
   userAnswers: any[]
@@ -155,58 +145,55 @@ export const gradeQuiz = async (
   const provider = getSelectedProvider();
   
   try {
-    let result: QuizResults | null = null;
+    // Call the edge function for quiz grading
+    const { data, error } = await supabase.functions.invoke('grade-quiz', {
+      body: {
+        questions,
+        userAnswers,
+        provider
+      }
+    });
     
-    switch (provider) {
-      case 'openai':
-        result = await gradeOpenAIQuiz(questions, userAnswers);
-        break;
-      case 'gemini':
-        result = await gradeQuizWithGemini(questions, userAnswers);
-        break;
-      case 'claude':
-      case 'mistral':
-        toast.error(`Integration with ${provider} is coming soon!`);
-        return null;
-      default:
-        toast.error('Unknown AI provider');
-        return null;
+    if (error) {
+      console.error('Error calling grade-quiz function:', error);
+      toast.error(`Error grading quiz: ${error.message}`);
+      return null;
     }
     
     // Validate the quiz results
-    if (!result || !result.risultati || !Array.isArray(result.risultati)) {
-      console.error('Invalid quiz results format:', result);
+    if (!data || !data.risultati || !Array.isArray(data.risultati)) {
+      console.error('Invalid quiz results format:', data);
       toast.error('Invalid quiz results returned by AI. Please try again.');
       return null;
     }
     
     // Make sure we have the same number of results as questions
-    if (result.risultati.length !== questions.length) {
-      console.warn(`Result count mismatch: ${result.risultati.length} results for ${questions.length} questions`);
+    if (data.risultati.length !== questions.length) {
+      console.warn(`Result count mismatch: ${data.risultati.length} results for ${questions.length} questions`);
       
       // Pad or truncate results to match question count
-      if (result.risultati.length < questions.length) {
+      if (data.risultati.length < questions.length) {
         // Pad with dummy results if we have too few
-        const padding = Array(questions.length - result.risultati.length).fill(0).map((_, i) => ({
-          domanda: questions[result.risultati.length + i].question,
-          risposta_utente: String(userAnswers[result.risultati.length + i]),
+        const padding = Array(questions.length - data.risultati.length).fill(0).map((_, i) => ({
+          domanda: questions[data.risultati.length + i].question,
+          risposta_utente: String(userAnswers[data.risultati.length + i]),
           corretto: false,
           punteggio: 0,
           spiegazione: 'Answer could not be evaluated'
         }));
         
-        result.risultati = [...result.risultati, ...padding];
+        data.risultati = [...data.risultati, ...padding];
       } else {
         // Truncate if we have too many
-        result.risultati = result.risultati.slice(0, questions.length);
+        data.risultati = data.risultati.slice(0, questions.length);
       }
       
       // Recalculate total score
-      const totalScore = result.risultati.reduce((sum, r) => sum + (r.punteggio || 0), 0) / questions.length;
-      result.punteggio_totale = totalScore;
+      const totalScore = data.risultati.reduce((sum, r) => sum + (r.punteggio || 0), 0) / questions.length;
+      data.punteggio_totale = totalScore;
     }
     
-    return result;
+    return data;
   } catch (error) {
     console.error('Error grading quiz:', error);
     toast.error(`Error grading quiz: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -214,7 +201,7 @@ export const gradeQuiz = async (
   }
 };
 
-// Check if the provider has a valid API key
+// Check if the provider has a valid API key (for API key management UI)
 export const hasValidApiKey = (): boolean => {
   const provider = getSelectedProvider();
   const apiKey = getApiKey(provider);

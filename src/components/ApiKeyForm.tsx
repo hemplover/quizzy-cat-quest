@@ -1,14 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Key, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { Settings, Key, Check, Alert } from 'lucide-react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { 
   AI_PROVIDERS, 
   AIProvider,
-  getSelectedProvider 
+  getSelectedProvider, 
+  setApiKey,
+  getApiKey
 } from '@/services/aiProviderService';
 import AIProviderSelector from './AIProviderSelector';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ApiKeyFormProps {
   onKeySubmit: (key: string, provider: AIProvider) => void;
@@ -23,6 +26,8 @@ const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
   const [isVisible, setIsVisible] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<AIProvider>(getSelectedProvider());
   const [hasKeys, setHasKeys] = useState<Record<string, boolean>>({});
+  const [useBackend, setUseBackend] = useState(true);
+  const [isCheckingBackend, setIsCheckingBackend] = useState(true);
 
   useEffect(() => {
     // Check if keys already exist in local storage
@@ -30,7 +35,7 @@ const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
     const savedKeys: Record<string, string> = {};
     
     AI_PROVIDERS.forEach(provider => {
-      const storedKey = localStorage.getItem(provider.apiKeyName);
+      const storedKey = getApiKey(provider.id);
       keysStatus[provider.id] = !!storedKey;
       
       if (storedKey) {
@@ -42,9 +47,47 @@ const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
     
     setHasKeys(keysStatus);
     setApiKeys(savedKeys);
+    
+    // Check if we have backend API keys set up
+    const checkBackendKeys = async () => {
+      try {
+        setIsCheckingBackend(true);
+        
+        const { data, error } = await supabase.functions.invoke('check-api-keys', {
+          body: {}
+        });
+        
+        if (error) {
+          console.error('Error checking backend API keys:', error);
+          setUseBackend(false);
+          return;
+        }
+        
+        // Update keys status based on backend response
+        if (data && data.keys) {
+          const backendKeysStatus = { ...keysStatus };
+          
+          Object.entries(data.keys).forEach(([provider, hasKey]) => {
+            backendKeysStatus[provider as AIProvider] = !!hasKey;
+          });
+          
+          setHasKeys(backendKeysStatus);
+          setUseBackend(true);
+        } else {
+          setUseBackend(false);
+        }
+      } catch (error) {
+        console.error('Failed to check backend API keys:', error);
+        setUseBackend(false);
+      } finally {
+        setIsCheckingBackend(false);
+      }
+    };
+    
+    checkBackendKeys();
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const currentProvider = AI_PROVIDERS.find(p => p.id === selectedProvider);
@@ -59,17 +102,44 @@ const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
       return;
     }
 
-    // Store in localStorage
-    localStorage.setItem(currentProvider.apiKeyName, apiKey);
-    
-    // Update has keys
-    setHasKeys({
-      ...hasKeys,
-      [selectedProvider]: true
-    });
-    
-    onKeySubmit(apiKey, selectedProvider);
-    toast.success(`${currentProvider.name} API key saved successfully`);
+    if (useBackend) {
+      try {
+        // Send API key to backend instead of storing locally
+        const { error } = await supabase.functions.invoke('set-api-key', {
+          body: {
+            provider: selectedProvider,
+            apiKey: apiKey
+          }
+        });
+        
+        if (error) {
+          toast.error(`Failed to save API key: ${error.message}`);
+          return;
+        }
+        
+        // Update has keys
+        setHasKeys({
+          ...hasKeys,
+          [selectedProvider]: true
+        });
+        
+        toast.success(`${currentProvider.name} API key saved securely on the server`);
+      } catch (error) {
+        console.error('Error saving API key to backend:', error);
+        toast.error('Failed to save API key to backend');
+      }
+    } else {
+      // Store in localStorage (as fallback if backend is not available)
+      setApiKey(selectedProvider, apiKey);
+      
+      // Update has keys
+      setHasKeys({
+        ...hasKeys,
+        [selectedProvider]: true
+      });
+      
+      onKeySubmit(apiKey, selectedProvider);
+    }
   };
 
   const handleProviderChange = (provider: AIProvider) => {
@@ -129,10 +199,21 @@ const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
       />
       
       <form onSubmit={handleSubmit} className="space-y-3">
-        <p className="text-xs text-muted-foreground">
-          Enter your API key for the selected provider. For demo purposes, the key is stored in your browser.
-          In a production app, this would be handled server-side.
-        </p>
+        {useBackend ? (
+          <div className="bg-blue-50 p-3 rounded-md mb-3">
+            <div className="flex items-start gap-2">
+              <Alert className="w-4 h-4 text-blue-500 mt-0.5" />
+              <p className="text-xs text-blue-700">
+                API keys are now stored securely on the server. Your keys won't be exposed in the browser.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Enter your API key for the selected provider. For demo purposes, the key is stored in your browser.
+            In a production app, this would be handled server-side.
+          </p>
+        )}
         
         <div className="relative">
           <Input
