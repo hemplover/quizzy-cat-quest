@@ -8,20 +8,45 @@ const AuthCallback = () => {
   const navigate = useNavigate();
   
   useEffect(() => {
-    // This page handles OAuth redirects
-    const { hash } = window.location;
-    
-    if (hash && hash.includes('access_token')) {
-      // Wait for Supabase Auth to process the token
-      supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_IN' && session) {
-          navigate('/dashboard');
+    // Process the auth callback
+    const processAuth = async () => {
+      try {
+        // Get the URL hash
+        const { hash, search } = window.location;
+        
+        // OAuth providers like Google use URL hash fragments
+        if (hash && hash.includes('access_token')) {
+          console.log('Processing token from hash fragment');
+          
+          // The hash contains all the token information
+          // Let Supabase Auth handle it with a side effect
+          const { error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.error('Error processing auth callback:', error);
+            navigate('/auth');
+            return;
+          }
+          
+          // Wait a moment to ensure auth state is processed
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 500);
+        } else if (search && search.includes('error')) {
+          // Handle errors from the OAuth provider
+          console.error('Auth error:', search);
+          navigate('/auth');
+        } else {
+          // If no hash with token, redirect to sign in
+          navigate('/auth');
         }
-      });
-    } else {
-      // If no hash with token, redirect to sign in
-      navigate('/auth');
-    }
+      } catch (error) {
+        console.error('Error in auth callback:', error);
+        navigate('/auth');
+      }
+    };
+    
+    processAuth();
   }, [navigate]);
   
   return (

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,7 +33,6 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [authMode, setAuthMode] = useState<'sign-in' | 'sign-up'>('sign-in');
   
-  // Check if user is already logged in
   useEffect(() => {
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
@@ -45,7 +43,6 @@ const Auth = () => {
     
     checkSession();
     
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (session) {
@@ -79,7 +76,6 @@ const Auth = () => {
         throw error;
       }
       
-      // Auth state change will handle navigation
       toast.success(t('Successfully signed in'));
     } catch (error: any) {
       console.error('Error signing in:', error);
@@ -115,8 +111,6 @@ const Auth = () => {
       }
       
       toast.success(t('Account created successfully'));
-      // Auth state change will handle navigation if auto-confirmed
-      // Otherwise show message about confirmation email
       toast.info(t('Please check your email for confirmation'));
     } catch (error: any) {
       console.error('Error signing up:', error);
