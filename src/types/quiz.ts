@@ -34,6 +34,7 @@ export interface QuizSettings {
   questionTypes: string[];
   numQuestions: number;
   model?: string;
+  previousQuizzes?: number;  // Added this property to fix the TypeScript error
 }
 
 export interface ProcessedFile {
