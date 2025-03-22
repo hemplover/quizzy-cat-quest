@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
@@ -46,6 +47,7 @@ const SubjectDetail = () => {
         setDocuments(subjectDocuments);
         
         const subjectQuizzes = await getQuizzesBySubjectId(subjectId);
+        console.log("Fetched quizzes:", subjectQuizzes);
         setQuizzes(subjectQuizzes);
       } catch (error) {
         console.error("Error fetching subject data:", error);
@@ -78,14 +80,24 @@ const SubjectDetail = () => {
   const calculateSubjectScore = () => {
     if (!quizzes || quizzes.length === 0) return 0;
     
-    const totalScore = quizzes.reduce((sum, quiz) => {
-      if (quiz.results && quiz.results.punteggio_totale) {
-        return sum + (quiz.results.punteggio_totale / quiz.questions.length) * 100;
-      }
-      return sum;
-    }, 0);
+    const quizzesWithResults = quizzes.filter(quiz => 
+      quiz.results && 
+      typeof quiz.results.punteggio_totale === 'number' && 
+      quiz.questions && 
+      quiz.questions.length > 0
+    );
     
-    return Math.round(totalScore / quizzes.length);
+    if (quizzesWithResults.length === 0) return 0;
+    
+    let totalScore = 0;
+    let totalPossibleScore = 0;
+    
+    quizzesWithResults.forEach(quiz => {
+      totalScore += quiz.results.punteggio_totale;
+      totalPossibleScore += quiz.questions.length;
+    });
+    
+    return Math.round((totalScore / totalPossibleScore) * 100);
   };
   
   const subjectScore = calculateSubjectScore();
@@ -274,53 +286,57 @@ const SubjectDetail = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {quizzes.map((quiz) => (
-                    <div key={quiz.id} className="glass-card p-4 rounded-lg">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3">
-                          <div className="p-2 bg-white rounded-lg border">
-                            <BookOpen className="w-6 h-6 text-cat" />
-                          </div>
-                          
-                          <div>
-                            <h3 className="font-medium">{quiz.title}</h3>
-                            <p className="text-xs text-muted-foreground">
-                              Created {new Date(quiz.createdAt).toLocaleDateString()} • 
-                              {quiz.questions.length} questions
-                            </p>
+                  {quizzes.map((quiz) => {
+                    const scorePercentage = quiz.results && quiz.questions && quiz.questions.length > 0 
+                      ? Math.round((quiz.results.punteggio_totale / quiz.questions.length) * 100) 
+                      : null;
+                    
+                    return (
+                      <div key={quiz.id} className="glass-card p-4 rounded-lg">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 bg-white rounded-lg border">
+                              <BookOpen className="w-6 h-6 text-cat" />
+                            </div>
                             
-                            <div className="flex mt-3 gap-2">
-                              <Link 
-                                to={`/quiz?id=${quiz.id}`}
-                                className="text-xs px-2 py-1 bg-cat/10 text-cat rounded hover:bg-cat/20"
-                              >
-                                Take Quiz
-                              </Link>
+                            <div>
+                              <h3 className="font-medium">{quiz.title}</h3>
+                              <p className="text-xs text-muted-foreground">
+                                Created {new Date(quiz.createdAt).toLocaleDateString()} • 
+                                {quiz.questions.length} questions
+                              </p>
                               
-                              {quiz.results && (
-                                <div className="text-xs px-2 py-1 bg-gray-100 rounded">
-                                  Last score: {Math.round((quiz.results.punteggio_totale / quiz.questions.length) * 100)}%
-                                </div>
-                              )}
+                              <div className="flex mt-3 gap-2">
+                                <Link 
+                                  to={`/quiz?id=${quiz.id}`}
+                                  className="text-xs px-2 py-1 bg-cat/10 text-cat rounded hover:bg-cat/20"
+                                >
+                                  Take Quiz
+                                </Link>
+                                
+                                {scorePercentage !== null && (
+                                  <div className="text-xs px-2 py-1 bg-gray-100 rounded">
+                                    Last score: {scorePercentage}%
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
+                          
+                          {scorePercentage !== null && (
+                            <div className={cn(
+                              "text-lg font-bold",
+                              scorePercentage >= 70 ? "text-green-600" : 
+                              scorePercentage >= 40 ? "text-amber-600" : 
+                              "text-red-600"
+                            )}>
+                              {scorePercentage}%
+                            </div>
+                          )}
                         </div>
-                        
-                        {quiz.results && (
-                          <div className={cn(
-                            "text-lg font-bold",
-                            Math.round((quiz.results.punteggio_totale / quiz.questions.length) * 100) >= 70 
-                              ? "text-green-600" 
-                              : Math.round((quiz.results.punteggio_totale / quiz.questions.length) * 100) >= 40 
-                                ? "text-amber-600" 
-                                : "text-red-600"
-                          )}>
-                            {Math.round((quiz.results.punteggio_totale / quiz.questions.length) * 100)}%
-                          </div>
-                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -362,7 +378,7 @@ const SubjectDetail = () => {
                       <div>
                         <span className="text-sm font-medium">Quiz History</span>
                         <div className="mt-2 space-y-2">
-                          {quizzes.filter(q => q.results).map((quiz) => {
+                          {quizzes.filter(q => q.results && q.questions && q.questions.length > 0).map((quiz) => {
                             const score = Math.round((quiz.results.punteggio_totale / quiz.questions.length) * 100);
                             return (
                               <div key={quiz.id} className="flex items-center gap-2">
@@ -387,29 +403,31 @@ const SubjectDetail = () => {
                     </div>
                   </div>
                   
-                  {quizzes.filter(q => q.results).length > 0 && (
+                  {quizzes.filter(q => q.results && q.questions && q.questions.length > 0).length > 0 && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="glass-card p-4 rounded-lg">
                         <h3 className="text-sm font-medium mb-2">Quizzes Completed</h3>
                         <p className="text-2xl font-bold text-cat">
-                          {quizzes.filter(q => q.results).length}
+                          {quizzes.filter(q => q.results && q.questions && q.questions.length > 0).length}
                         </p>
                       </div>
                       
                       <div className="glass-card p-4 rounded-lg">
                         <h3 className="text-sm font-medium mb-2">Questions Answered</h3>
                         <p className="text-2xl font-bold text-purple-600">
-                          {quizzes.filter(q => q.results).reduce((sum, q) => sum + q.questions.length, 0)}
+                          {quizzes.filter(q => q.results && q.questions && q.questions.length > 0)
+                            .reduce((sum, q) => sum + q.questions.length, 0)}
                         </p>
                       </div>
                       
                       <div className="glass-card p-4 rounded-lg">
                         <h3 className="text-sm font-medium mb-2">Best Score</h3>
                         <p className="text-2xl font-bold text-green-600">
-                          {Math.max(...quizzes
-                            .filter(q => q.results)
-                            .map(q => Math.round((q.results.punteggio_totale / q.questions.length) * 100))
-                          )}%
+                          {quizzes.filter(q => q.results && q.questions && q.questions.length > 0).length > 0 ? 
+                            Math.max(...quizzes
+                              .filter(q => q.results && q.questions && q.questions.length > 0)
+                              .map(q => Math.round((q.results.punteggio_totale / q.questions.length) * 100))
+                            ) : 0}%
                         </p>
                       </div>
                     </div>

@@ -97,23 +97,28 @@ const Dashboard = () => {
         
         // Calculate total and average score
         let totalScore = 0;
+        let totalPossibleScore = 0;
         let quizzesWithResults = 0;
         
         quizzes.forEach(quiz => {
-          if (quiz.results && typeof quiz.results.punteggio_totale === 'number') {
-            totalScore += quiz.results.punteggio_totale;
-            quizzesWithResults++;
-            console.log(`Quiz ${quiz.id} score: ${quiz.results.punteggio_totale * 100}%`);
+          if (quiz.results && quiz.questions && quiz.questions.length > 0) {
+            if (typeof quiz.results.punteggio_totale === 'number') {
+              totalScore += quiz.results.punteggio_totale;
+              totalPossibleScore += quiz.questions.length;
+              quizzesWithResults++;
+              console.log(`Quiz ${quiz.id} score: ${(quiz.results.punteggio_totale / quiz.questions.length) * 100}%`);
+            }
           }
         });
         
-        const averageScore = quizzesWithResults > 0 ? (totalScore / quizzesWithResults) * 100 : 0;
+        const averageScore = quizzesWithResults > 0 ? 
+          Math.round((totalScore / totalPossibleScore) * 100) : 0;
         
         return {
           ...subject,
           quizCount: quizzes.length,
           completedQuizCount: quizzesWithResults,
-          averageScore: Math.round(averageScore)
+          averageScore: averageScore
         };
       }));
       
@@ -147,6 +152,18 @@ const Dashboard = () => {
       sum + (result.score / result.totalQuestions) * 100, 0);
     
     return Math.round(totalPercentage / validResults.length);
+  };
+  
+  // Calculate the average score for all subjects with completed quizzes
+  const calculateOverallAverageScore = () => {
+    const subjectsWithScores = subjects.filter(s => s.completedQuizCount > 0);
+    
+    if (subjectsWithScores.length === 0) {
+      return '-';
+    }
+    
+    const totalScore = subjectsWithScores.reduce((sum, subject) => sum + subject.averageScore, 0);
+    return Math.round(totalScore / subjectsWithScores.length);
   };
   
   // Identify weakest subjects (lowest scores)
@@ -205,12 +222,7 @@ const Dashboard = () => {
                 <span className="text-sm font-medium">{t('averageScore')}</span>
               </div>
               <p className="text-2xl font-bold">
-                {subjects.some(s => s.completedQuizCount > 0) 
-                  ? Math.round(subjects
-                      .filter(s => s.completedQuizCount > 0)
-                      .reduce((sum, s) => sum + s.averageScore, 0) / 
-                      subjects.filter(s => s.completedQuizCount > 0).length)
-                  : '-'}%
+                {calculateOverallAverageScore()}%
               </p>
             </div>
           </div>
