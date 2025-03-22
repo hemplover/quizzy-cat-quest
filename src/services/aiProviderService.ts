@@ -1,7 +1,7 @@
 
 import { toast } from 'sonner';
 
-export type AIProvider = 'gemini';
+export type AIProvider = 'gemini' | 'openai';
 
 interface AIProviderConfig {
   id: AIProvider;

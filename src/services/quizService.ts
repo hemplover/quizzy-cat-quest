@@ -1,6 +1,8 @@
+
 import { toast } from 'sonner';
 import { QuizQuestion, GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
 import { supabase } from '@/integrations/supabase/client';
+import { getDefaultModel } from '@/services/aiProviderService';
 
 // Transform generated questions to our app format with improved reliability
 export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {

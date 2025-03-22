@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Settings, Key, Check, AlertCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -96,7 +95,6 @@ const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
       return;
     }
     
-    // Skip submission for backend-only providers
     if (isBackendOnly) {
       toast.info(`${currentProvider.name} API keys are managed on the server`);
       return;
@@ -133,7 +131,6 @@ const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
         toast.error('Failed to save API key to backend');
       }
     } else {
-      // Also store the key in localStorage even when using backend
       setApiKey(selectedProvider, apiKey);
       
       setHasKeys({
@@ -230,7 +227,7 @@ const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
               type="password"
               value={apiKeys[selectedProvider] || ''}
               onChange={(e) => handleInputChange(e, selectedProvider)}
-              placeholder={`${selectedProvider === 'openai' ? 'sk-...' : 'Enter API key'}`}
+              placeholder={`Enter API key`}
               className="w-full text-sm focus:ring-cat focus:border-cat"
             />
             
