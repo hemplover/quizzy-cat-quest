@@ -1,3 +1,4 @@
+
 import { toast } from 'sonner';
 
 export type AIProvider = 'openai' | 'gemini' | 'claude' | 'mistral';
@@ -100,17 +101,29 @@ export const setSelectedProvider = (provider: AIProvider): void => {
 export const getApiKey = (provider: AIProvider): string | null => {
   const providerConfig = getProviderConfig(provider);
   
+  if (!providerConfig) {
+    return null;
+  }
+  
   // If provider is backend-only, return a placeholder value
   if (providerConfig?.useBackendOnly) {
     return "BACKEND_MANAGED";
   }
   
-  return localStorage.getItem(`${provider}_api_key`);
+  // Get key from localStorage with correct key name for the provider
+  const key = localStorage.getItem(`${provider}_api_key`);
+  console.log(`Retrieved API key for ${provider}:`, key ? 'Key exists' : 'No key found');
+  return key;
 };
 
 // Set the API key for a provider
 export const setApiKey = (provider: AIProvider, apiKey: string): void => {
   const providerConfig = getProviderConfig(provider);
+  
+  if (!providerConfig) {
+    toast.error('Unknown provider');
+    return;
+  }
   
   // Don't allow setting API keys for backend-only providers
   if (providerConfig?.useBackendOnly) {
@@ -118,8 +131,10 @@ export const setApiKey = (provider: AIProvider, apiKey: string): void => {
     return;
   }
   
+  // Store key in localStorage with correct key name for the provider
   localStorage.setItem(`${provider}_api_key`, apiKey);
-  toast.success(`${provider.toUpperCase()} API key saved successfully`);
+  console.log(`Saved API key for ${provider}`);
+  toast.success(`${providerConfig.name} API key saved successfully`);
 };
 
 // Get available models for the selected provider

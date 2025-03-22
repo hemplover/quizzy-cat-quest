@@ -133,6 +133,7 @@ const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
         toast.error('Failed to save API key to backend');
       }
     } else {
+      // Also store the key in localStorage even when using backend
       setApiKey(selectedProvider, apiKey);
       
       setHasKeys({

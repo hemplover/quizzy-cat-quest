@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -145,8 +144,10 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings, clien
   const apiKey = clientApiKey || GEMINI_API_KEY;
   
   if (!apiKey) {
-    throw new Error('Gemini API key is not provided');
+    throw new Error('Gemini API key is not provided. Please provide a key in the client or set it in the server environment.');
   }
+  
+  console.log('Using Gemini API key:', apiKey ? 'Key exists' : 'No key found');
   
   // Detect language and preserve it
   const languagePrompt = "Please detect the language of the content and create the quiz in that same language. Preserve all terminology and concepts in their original language.";
@@ -169,6 +170,8 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings, clien
 
   // Use the updated Google AI API URL for the Gemini 2.0 models
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+  
+  console.log(`Making request to Gemini API: ${apiUrl}`);
   
   const response = await fetch(apiUrl, {
     method: 'POST',

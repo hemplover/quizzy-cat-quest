@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { 
   AIProvider, 
@@ -82,6 +81,12 @@ export const generateQuiz = async (
   try {
     // Get API key if it's stored in localStorage
     const apiKey = getApiKey(provider);
+    console.log(`API key exists for ${provider}:`, !!apiKey);
+    
+    if (!apiKey && !isBackendOnlyProvider(provider)) {
+      toast.error(`${provider.toUpperCase()} API key is not set. Please add your API key in the settings.`);
+      return null;
+    }
     
     // Call the edge function for quiz generation
     const { data, error } = await supabase.functions.invoke('generate-quiz', {

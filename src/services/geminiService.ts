@@ -1,13 +1,17 @@
-
 import { getApiKey } from './aiProviderService';
 import { GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
+import { toast } from 'sonner';
 
 export const generateQuizWithGemini = async (
   content: string,
   settings: QuizSettings
 ): Promise<GeneratedQuiz> => {
   const apiKey = getApiKey('gemini');
+  console.log('Gemini API Key exists:', !!apiKey);
+  
   if (!apiKey) {
+    console.error('Gemini API key is not set');
+    toast.error('Gemini API key is not set. Please add your API key in the settings.');
     throw new Error('Gemini API key is not set');
   }
   
@@ -23,6 +27,7 @@ export const generateQuizWithGemini = async (
 - Adjust difficulty according to the selected level: ${settings.difficulty}
 - The quiz must feel like an official test, not a casual practice exercise.
 - Return ONLY valid JSON with no additional text.
+- Please detect the language of the content and create the quiz in that same language. Preserve all terminology and concepts in their original language.
 
 ### Question Types to Include:
 ${settings.questionTypes.map(type => `- ${type}`).join('\n')}
@@ -94,7 +99,7 @@ ${content}
     }
 
     const data = await response.json();
-    console.log('Gemini API response:', data);
+    console.log('Gemini API response received');
     
     // Extract the content based on the response format
     let generatedContent;
