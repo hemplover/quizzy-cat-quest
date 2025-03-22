@@ -1,12 +1,4 @@
-
 import { toast } from 'sonner';
-import { 
-  AIProvider, 
-  getSelectedProvider, 
-  getApiKey,
-  getDefaultModel,
-  isBackendOnlyProvider
-} from './aiProviderService';
 import { QuizQuestion, GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -74,31 +66,18 @@ export const generateQuiz = async (
   content: string,
   settings: QuizSettings
 ): Promise<GeneratedQuiz | null> => {
-  const provider = getSelectedProvider();
-  console.log(`Generating quiz with provider: ${provider}`);
+  console.log(`Generating quiz with Gemini`);
   console.log(`Content type: ${typeof content}`);
   console.log(`Selected question types:`, settings.questionTypes);
   
   try {
-    // Get API key if it's stored in localStorage
-    const apiKey = getApiKey(provider);
-    console.log(`API key exists for ${provider}:`, !!apiKey);
-    
-    if (!apiKey && !isBackendOnlyProvider(provider)) {
-      toast.error(`${provider.toUpperCase()} API key is not set. Please add your API key in the settings.`);
-      return null;
-    }
-    
-    // For Gemini, we'll only use the backend API key
-    const shouldSendApiKey = provider !== 'gemini';
-    
     // Call the edge function for quiz generation
     const { data, error } = await supabase.functions.invoke('generate-quiz', {
       body: {
         content,
         settings,
-        provider,
-        apiKey: shouldSendApiKey ? apiKey : null // Only pass non-Gemini API keys
+        provider: 'gemini',
+        apiKey: null  // We're using backend API key only
       }
     });
     
@@ -157,15 +136,13 @@ export const gradeQuiz = async (
   questions: any[], 
   userAnswers: any[]
 ): Promise<QuizResults | null> => {
-  const provider = getSelectedProvider();
-  
   try {
     // Call the edge function for quiz grading
     const { data, error } = await supabase.functions.invoke('grade-quiz', {
       body: {
         questions,
         userAnswers,
-        provider
+        provider: 'gemini'
       }
     });
     
@@ -216,17 +193,9 @@ export const gradeQuiz = async (
   }
 };
 
-// Check if the provider has a valid API key (for API key management UI)
+// Always returns true since we're using backend-only Gemini
 export const hasValidApiKey = (): boolean => {
-  const provider = getSelectedProvider();
-  
-  // If the provider is backend-only, we assume the backend handles the API key
-  if (isBackendOnlyProvider(provider)) {
-    return true;
-  }
-  
-  const apiKey = getApiKey(provider);
-  return !!apiKey;
+  return true;
 };
 
 // Get the appropriate model to use based on provider
@@ -241,13 +210,7 @@ export const setModelToUse = (model: string): void => {
 
 // Get the selected model 
 export const getSelectedModel = (): string => {
-  const savedModel = localStorage.getItem('selected_model');
-  if (!savedModel) {
-    const defaultModel = getDefaultModel();
-    localStorage.setItem('selected_model', defaultModel);
-    return defaultModel;
-  }
-  return savedModel;
+  return 'gemini-2-flash';
 };
 
 // Save the most recently uploaded text for the current subject

@@ -1,7 +1,7 @@
 
 import { toast } from 'sonner';
 
-export type AIProvider = 'openai' | 'gemini' | 'claude' | 'mistral';
+export type AIProvider = 'gemini';
 
 interface AIProviderConfig {
   id: AIProvider;
@@ -13,24 +13,10 @@ interface AIProviderConfig {
   apiKeyRequired: boolean;
   supportsFileUpload: boolean;
   apiKeyName: string;
-  useBackendOnly?: boolean;
+  useBackendOnly: boolean;
 }
 
 export const AI_PROVIDERS: AIProviderConfig[] = [
-  {
-    id: 'openai',
-    name: 'OpenAI',
-    icon: '🤖',
-    description: 'Powerful AI models for text and image understanding',
-    models: [
-      { id: 'gpt-4o', name: 'GPT-4o (File Upload Support)', description: 'High performance model with file upload support' },
-      { id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: 'Faster and more affordable version' },
-    ],
-    defaultModel: 'gpt-4o',
-    apiKeyRequired: true,
-    supportsFileUpload: true,
-    apiKeyName: 'openai_api_key'
-  },
   {
     id: 'gemini',
     name: 'Google Gemini',
@@ -45,36 +31,6 @@ export const AI_PROVIDERS: AIProviderConfig[] = [
     supportsFileUpload: false,
     apiKeyName: 'gemini_api_key',
     useBackendOnly: true  // Force Gemini to use backend API key
-  },
-  {
-    id: 'claude',
-    name: 'Anthropic Claude',
-    icon: '🧠',
-    description: 'Claude models prioritize safety and helpfulness',
-    models: [
-      { id: 'claude-3-opus', name: 'Claude 3 Opus', description: 'Most capable Claude model' },
-      { id: 'claude-3-sonnet', name: 'Claude 3 Sonnet', description: 'Balanced capability and speed' },
-      { id: 'claude-3-haiku', name: 'Claude 3 Haiku', description: 'Fastest Claude model' },
-    ],
-    defaultModel: 'claude-3-sonnet',
-    apiKeyRequired: true,
-    supportsFileUpload: false,
-    apiKeyName: 'claude_api_key'
-  },
-  {
-    id: 'mistral',
-    name: 'Mistral AI',
-    icon: '✨',
-    description: 'Open source large language models',
-    models: [
-      { id: 'mistral-large', name: 'Mistral Large', description: 'Most powerful Mistral model' },
-      { id: 'mistral-medium', name: 'Mistral Medium', description: 'Balanced performance model' },
-      { id: 'mistral-small', name: 'Mistral Small', description: 'Efficient and fast model' },
-    ],
-    defaultModel: 'mistral-medium',
-    apiKeyRequired: true,
-    supportsFileUpload: false,
-    apiKeyName: 'mistral_api_key'
   }
 ];
 
@@ -83,85 +39,47 @@ export const getProviderConfig = (provider: AIProvider): AIProviderConfig | unde
   return AI_PROVIDERS.find(p => p.id === provider);
 };
 
-// Get the selected provider from localStorage or default to OpenAI
+// Get the selected provider - always returns Gemini
 export const getSelectedProvider = (): AIProvider => {
-  const savedProvider = localStorage.getItem('selected_provider');
-  if (!savedProvider) {
-    localStorage.setItem('selected_provider', 'openai');
-    return 'openai';
-  }
-  return savedProvider as AIProvider;
+  return 'gemini';
 };
 
-// Set the selected provider
+// No-op function since we now only use Gemini
 export const setSelectedProvider = (provider: AIProvider): void => {
-  localStorage.setItem('selected_provider', provider);
+  // No-op since we always use Gemini now
 };
 
-// Get the API key for a provider
+// Get the API key for a provider - will always return backend managed for Gemini
 export const getApiKey = (provider: AIProvider): string | null => {
-  const providerConfig = getProviderConfig(provider);
-  
-  if (!providerConfig) {
-    return null;
-  }
-  
-  // If provider is backend-only, return a placeholder value
-  if (providerConfig?.useBackendOnly) {
+  if (provider === 'gemini') {
     return "BACKEND_MANAGED";
   }
-  
-  // Get key from localStorage with correct key name for the provider
-  const key = localStorage.getItem(`${provider}_api_key`);
-  console.log(`Retrieved API key for ${provider}:`, key ? 'Key exists' : 'No key found');
-  return key;
+  return null;
 };
 
-// Set the API key for a provider
+// No-op function since we only use backend API key
 export const setApiKey = (provider: AIProvider, apiKey: string): void => {
-  const providerConfig = getProviderConfig(provider);
-  
-  if (!providerConfig) {
-    toast.error('Unknown provider');
-    return;
-  }
-  
-  // Don't allow setting API keys for backend-only providers
-  if (providerConfig?.useBackendOnly) {
-    toast.info(`${providerConfig.name} API keys are managed on the server`);
-    return;
-  }
-  
-  // Store key in localStorage with correct key name for the provider
-  localStorage.setItem(`${provider}_api_key`, apiKey);
-  console.log(`Saved API key for ${provider}`);
-  toast.success(`${providerConfig.name} API key saved successfully`);
+  toast.info('API keys are managed on the server');
 };
 
-// Get available models for the selected provider
+// Get available models for Gemini
 export const getAvailableModels = (provider?: AIProvider): Array<{ id: string; name: string; description: string }> => {
-  const selectedProvider = provider || getSelectedProvider();
-  const providerConfig = getProviderConfig(selectedProvider);
+  const providerConfig = getProviderConfig('gemini');
   return providerConfig?.models || [];
 };
 
-// Check if the provider supports file upload
+// Check if the provider supports file upload - Gemini doesn't
 export const supportsFileUpload = (provider?: AIProvider): boolean => {
-  const selectedProvider = provider || getSelectedProvider();
-  const providerConfig = getProviderConfig(selectedProvider);
-  return providerConfig?.supportsFileUpload || false;
+  return false;
 };
 
-// Check if the provider is backend-only
+// Gemini is always backend-only
 export const isBackendOnlyProvider = (provider?: AIProvider): boolean => {
-  const selectedProvider = provider || getSelectedProvider();
-  const providerConfig = getProviderConfig(selectedProvider);
-  return !!providerConfig?.useBackendOnly;
+  return true;
 };
 
-// Get default model for the selected provider
+// Get default model for Gemini
 export const getDefaultModel = (provider?: AIProvider): string => {
-  const selectedProvider = provider || getSelectedProvider();
-  const providerConfig = getProviderConfig(selectedProvider);
-  return providerConfig?.defaultModel || 'gpt-4o';
+  const providerConfig = getProviderConfig('gemini');
+  return providerConfig?.defaultModel || 'gemini-2-flash';
 };

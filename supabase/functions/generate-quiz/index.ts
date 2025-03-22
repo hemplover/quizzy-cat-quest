@@ -21,47 +21,18 @@ serve(async (req) => {
   }
 
   try {
-    const { content, settings, provider, apiKey: clientApiKey } = await req.json();
+    const { content, settings } = await req.json();
     
-    if (!content || !settings || !provider) {
-      throw new Error('Missing required parameters: content, settings, or provider');
+    if (!content || !settings) {
+      throw new Error('Missing required parameters: content or settings');
     }
     
-    console.log(`Generating quiz with provider: ${provider}`);
-    console.log(`Selected model: ${settings.model}`);
+    console.log('Generating quiz with Gemini');
+    console.log(`Selected model: ${settings.model || 'gemini-2-flash'}`);
     console.log(`Selected question types:`, settings.questionTypes);
-    console.log(`Client API key provided: ${clientApiKey ? 'Yes' : 'No'}`);
     
-    let result = null;
-    
-    switch (provider) {
-      case 'openai':
-        result = await generateOpenAIQuiz(content, settings, clientApiKey);
-        break;
-      case 'gemini':
-        // For Gemini, prioritize backend API key
-        const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-        if (!GEMINI_API_KEY) {
-          console.error('Gemini API key not found in Supabase secrets');
-          if (!clientApiKey) {
-            throw new Error('Gemini API key is not provided. Please set it in the Supabase secrets or provide it in the client.');
-          }
-        }
-        // Always use backend key for Gemini
-        result = await generateGeminiQuiz(content, settings, null);
-        break;
-      case 'claude':
-      case 'mistral':
-        return new Response(
-          JSON.stringify({ error: `Integration with ${provider} is coming soon!` }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      default:
-        return new Response(
-          JSON.stringify({ error: 'Unknown AI provider' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-    }
+    // Always use Gemini backend
+    const result = await generateGeminiQuiz(content, settings);
     
     return new Response(
       JSON.stringify(result),
@@ -78,84 +49,11 @@ serve(async (req) => {
   }
 });
 
-// OpenAI quiz generation function
-async function generateOpenAIQuiz(content: string, settings: QuizSettings, clientApiKey?: string) {
-  const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-  const apiKey = clientApiKey || OPENAI_API_KEY;
-  
-  if (!apiKey) {
-    throw new Error('OpenAI API key is not provided');
-  }
-  
-  const model = settings.model || 'gpt-4o-mini';
-  
-  // Detect language and preserve it
-  const languagePrompt = "Please detect the language of the content and create the quiz in that same language. Preserve all terminology and concepts in their original language.";
-  
-  // Prepare prompt
-  const prompt = buildPrompt(content, settings, languagePrompt);
-
-  // Call OpenAI API
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        { 
-          role: 'system', 
-          content: 'You are a helpful assistant that creates quizzes based on educational material. You always maintain the original language of the content.' 
-        },
-        { 
-          role: 'user', 
-          content: prompt 
-        }
-      ],
-      temperature: 0.3
-    })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(`OpenAI API Error: ${errorData.error?.message || 'Unknown error'}`);
-  }
-
-  const data = await response.json();
-  console.log('OpenAI API response received');
-  
-  // Extract the content
-  const generatedContent = data.choices[0].message.content;
-  
-  try {
-    // Parse the response as JSON
-    return JSON.parse(generatedContent);
-  } catch (error) {
-    console.error('Error parsing quiz JSON from OpenAI:', error);
-    
-    // Try to extract JSON from the text
-    const jsonMatch = generatedContent.match(/```json\n([\s\S]*)\n```/) || 
-                       generatedContent.match(/\{[\s\S]*\}/);
-    
-    if (jsonMatch) {
-      const extractedJson = jsonMatch[1] || jsonMatch[0];
-      return JSON.parse(extractedJson);
-    }
-    
-    throw new Error('Failed to parse quiz from OpenAI response');
-  }
-}
-
 // Gemini quiz generation function
-async function generateGeminiQuiz(content: string, settings: QuizSettings, clientApiKey?: string) {
+async function generateGeminiQuiz(content: string, settings: QuizSettings) {
   const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
   
-  // Always use backend API key for Gemini
-  const apiKey = GEMINI_API_KEY;
-  
-  if (!apiKey) {
+  if (!GEMINI_API_KEY) {
     throw new Error('Gemini API key is not configured in Supabase secrets. Please add GEMINI_API_KEY to your Supabase secrets.');
   }
   
@@ -189,7 +87,7 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings, clien
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey
+      'x-goog-api-key': GEMINI_API_KEY
     },
     body: JSON.stringify({
       contents: [

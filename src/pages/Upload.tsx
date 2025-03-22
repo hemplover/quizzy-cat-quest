@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { BookOpen, Settings, Sparkles, ArrowRight, FileText, CheckCircle2, Pencil, AlertCircle, Loader2 } from 'lucide-react';
@@ -6,19 +7,10 @@ import { toast } from 'sonner';
 import { 
   generateQuiz, 
   transformQuizQuestions,
-  hasValidApiKey,
-  getModelToUse,
   getSelectedModel
 } from '@/services/quizService';
-import ApiKeyForm from '@/components/ApiKeyForm';
-import AIProviderSelector from '@/components/AIProviderSelector';
-import ModelSelector from '@/components/ModelSelector';
 import SubjectSelector from '@/components/SubjectSelector';
-import { 
-  AIProvider, 
-  getSelectedProvider,
-  AI_PROVIDERS
-} from '@/services/aiProviderService';
+import { getDefaultModel } from '@/services/aiProviderService';
 import {
   getSubjects,
   createDocument,
@@ -47,20 +39,17 @@ const Upload = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [catMessage, setCatMessage] = useState(t('uploadInstructions'));
   const [processedContent, setProcessedContent] = useState<string | null>(null);
-  const [hasApiKey, setHasApiKey] = useState(false);
   const [isReadyToGenerateQuiz, setIsReadyToGenerateQuiz] = useState(false);
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
-  const [selectedAIProvider, setSelectedAIProvider] = useState<AIProvider>(getSelectedProvider());
-  const [selectedModel, setSelectedModel] = useState<string>(getSelectedModel());
   const [selectedSubject, setSelectedSubject] = useState<string | null>(initialSubjectId);
   const [uploadStep, setUploadStep] = useState<'content' | 'settings'>('content');
   const [subjectName, setSubjectName] = useState<string>('');
   const [documentName, setDocumentName] = useState<string>('');
+  const selectedModel = getDefaultModel();
   
   useEffect(() => {
     const initialize = async () => {
       setIsLoading(true);
-      setHasApiKey(hasValidApiKey());
       
       await initializeSubjectsIfNeeded();
       
@@ -96,25 +85,6 @@ const Upload = () => {
     
     initialize();
   }, [initialSubjectId, documentId, t]);
-
-  const handleApiKeySubmit = (key: string, provider: AIProvider) => {
-    setSelectedAIProvider(provider);
-    setHasApiKey(hasValidApiKey());
-  };
-  
-  const handleProviderChange = (provider: AIProvider) => {
-    setSelectedAIProvider(provider);
-    setHasApiKey(hasValidApiKey());
-    
-    const providerConfig = AI_PROVIDERS.find(p => p.id === provider);
-    if (providerConfig) {
-      setSelectedModel(providerConfig.defaultModel);
-    }
-  };
-  
-  const handleModelChange = (model: string) => {
-    setSelectedModel(model);
-  };
   
   const handleSubjectChange = async (subjectId: string) => {
     setSelectedSubject(subjectId);
@@ -167,11 +137,6 @@ const Upload = () => {
 
     if (!selectedSubject) {
       toast.error(t('selectSubject'));
-      return;
-    }
-
-    if (!hasApiKey) {
-      toast.error(t('apiKeyRequired').replace('{provider}', selectedAIProvider.toUpperCase()));
       return;
     }
 
@@ -296,24 +261,10 @@ const Upload = () => {
       
       {uploadStep === 'content' && (
         <div className="glass-card p-6 rounded-xl mb-8">
-          <div className="grid md:grid-cols-2 gap-6 mb-6">
-            <AIProviderSelector 
-              onProviderChange={handleProviderChange} 
-            />
-            
-            <ApiKeyForm 
-              onKeySubmit={handleApiKeySubmit} 
-            />
-          </div>
-          
-          <div className="grid md:grid-cols-2 gap-6 mb-6">
+          <div className="mb-6">
             <SubjectSelector
               selectedSubject={selectedSubject}
               onSubjectChange={handleSubjectChange}
-            />
-            
-            <ModelSelector 
-              onModelChange={handleModelChange}
             />
           </div>
           
@@ -459,7 +410,7 @@ const Upload = () => {
                 
                 <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
                   <p className="text-xs text-blue-700">
-                    {t('usingModel').replace('{model}', selectedModel)}
+                    {t('usingAI').replace('{ai}', 'Google Gemini')}
                   </p>
                 </div>
               </div>
