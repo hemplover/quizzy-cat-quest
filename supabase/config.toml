@@ -39,12 +39,12 @@ refresh_token_reuse_interval = 10
 [realtime]
 enabled = true
 
-[edge_functions]
-[edge_functions.generate-quiz]
+[functions]
+[functions.generate-quiz]
 verify_jwt = false
-[edge_functions.grade-quiz]
+[functions.grade-quiz]
 verify_jwt = false
-[edge_functions.check-api-keys]
+[functions.check-api-keys]
 verify_jwt = false
-[edge_functions.set-api-key]
+[functions.set-api-key]
 verify_jwt = false
