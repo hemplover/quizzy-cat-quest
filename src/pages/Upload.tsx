@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { BookOpen, Settings, Sparkles, ArrowRight, FileText, CheckCircle2, Pencil, AlertCircle, Loader2 } from 'lucide-react';
@@ -101,6 +100,8 @@ const Upload = () => {
     
     if (e.target.value.length > 200) {
       setCatMessage(t('enoughText'));
+    } else if (e.target.value.length < 100) {
+      setCatMessage('This text seems too short. I need more content to create a good quiz.');
     }
   };
 
@@ -123,8 +124,8 @@ const Upload = () => {
       
       setUploadStep('settings');
     } else {
-      toast.error(t('enterMoreText'));
-      setCatMessage(t('needMoreText'));
+      toast.error('Please enter more text. The content is too short to create a good quiz.');
+      setCatMessage('I need more detailed content to create a meaningful quiz.');
     }
   };
 
@@ -137,6 +138,12 @@ const Upload = () => {
 
     if (!selectedSubject) {
       toast.error(t('selectSubject'));
+      return;
+    }
+    
+    if (processedContent.trim().length < 100) {
+      toast.error('Please provide more detailed study material.');
+      setCatMessage('I need more detailed content to create a good quiz.');
       return;
     }
 
@@ -152,47 +159,62 @@ const Upload = () => {
 
     try {
       console.log("Generating quiz with settings:", quizSettings);
-      console.log("Content type:", typeof processedContent);
+      console.log("Content length:", processedContent.length, "characters");
       
       const generatedQuiz = await generateQuiz(processedContent, quizSettings);
       
-      if (generatedQuiz && generatedQuiz.quiz && generatedQuiz.quiz.length > 0) {
-        const questions = transformQuizQuestions(generatedQuiz);
-        
-        if (textInput) {
-          const document = await createDocument({
-            subjectId: selectedSubject,
-            name: documentName || 'Text Input ' + new Date().toLocaleString(),
-            content: processedContent,
-            fileType: 'text/plain',
-            fileSize: new Blob([textInput]).size
-          });
-          
-          await createQuizRecord({
-            subjectId: selectedSubject,
-            documentId: document.id,
-            title: `Quiz on ${documentName || 'Text Input'}`,
-            questions: questions
-          });
-        }
-        
-        sessionStorage.setItem('quizQuestions', JSON.stringify(questions));
-        sessionStorage.setItem('quizData', JSON.stringify({
-          source: documentName || 'Text input',
-          difficulty,
-          questionTypes: selectedQuestionTypes,
-          numQuestions: questions.length,
-          createdAt: new Date().toISOString(),
-          model: selectedModel
-        }));
-        
-        toast.success(t('quizCreatedSuccess'));
-        navigate('/quiz');
-      } else {
+      if (!generatedQuiz) {
         setCatMessage(t('couldNotCreateQuiz'));
-        toast.error(t('unableToGenerateQuiz'));
+        toast.error('I couldn\'t create a good quiz from this content. Please provide more detailed study material.');
         setIsGeneratingQuiz(false);
+        return;
       }
+      
+      if (!generatedQuiz.quiz || generatedQuiz.quiz.length === 0) {
+        setCatMessage(t('couldNotCreateQuiz'));
+        toast.error('No questions were generated. Please try with more detailed content.');
+        setIsGeneratingQuiz(false);
+        return;
+      }
+      
+      const questions = transformQuizQuestions(generatedQuiz);
+      
+      if (!questions || questions.length === 0) {
+        setCatMessage(t('couldNotCreateQuiz'));
+        toast.error('Failed to process quiz questions. Please try again.');
+        setIsGeneratingQuiz(false);
+        return;
+      }
+      
+      if (textInput) {
+        const document = await createDocument({
+          subjectId: selectedSubject,
+          name: documentName || 'Text Input ' + new Date().toLocaleString(),
+          content: processedContent,
+          fileType: 'text/plain',
+          fileSize: new Blob([textInput]).size
+        });
+        
+        await createQuizRecord({
+          subjectId: selectedSubject,
+          documentId: document.id,
+          title: `Quiz on ${documentName || 'Text Input'}`,
+          questions: questions
+        });
+      }
+      
+      sessionStorage.setItem('quizQuestions', JSON.stringify(questions));
+      sessionStorage.setItem('quizData', JSON.stringify({
+        source: documentName || 'Text input',
+        difficulty,
+        questionTypes: selectedQuestionTypes,
+        numQuestions: questions.length,
+        createdAt: new Date().toISOString(),
+        model: selectedModel
+      }));
+      
+      toast.success(t('quizCreatedSuccess'));
+      navigate('/quiz');
     } catch (error) {
       console.error("Error creating quiz:", error);
       toast.error(t('errorCreatingQuiz'));

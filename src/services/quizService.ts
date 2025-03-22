@@ -1,3 +1,4 @@
+
 import { toast } from 'sonner';
 import { QuizQuestion, GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
 import { supabase } from '@/integrations/supabase/client';
@@ -68,7 +69,13 @@ export const generateQuiz = async (
 ): Promise<GeneratedQuiz | null> => {
   console.log(`Generating quiz with Gemini`);
   console.log(`Content type: ${typeof content}`);
+  console.log(`Content length: ${content.length} characters`);
   console.log(`Selected question types:`, settings.questionTypes);
+  
+  if (!content || content.trim().length < 100) {
+    toast.error('Please provide more detailed study material.');
+    return null;
+  }
   
   try {
     // Call the edge function for quiz generation
@@ -85,8 +92,21 @@ export const generateQuiz = async (
       return null;
     }
     
-    if (!data || !data.quiz || data.quiz.length === 0) {
-      console.error('Failed to generate quiz: Empty or invalid response from API');
+    if (!data) {
+      console.error('No data returned from generate-quiz function');
+      toast.error('Failed to generate quiz. Please try again with more detailed content.');
+      return null;
+    }
+    
+    if (data.error) {
+      console.error('Error returned from generate-quiz function:', data.error);
+      toast.error(`Error generating quiz: ${data.error}`);
+      return null;
+    }
+    
+    if (!data.quiz || data.quiz.length === 0) {
+      console.error('Failed to generate quiz: Empty or invalid response from API', data);
+      toast.error('Could not create a quiz from this content. Please provide more detailed study material.');
       return null;
     }
     

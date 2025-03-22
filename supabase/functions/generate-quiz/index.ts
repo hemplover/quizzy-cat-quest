@@ -29,6 +29,7 @@ serve(async (req) => {
     
     console.log('Generating quiz with Gemini');
     console.log(`Selected question types:`, settings.questionTypes);
+    console.log(`Content length: ${content.length} characters`);
     
     // Always use backend Gemini API
     const result = await generateGeminiQuiz(content, settings);
@@ -61,10 +62,15 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings) {
   // Detect language and preserve it
   const languagePrompt = "Please detect the language of the content and create the quiz in that same language. Preserve all terminology and concepts in their original language.";
   
+  // Ensure sufficient content for quiz generation
+  if (content.trim().length < 100) {
+    throw new Error('The provided content is too short. Please provide more detailed study material.');
+  }
+  
   // Prepare prompt for Gemini
   const prompt = buildPrompt(content, settings, languagePrompt);
   
-  // Default to Gemini 2.0 Flash model
+  // Default to Gemini 2.0 Flash model for better performance
   const modelName = 'gemini-2.0-flash';
   
   console.log(`Using Gemini model: ${modelName}`);
@@ -74,69 +80,82 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings) {
   
   console.log(`Making request to Gemini API: ${apiUrl}`);
   
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': GEMINI_API_KEY
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            {
-              text: prompt
-            }
-          ]
-        }
-      ],
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 1200
-      }
-    })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    const errorMessage = errorData.error?.message || 'Unknown error';
-    console.error('Gemini API Error:', errorData);
-    throw new Error(`Gemini API Error: ${errorMessage}`);
-  }
-
-  const data = await response.json();
-  console.log('Gemini API response received');
-  
-  // Extract the content - handle different response formats for different Gemini versions
-  let generatedContent;
-  
-  if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-    // Format for newer Gemini versions
-    generatedContent = data.candidates[0].content.parts[0].text;
-  } else if (data.text) {
-    // Simplified response format in some versions
-    generatedContent = data.text;
-  } else {
-    console.error('Unexpected Gemini response format:', data);
-    throw new Error('Unexpected response format from Gemini API');
-  }
-  
   try {
-    // Parse the response as JSON
-    return JSON.parse(generatedContent);
-  } catch (error) {
-    console.error('Error parsing quiz JSON from Gemini:', error);
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': GEMINI_API_KEY
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 1500  // Increased token limit for better quiz generation
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = errorData.error?.message || 'Unknown error';
+      console.error('Gemini API Error:', errorData);
+      throw new Error(`Gemini API Error: ${errorMessage}`);
+    }
+
+    const data = await response.json();
+    console.log('Gemini API response received');
+    console.log('Response status:', response.status);
     
-    // Try to extract JSON from the text
-    const jsonMatch = generatedContent.match(/```json\n([\s\S]*)\n```/) || 
-                       generatedContent.match(/\{[\s\S]*\}/);
+    // Extract the content - handle different response formats for different Gemini versions
+    let generatedContent;
     
-    if (jsonMatch) {
-      const extractedJson = jsonMatch[1] || jsonMatch[0];
-      return JSON.parse(extractedJson);
+    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+      // Format for newer Gemini versions
+      generatedContent = data.candidates[0].content.parts[0].text;
+    } else if (data.text) {
+      // Simplified response format in some versions
+      generatedContent = data.text;
+    } else {
+      console.error('Unexpected Gemini response format:', data);
+      throw new Error('Unexpected response format from Gemini API');
     }
     
-    throw new Error('Failed to parse quiz from Gemini response');
+    console.log('Generated content length:', generatedContent.length);
+    if (generatedContent.length < 50) {
+      console.error('Generated content too short:', generatedContent);
+      throw new Error('The AI generated content is too short. Please try with more detailed study material.');
+    }
+    
+    try {
+      // Parse the response as JSON
+      return JSON.parse(generatedContent);
+    } catch (error) {
+      console.error('Error parsing quiz JSON from Gemini:', error);
+      
+      // Try to extract JSON from the text
+      const jsonMatch = generatedContent.match(/```json\n([\s\S]*)\n```/) || 
+                       generatedContent.match(/\{[\s\S]*\}/);
+      
+      if (jsonMatch) {
+        const extractedJson = jsonMatch[1] || jsonMatch[0];
+        console.log('Extracted JSON content:', extractedJson.substring(0, 100) + '...');
+        return JSON.parse(extractedJson);
+      }
+      
+      throw new Error('Failed to parse quiz from Gemini response. Please try again with more detailed content.');
+    }
+  } catch (error) {
+    console.error('Error in Gemini API call:', error);
+    throw error;
   }
 }
 
