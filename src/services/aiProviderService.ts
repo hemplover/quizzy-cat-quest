@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 
 export type AIProvider = 'openai' | 'gemini' | 'claude' | 'mistral';
@@ -35,16 +34,15 @@ export const AI_PROVIDERS: AIProviderConfig[] = [
     id: 'gemini',
     name: 'Google Gemini',
     icon: '🌐',
-    description: 'Google\'s multimodal AI system (Backend Only)',
+    description: 'Google\'s multimodal AI system',
     models: [
       { id: 'gemini-2-flash', name: 'Gemini 2.0 Flash', description: 'Fast, affordable, high-quality model' },
       { id: 'gemini-pro', name: 'Gemini Pro', description: 'Google\'s advanced language model' },
     ],
     defaultModel: 'gemini-2-flash',
-    apiKeyRequired: false,
+    apiKeyRequired: true,
     supportsFileUpload: false,
-    apiKeyName: 'gemini_api_key',
-    useBackendOnly: true
+    apiKeyName: 'gemini_api_key'
   },
   {
     id: 'claude',

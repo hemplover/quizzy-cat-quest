@@ -4,7 +4,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
 };
 
 interface QuizSettings {
@@ -21,7 +21,7 @@ serve(async (req) => {
   }
 
   try {
-    const { content, settings, provider } = await req.json();
+    const { content, settings, provider, apiKey: clientApiKey } = await req.json();
     
     if (!content || !settings || !provider) {
       throw new Error('Missing required parameters: content, settings, or provider');
@@ -30,15 +30,16 @@ serve(async (req) => {
     console.log(`Generating quiz with provider: ${provider}`);
     console.log(`Selected model: ${settings.model}`);
     console.log(`Selected question types:`, settings.questionTypes);
+    console.log(`Client API key provided: ${clientApiKey ? 'Yes' : 'No'}`);
     
     let result = null;
     
     switch (provider) {
       case 'openai':
-        result = await generateOpenAIQuiz(content, settings);
+        result = await generateOpenAIQuiz(content, settings, clientApiKey);
         break;
       case 'gemini':
-        result = await generateGeminiQuiz(content, settings);
+        result = await generateGeminiQuiz(content, settings, clientApiKey);
         break;
       case 'claude':
       case 'mistral':
@@ -69,22 +70,27 @@ serve(async (req) => {
 });
 
 // OpenAI quiz generation function
-async function generateOpenAIQuiz(content: string, settings: QuizSettings) {
+async function generateOpenAIQuiz(content: string, settings: QuizSettings, clientApiKey?: string) {
   const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-  if (!OPENAI_API_KEY) {
-    throw new Error('OpenAI API key is not set in environment variables');
+  const apiKey = clientApiKey || OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error('OpenAI API key is not provided');
   }
   
   const model = settings.model || 'gpt-4o-mini';
   
+  // Detect language and preserve it
+  const languagePrompt = "Please detect the language of the content and create the quiz in that same language. Preserve all terminology and concepts in their original language.";
+  
   // Prepare prompt
-  const prompt = buildPrompt(content, settings);
+  const prompt = buildPrompt(content, settings, languagePrompt);
 
   // Call OpenAI API
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
@@ -92,7 +98,7 @@ async function generateOpenAIQuiz(content: string, settings: QuizSettings) {
       messages: [
         { 
           role: 'system', 
-          content: 'You are a helpful assistant that creates quizzes based on educational material.' 
+          content: 'You are a helpful assistant that creates quizzes based on educational material. You always maintain the original language of the content.' 
         },
         { 
           role: 'user', 
@@ -134,14 +140,19 @@ async function generateOpenAIQuiz(content: string, settings: QuizSettings) {
 }
 
 // Gemini quiz generation function
-async function generateGeminiQuiz(content: string, settings: QuizSettings) {
+async function generateGeminiQuiz(content: string, settings: QuizSettings, clientApiKey?: string) {
   const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-  if (!GEMINI_API_KEY) {
-    throw new Error('Gemini API key is not set in environment variables');
+  const apiKey = clientApiKey || GEMINI_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error('Gemini API key is not provided');
   }
   
+  // Detect language and preserve it
+  const languagePrompt = "Please detect the language of the content and create the quiz in that same language. Preserve all terminology and concepts in their original language.";
+  
   // Prepare prompt for Gemini
-  const prompt = buildPrompt(content, settings);
+  const prompt = buildPrompt(content, settings, languagePrompt);
   
   // Determine which model to use based on settings
   let modelName;
@@ -163,7 +174,7 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-goog-api-key': GEMINI_API_KEY
+      'x-goog-api-key': apiKey
     },
     body: JSON.stringify({
       contents: [
@@ -226,7 +237,7 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings) {
 }
 
 // Build prompt for AI providers
-function buildPrompt(content: string, settings: QuizSettings): string {
+function buildPrompt(content: string, settings: QuizSettings, languagePrompt: string = ""): string {
   return `You are a university professor responsible for creating exams for students. Based only on the provided study material, generate a realistic university-level exam.
 
 ### Rules:
@@ -237,6 +248,7 @@ function buildPrompt(content: string, settings: QuizSettings): string {
 - Adjust difficulty according to the selected level: ${settings.difficulty}
 - The quiz must feel like an official test, not a casual practice exercise.
 - Return ONLY valid JSON with no additional text.
+${languagePrompt ? `- ${languagePrompt}` : ''}
 
 ### Question Types to Include:
 ${settings.questionTypes.map(type => `- ${type}`).join('\n')}

@@ -80,12 +80,16 @@ export const generateQuiz = async (
   console.log(`Selected question types:`, settings.questionTypes);
   
   try {
+    // Get API key if it's stored in localStorage
+    const apiKey = getApiKey(provider);
+    
     // Call the edge function for quiz generation
     const { data, error } = await supabase.functions.invoke('generate-quiz', {
       body: {
         content,
         settings,
-        provider
+        provider,
+        apiKey: apiKey // Pass the API key from localStorage if available
       }
     });
     
