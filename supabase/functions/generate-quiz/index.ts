@@ -28,6 +28,7 @@ serve(async (req) => {
     }
     
     console.log(`Generating quiz with provider: ${provider}`);
+    console.log(`Selected model: ${settings.model}`);
     console.log(`Selected question types:`, settings.questionTypes);
     
     let result = null;
@@ -141,8 +142,13 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings) {
   
   // Prepare prompt for Gemini
   const prompt = buildPrompt(content, settings);
+  const model = settings.model === 'gemini-2-flash' ? 'gemini-1.5-flash' : 'gemini-pro';
+  
+  console.log(`Using Gemini model: ${model}`);
 
-  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+  
+  const response = await fetch(apiUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
