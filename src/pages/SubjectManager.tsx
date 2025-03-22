@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -8,7 +7,8 @@ import {
   Trash2, 
   FileText, 
   ArrowRight,
-  Info
+  Info,
+  Loader2
 } from 'lucide-react';
 import {
   Card,
@@ -63,6 +63,7 @@ const SubjectManager = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Edit subject form state
   const [editName, setEditName] = useState('');
@@ -74,9 +75,13 @@ const SubjectManager = () => {
   const colors = ['#4f46e5', '#16a34a', '#b45309', '#db2777', '#9333ea', '#059669', '#d97706', '#dc2626', '#0891b2', '#4338ca'];
 
   useEffect(() => {
-    // Initialize default subjects if needed
-    initializeSubjectsIfNeeded();
-    loadSubjects();
+    const initialize = async () => {
+      // Initialize default subjects if needed
+      await initializeSubjectsIfNeeded();
+      await loadSubjects();
+    };
+    
+    initialize();
   }, []);
   
   useEffect(() => {
@@ -85,23 +90,36 @@ const SubjectManager = () => {
     }
   }, [selectedSubject]);
   
-  const loadSubjects = () => {
-    const loadedSubjects = getSubjects();
-    setSubjects(loadedSubjects);
-    
-    if (loadedSubjects.length > 0) {
-      setSelectedSubject(loadedSubjects[0]);
-    } else {
-      setSelectedSubject(null);
+  const loadSubjects = async () => {
+    setIsLoading(true);
+    try {
+      const loadedSubjects = await getSubjects();
+      setSubjects(loadedSubjects);
+      
+      if (loadedSubjects.length > 0) {
+        setSelectedSubject(loadedSubjects[0]);
+      } else {
+        setSelectedSubject(null);
+      }
+    } catch (error) {
+      console.error("Error loading subjects:", error);
+      toast.error("Failed to load subjects");
+    } finally {
+      setIsLoading(false);
     }
   };
   
-  const loadDocumentsAndQuizzes = (subjectId: string) => {
-    const loadedDocuments = getDocumentsBySubjectId(subjectId);
-    const loadedQuizzes = getQuizzesBySubjectId(subjectId);
-    
-    setDocuments(loadedDocuments);
-    setQuizzes(loadedQuizzes);
+  const loadDocumentsAndQuizzes = async (subjectId: string) => {
+    try {
+      const loadedDocuments = await getDocumentsBySubjectId(subjectId);
+      const loadedQuizzes = await getQuizzesBySubjectId(subjectId);
+      
+      setDocuments(loadedDocuments);
+      setQuizzes(loadedQuizzes);
+    } catch (error) {
+      console.error("Error loading subject content:", error);
+      toast.error("Failed to load documents and quizzes");
+    }
   };
   
   const handleSelectSubject = (subject: Subject) => {
@@ -116,7 +134,7 @@ const SubjectManager = () => {
     setEditDialogOpen(true);
   };
   
-  const handleUpdateSubject = () => {
+  const handleUpdateSubject = async () => {
     if (!selectedSubject) return;
     
     if (!editName.trim()) {
@@ -124,48 +142,68 @@ const SubjectManager = () => {
       return;
     }
     
-    const updated = updateSubject(selectedSubject.id, {
-      name: editName,
-      description: editDescription,
-      icon: editIcon,
-      color: editColor
-    });
-    
-    if (updated) {
-      setEditDialogOpen(false);
-      loadSubjects();
+    try {
+      const updated = await updateSubject(selectedSubject.id, {
+        name: editName,
+        description: editDescription,
+        icon: editIcon,
+        color: editColor
+      });
       
-      // Re-select the updated subject
-      const refreshedSubject = getSubjectById(selectedSubject.id);
-      if (refreshedSubject) {
-        setSelectedSubject(refreshedSubject);
+      if (updated) {
+        setEditDialogOpen(false);
+        await loadSubjects();
+        
+        // Re-select the updated subject
+        const refreshedSubject = await getSubjectById(selectedSubject.id);
+        if (refreshedSubject) {
+          setSelectedSubject(refreshedSubject);
+        }
       }
+    } catch (error) {
+      console.error("Error updating subject:", error);
+      toast.error("Failed to update subject");
     }
   };
   
-  const handleDeleteSubject = (subjectId: string) => {
-    const success = deleteSubject(subjectId);
-    
-    if (success) {
-      loadSubjects();
+  const handleDeleteSubject = async (subjectId: string) => {
+    try {
+      const success = await deleteSubject(subjectId);
+      
+      if (success) {
+        await loadSubjects();
+      }
+    } catch (error) {
+      console.error("Error deleting subject:", error);
+      toast.error("Failed to delete subject");
     }
   };
   
-  const handleDeleteDocument = (documentId: string) => {
-    const success = deleteDocument(documentId);
-    
-    if (success && selectedSubject) {
-      loadDocumentsAndQuizzes(selectedSubject.id);
-      toast.success('Document deleted successfully');
+  const handleDeleteDocument = async (documentId: string) => {
+    try {
+      const success = await deleteDocument(documentId);
+      
+      if (success && selectedSubject) {
+        await loadDocumentsAndQuizzes(selectedSubject.id);
+        toast.success('Document deleted successfully');
+      }
+    } catch (error) {
+      console.error("Error deleting document:", error);
+      toast.error("Failed to delete document");
     }
   };
   
-  const handleDeleteQuiz = (quizId: string) => {
-    const success = deleteQuiz(quizId);
-    
-    if (success && selectedSubject) {
-      loadDocumentsAndQuizzes(selectedSubject.id);
-      toast.success('Quiz deleted successfully');
+  const handleDeleteQuiz = async (quizId: string) => {
+    try {
+      const success = await deleteQuiz(quizId);
+      
+      if (success && selectedSubject) {
+        await loadDocumentsAndQuizzes(selectedSubject.id);
+        toast.success('Quiz deleted successfully');
+      }
+    } catch (error) {
+      console.error("Error deleting quiz:", error);
+      toast.error("Failed to delete quiz");
     }
   };
   
@@ -181,6 +219,15 @@ const SubjectManager = () => {
     
     navigate('/upload');
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="w-8 h-8 text-cat animate-spin mr-2" />
+        <p className="text-muted-foreground">Loading subjects...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -229,7 +276,7 @@ const SubjectManager = () => {
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{subject.name}</div>
                       <div className="text-xs text-muted-foreground truncate">
-                        {getDocumentsBySubjectId(subject.id).length} documents
+                        {documents.length} documents
                       </div>
                     </div>
                   </button>

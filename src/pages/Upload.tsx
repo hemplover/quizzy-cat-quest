@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { BookOpen, Settings, Sparkles, ArrowRight, FileText, CheckCircle2, Pencil, AlertCircle } from 'lucide-react';
+import { BookOpen, Settings, Sparkles, ArrowRight, FileText, CheckCircle2, Pencil, AlertCircle, Loader2 } from 'lucide-react';
 import CatTutor from '@/components/CatTutor';
 import { toast } from 'sonner';
 import { 
@@ -45,6 +44,7 @@ const Upload = () => {
   const [selectedQuestionTypes, setSelectedQuestionTypes] = useState<string[]>(['multiple-choice', 'true-false']);
   const [numQuestions, setNumQuestions] = useState(10);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [catMessage, setCatMessage] = useState(t('uploadInstructions'));
   const [processedContent, setProcessedContent] = useState<string | null>(null);
   const [hasApiKey, setHasApiKey] = useState(false);
@@ -59,41 +59,48 @@ const Upload = () => {
   
   // Restore text from a previously uploaded document
   useEffect(() => {
-    setHasApiKey(hasValidApiKey());
-    
-    // Initialize subjects if needed
-    initializeSubjectsIfNeeded();
-    
-    const subjects = getSubjects();
-    if (subjects.length > 0 && !selectedSubject) {
-      setSelectedSubject(subjects[0].id);
-    }
-    
-    // If a subject ID is provided, fetch its name
-    if (initialSubjectId) {
-      const subject = getSubjectById(initialSubjectId);
-      if (subject) {
-        setSubjectName(subject.name);
+    const initialize = async () => {
+      setIsLoading(true);
+      setHasApiKey(hasValidApiKey());
+      
+      // Initialize subjects if needed
+      await initializeSubjectsIfNeeded();
+      
+      const subjects = await getSubjects();
+      if (subjects.length > 0 && !selectedSubject) {
+        setSelectedSubject(subjects[0].id);
       }
-    }
-    
-    // If document ID is provided, we should fetch that document and populate with its content
-    if (documentId) {
-      const document = getDocumentById(documentId);
-      if (document) {
-        setDocumentName(document.name);
-        
-        if (document.content) {
-          // If it's text content
-          setTextInput(document.content);
-          setProcessedContent(document.content);
-          setIsReadyToGenerateQuiz(true);
-          setCatMessage(t('documentLoaded').replace('{document}', document.name));
-          // Move to settings step
-          setUploadStep('settings');
+      
+      // If a subject ID is provided, fetch its name
+      if (initialSubjectId) {
+        const subject = await getSubjectById(initialSubjectId);
+        if (subject) {
+          setSubjectName(subject.name);
         }
       }
-    }
+      
+      // If document ID is provided, we should fetch that document and populate with its content
+      if (documentId) {
+        const document = await getDocumentById(documentId);
+        if (document) {
+          setDocumentName(document.name);
+          
+          if (document.content) {
+            // If it's text content
+            setTextInput(document.content);
+            setProcessedContent(document.content);
+            setIsReadyToGenerateQuiz(true);
+            setCatMessage(t('documentLoaded').replace('{document}', document.name));
+            // Move to settings step
+            setUploadStep('settings');
+          }
+        }
+      }
+      
+      setIsLoading(false);
+    };
+    
+    initialize();
   }, [initialSubjectId, documentId, t]);
 
   const handleApiKeySubmit = (key: string, provider: AIProvider) => {
@@ -116,9 +123,9 @@ const Upload = () => {
     setSelectedModel(model);
   };
   
-  const handleSubjectChange = (subjectId: string) => {
+  const handleSubjectChange = async (subjectId: string) => {
     setSelectedSubject(subjectId);
-    const subject = getSubjectById(subjectId);
+    const subject = await getSubjectById(subjectId);
     if (subject) {
       setSubjectName(subject.name);
     }
@@ -197,7 +204,7 @@ const Upload = () => {
         const questions = transformQuizQuestions(generatedQuiz);
         
         if (textInput) {
-          const document = createDocument({
+          const document = await createDocument({
             subjectId: selectedSubject,
             name: documentName || 'Text Input ' + new Date().toLocaleString(),
             content: processedContent,
@@ -205,7 +212,7 @@ const Upload = () => {
             fileSize: new Blob([textInput]).size
           });
           
-          createQuizRecord({
+          await createQuizRecord({
             subjectId: selectedSubject,
             documentId: document.id,
             title: `Quiz on ${documentName || 'Text Input'}`,
@@ -251,6 +258,15 @@ const Upload = () => {
     { id: 'true-false', name: t('trueFalse') },
     { id: 'open-ended', name: t('openEnded') },
   ];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="w-8 h-8 text-cat animate-spin mr-2" />
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto">

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
@@ -58,6 +57,7 @@ const Dashboard = () => {
   const [quizResults, setQuizResults] = useState<any[]>([]);
   const [createSubjectOpen, setCreateSubjectOpen] = useState(false);
   const [subjects, setSubjects] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
     // Load user XP from localStorage
@@ -68,7 +68,7 @@ const Dashboard = () => {
     const storedResults = JSON.parse(sessionStorage.getItem('quizResults') || '[]');
     setQuizResults(storedResults);
     
-    // Load subjects from local storage
+    // Load subjects from Supabase
     loadSubjects();
   }, []);
 
@@ -76,35 +76,42 @@ const Dashboard = () => {
   const levelInfo = getLevelInfo(userXP);
   const nextLevelXP = levelInfo.next.minXP;
   
-  // Load all subjects from localStorage
-  const loadSubjects = () => {
-    const loadedSubjects = getSubjects();
-    
-    // Calculate stats for each subject
-    const subjectsWithStats = loadedSubjects.map(subject => {
-      const quizzes = getQuizzesBySubjectId(subject.id);
-      const totalScore = quizzes.reduce((sum, quiz) => {
-        if (quiz.results) {
-          return sum + quiz.results.punteggio_totale;
-        }
-        return sum;
-      }, 0);
+  // Load all subjects from Supabase
+  const loadSubjects = async () => {
+    setIsLoading(true);
+    try {
+      const loadedSubjects = await getSubjects();
       
-      const averageScore = quizzes.length > 0 ? (totalScore / quizzes.length) * 100 : 0;
+      // Calculate stats for each subject
+      const subjectsWithStats = await Promise.all(loadedSubjects.map(async (subject) => {
+        const quizzes = await getQuizzesBySubjectId(subject.id);
+        const totalScore = quizzes.reduce((sum, quiz) => {
+          if (quiz.results) {
+            return sum + quiz.results.punteggio_totale;
+          }
+          return sum;
+        }, 0);
+        
+        const averageScore = quizzes.length > 0 ? (totalScore / quizzes.length) * 100 : 0;
+        
+        return {
+          ...subject,
+          quizCount: quizzes.length,
+          averageScore: Math.round(averageScore)
+        };
+      }));
       
-      return {
-        ...subject,
-        quizCount: quizzes.length,
-        averageScore: Math.round(averageScore)
-      };
-    });
-    
-    setSubjects(subjectsWithStats);
+      setSubjects(subjectsWithStats);
+    } catch (error) {
+      console.error("Error loading subjects:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
   
-  const handleSubjectCreated = (subjectId: string) => {
-    loadSubjects();
-    const newSubject = getSubjectById(subjectId);
+  const handleSubjectCreated = async (subjectId: string) => {
+    await loadSubjects();
+    const newSubject = await getSubjectById(subjectId);
     if (newSubject) {
       navigate(`/subjects/${subjectId}`);
     }
@@ -250,7 +257,11 @@ const Dashboard = () => {
           </div>
           
           <div className="space-y-4">
-            {subjects.length > 0 ? (
+            {isLoading ? (
+              <div className="text-center py-4">
+                <p className="text-muted-foreground">Loading subjects...</p>
+              </div>
+            ) : subjects.length > 0 ? (
               subjects.map((subject) => (
                 <Link 
                   key={subject.id}

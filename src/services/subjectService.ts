@@ -1,6 +1,8 @@
 
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { Database } from '@/integrations/supabase/types';
+import { Json } from '@/integrations/supabase/types';
 
 export interface Subject {
   id: string;
@@ -350,7 +352,7 @@ export const getQuizzes = async (): Promise<Quiz[]> => {
       subjectId: quiz.subject_id,
       documentId: quiz.document_id,
       title: quiz.title,
-      questions: quiz.questions,
+      questions: Array.isArray(quiz.questions) ? quiz.questions : JSON.parse(quiz.questions as string),
       settings: quiz.settings,
       results: quiz.results,
       createdAt: quiz.created_at
@@ -380,7 +382,7 @@ export const getQuizzesBySubjectId = async (subjectId: string): Promise<Quiz[]> 
       subjectId: quiz.subject_id,
       documentId: quiz.document_id,
       title: quiz.title,
-      questions: quiz.questions,
+      questions: Array.isArray(quiz.questions) ? quiz.questions : JSON.parse(quiz.questions as string),
       settings: quiz.settings,
       results: quiz.results,
       createdAt: quiz.created_at
@@ -410,7 +412,7 @@ export const getQuizById = async (id: string): Promise<Quiz | null> => {
       subjectId: data.subject_id,
       documentId: data.document_id,
       title: data.title,
-      questions: data.questions,
+      questions: Array.isArray(data.questions) ? data.questions : JSON.parse(data.questions as string),
       settings: data.settings,
       results: data.results,
       createdAt: data.created_at
@@ -446,7 +448,7 @@ export const createQuiz = async (quiz: Omit<Quiz, 'id' | 'createdAt'>): Promise<
       subjectId: data.subject_id,
       documentId: data.document_id,
       title: data.title,
-      questions: data.questions,
+      questions: Array.isArray(data.questions) ? data.questions : JSON.parse(data.questions as string),
       settings: data.settings,
       results: data.results,
       createdAt: data.created_at
@@ -477,7 +479,7 @@ export const updateQuizResults = async (id: string, results: any): Promise<Quiz 
       subjectId: data.subject_id,
       documentId: data.document_id,
       title: data.title,
-      questions: data.questions,
+      questions: Array.isArray(data.questions) ? data.questions : JSON.parse(data.questions as string),
       settings: data.settings,
       results: data.results,
       createdAt: data.created_at

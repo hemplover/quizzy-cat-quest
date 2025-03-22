@@ -27,6 +27,7 @@ const CreateSubjectModal: React.FC<CreateSubjectModalProps> = ({
   const { t } = useLanguage();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Predefined options
   const icons = ['📚', '📝', '📊', '🧮', '🔬', '🧪', '🔭', '📜', '🌍', '🧠', '⚛️', '🧬', '🔠', '🎨', '🎭', '🎵', '🏛️', '💻', '🌐', '📱'];
@@ -35,22 +36,30 @@ const CreateSubjectModal: React.FC<CreateSubjectModalProps> = ({
   const [selectedIcon, setSelectedIcon] = useState(icons[0]);
   const [selectedColor, setSelectedColor] = useState(colors[0]);
 
-  const handleCreateSubject = () => {
-    if (!name.trim()) return;
+  const handleCreateSubject = async () => {
+    if (!name.trim() || isSubmitting) return;
     
-    const newSubject = createSubject({
-      name,
-      description,
-      icon: selectedIcon,
-      color: selectedColor
-    });
+    setIsSubmitting(true);
     
-    onOpenChange(false);
-    setName('');
-    setDescription('');
-    
-    if (onSubjectCreated) {
-      onSubjectCreated(newSubject.id);
+    try {
+      const newSubject = await createSubject({
+        name,
+        description,
+        icon: selectedIcon,
+        color: selectedColor
+      });
+      
+      onOpenChange(false);
+      setName('');
+      setDescription('');
+      
+      if (onSubjectCreated && newSubject) {
+        onSubjectCreated(newSubject.id);
+      }
+    } catch (error) {
+      console.error('Error creating subject:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -131,9 +140,9 @@ const CreateSubjectModal: React.FC<CreateSubjectModalProps> = ({
             type="button" 
             onClick={handleCreateSubject}
             className="bg-cat hover:bg-cat/90"
-            disabled={!name.trim()}
+            disabled={!name.trim() || isSubmitting}
           >
-            {t('create')}
+            {isSubmitting ? t('creating') : t('create')}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
@@ -24,6 +23,7 @@ const SubjectDetail = () => {
   const [documents, setDocuments] = useState<any[]>([]);
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('documents');
+  const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
     if (!subjectId) {
@@ -31,29 +31,45 @@ const SubjectDetail = () => {
       return;
     }
     
-    const fetchSubjectData = () => {
-      const subjectData = getSubjectById(subjectId);
-      if (!subjectData) {
-        toast.error("Subject not found");
-        return;
+    const fetchSubjectData = async () => {
+      setIsLoading(true);
+      try {
+        const subjectData = await getSubjectById(subjectId);
+        if (!subjectData) {
+          toast.error("Subject not found");
+          return;
+        }
+        
+        setSubject(subjectData);
+        
+        const subjectDocuments = await getDocumentsBySubjectId(subjectId);
+        setDocuments(subjectDocuments);
+        
+        const subjectQuizzes = await getQuizzesBySubjectId(subjectId);
+        setQuizzes(subjectQuizzes);
+      } catch (error) {
+        console.error("Error fetching subject data:", error);
+        toast.error("Failed to load subject data");
+      } finally {
+        setIsLoading(false);
       }
-      
-      setSubject(subjectData);
-      
-      const subjectDocuments = getDocumentsBySubjectId(subjectId);
-      setDocuments(subjectDocuments);
-      
-      const subjectQuizzes = getQuizzesBySubjectId(subjectId);
-      setQuizzes(subjectQuizzes);
     };
     
     fetchSubjectData();
   }, [subjectId]);
   
-  if (!subject) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <p className="text-muted-foreground">Loading subject data...</p>
+      </div>
+    );
+  }
+  
+  if (!subject) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <p className="text-muted-foreground">Subject not found</p>
       </div>
     );
   }
@@ -210,7 +226,7 @@ const SubjectDetail = () => {
                             {doc.name}
                           </h3>
                           <p className="text-xs text-muted-foreground">
-                            Uploaded {new Date(doc.createdAt).toLocaleDateString()}
+                            Uploaded {new Date(doc.uploadedAt).toLocaleDateString()}
                           </p>
                           
                           <div className="flex mt-3 gap-2">
