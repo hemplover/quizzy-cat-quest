@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { BookOpen, Settings, Sparkles, ArrowRight, FileText, CheckCircle2, Pencil, AlertCircle, Loader2 } from 'lucide-react';
+import { BookOpen, Settings, Sparkles, ArrowRight, FileText, CheckCircle2, Pencil, AlertCircle, Loader2, Upload as UploadIcon } from 'lucide-react';
 import CatTutor from '@/components/CatTutor';
 import { toast } from 'sonner';
 import { 
@@ -21,6 +22,9 @@ import {
 import { QuizSettings } from '@/types/quiz';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { Textarea } from '@/components/ui/textarea';
+import FileUpload from '@/components/FileUpload';
+import { parseDocument } from '@/utils/documentParser';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Upload = () => {
   const { t } = useLanguage();
@@ -44,6 +48,8 @@ const Upload = () => {
   const [uploadStep, setUploadStep] = useState<'content' | 'settings'>('content');
   const [subjectName, setSubjectName] = useState<string>('');
   const [documentName, setDocumentName] = useState<string>('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadMethod, setUploadMethod] = useState<'text' | 'file'>('text');
   const selectedModel = getDefaultModel();
   
   useEffect(() => {
@@ -129,6 +135,39 @@ const Upload = () => {
     }
   };
 
+  const handleFileUpload = async (file: File) => {
+    setSelectedFile(file);
+    setDocumentName(file.name);
+    setCatMessage(`I'll analyze this ${file.type.split('/')[1]} file and create a quiz based on its content.`);
+    setIsProcessing(true);
+    
+    try {
+      // Parse the document to extract text
+      const extractedText = await parseDocument(file);
+      
+      if (!extractedText || extractedText.trim().length < 100) {
+        toast.error('The document content is too short or could not be extracted properly.');
+        setCatMessage('I couldn\'t extract enough text from this document. Please try a different file or paste text directly.');
+        setIsProcessing(false);
+        return;
+      }
+      
+      setTextInput(extractedText);
+      setProcessedContent(extractedText);
+      setIsReadyToGenerateQuiz(true);
+      setCatMessage(`I've analyzed your ${file.name} file and extracted the content. Ready to create a quiz!`);
+      toast.success(`Successfully processed ${file.name}`);
+      
+      setUploadStep('settings');
+    } catch (error) {
+      console.error('Error processing document:', error);
+      toast.error(`Error processing document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setCatMessage('I had trouble processing this document. Please try a different file or paste text directly.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleCreateQuiz = async () => {
     if (!processedContent) {
       toast.error(t('provideContent'));
@@ -186,26 +225,29 @@ const Upload = () => {
         return;
       }
       
-      if (textInput) {
-        const document = await createDocument({
-          subjectId: selectedSubject,
-          name: documentName || 'Text Input ' + new Date().toLocaleString(),
-          content: processedContent,
-          fileType: 'text/plain',
-          fileSize: new Blob([textInput]).size
-        });
-        
-        await createQuizRecord({
-          subjectId: selectedSubject,
-          documentId: document.id,
-          title: `Quiz on ${documentName || 'Text Input'}`,
-          questions: questions
-        });
-      }
+      // Create document and quiz record
+      const docName = documentName || (selectedFile ? selectedFile.name : 'Text Input ' + new Date().toLocaleString());
+      const fileType = selectedFile ? selectedFile.type : 'text/plain';
+      const fileSize = selectedFile ? selectedFile.size : new Blob([textInput]).size;
+      
+      const document = await createDocument({
+        subjectId: selectedSubject,
+        name: docName,
+        content: processedContent,
+        fileType: fileType,
+        fileSize: fileSize
+      });
+      
+      await createQuizRecord({
+        subjectId: selectedSubject,
+        documentId: document.id,
+        title: `Quiz on ${docName}`,
+        questions: questions
+      });
       
       sessionStorage.setItem('quizQuestions', JSON.stringify(questions));
       sessionStorage.setItem('quizData', JSON.stringify({
-        source: documentName || 'Text input',
+        source: docName,
         difficulty,
         questionTypes: selectedQuestionTypes,
         numQuestions: questions.length,
@@ -291,31 +333,64 @@ const Upload = () => {
           </div>
           
           <div className="mt-6">
-            <div className="flex items-center gap-2 mb-4">
-              <BookOpen className="w-5 h-5 text-cat" />
-              <h2 className="text-xl font-medium">{t('pasteText')}</h2>
-            </div>
-            
-            <Textarea
-              className="w-full h-40 p-4 border rounded-lg focus:ring-cat focus:border-cat focus:outline-none transition-colors"
-              placeholder={t('pasteTextPlaceholder')}
-              value={textInput}
-              onChange={handleTextInputChange}
-              disabled={isProcessing}
-            />
-            
-            {textInput.trim().length > 0 && (
-              <div className="mt-4 flex justify-end">
-                <button
-                  onClick={handleProcessText}
-                  disabled={isProcessing || textInput.trim().length < 100}
-                  className="cat-button-secondary"
-                >
-                  <FileText className="w-5 h-5 mr-2" />
-                  {t('processText')}
-                </button>
-              </div>
-            )}
+            <Tabs defaultValue="text" className="w-full" onValueChange={(value) => setUploadMethod(value as 'text' | 'file')}>
+              <TabsList className="mb-6 grid w-full grid-cols-2">
+                <TabsTrigger value="text" className="flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  <span>{t('pasteText')}</span>
+                </TabsTrigger>
+                <TabsTrigger value="file" className="flex items-center gap-2">
+                  <UploadIcon className="w-4 h-4" />
+                  <span>Upload Document</span>
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="text">
+                <div className="flex items-center gap-2 mb-4">
+                  <BookOpen className="w-5 h-5 text-cat" />
+                  <h2 className="text-xl font-medium">{t('pasteText')}</h2>
+                </div>
+                
+                <Textarea
+                  className="w-full h-40 p-4 border rounded-lg focus:ring-cat focus:border-cat focus:outline-none transition-colors"
+                  placeholder={t('pasteTextPlaceholder')}
+                  value={textInput}
+                  onChange={handleTextInputChange}
+                  disabled={isProcessing}
+                />
+                
+                {textInput.trim().length > 0 && (
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      onClick={handleProcessText}
+                      disabled={isProcessing || textInput.trim().length < 100}
+                      className="cat-button-secondary"
+                    >
+                      <FileText className="w-5 h-5 mr-2" />
+                      {t('processText')}
+                    </button>
+                  </div>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="file">
+                <div className="flex items-center gap-2 mb-4">
+                  <UploadIcon className="w-5 h-5 text-cat" />
+                  <h2 className="text-xl font-medium">Upload Document</h2>
+                </div>
+                
+                <p className="text-sm text-muted-foreground mb-4">
+                  Upload a PDF, Word document, PowerPoint, or other text-based file to generate a quiz.
+                </p>
+                
+                <FileUpload 
+                  onFileUpload={handleFileUpload}
+                  accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.html,.htm"
+                  maxSize={20}
+                  showUploadButton={true}
+                />
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       )}
@@ -331,14 +406,18 @@ const Upload = () => {
             <div className="flex items-center justify-between p-4 rounded-lg border bg-gray-50 mb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-white rounded-full border">
-                  <Pencil className="w-5 h-5 text-cat" />
+                  {selectedFile ? (
+                    <FileText className="w-5 h-5 text-cat" />
+                  ) : (
+                    <Pencil className="w-5 h-5 text-cat" />
+                  )}
                 </div>
                 <div>
                   <h3 className="font-medium">
-                    {documentName || t('textInput')}
+                    {documentName || selectedFile?.name || t('textInput')}
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    {`${textInput.length} ${t('characters')}`}
+                    {`${processedContent.length} ${t('characters')}`}
                   </p>
                 </div>
               </div>
@@ -348,6 +427,7 @@ const Upload = () => {
                   setUploadStep('content');
                   setProcessedContent(null);
                   setIsReadyToGenerateQuiz(false);
+                  setSelectedFile(null);
                 }}
                 className="text-xs px-3 py-1.5 rounded bg-gray-200 hover:bg-gray-300 text-gray-800"
               >

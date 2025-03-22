@@ -67,8 +67,19 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings) {
     throw new Error('The provided content is too short. Please provide more detailed study material.');
   }
   
+  // Handle large documents by trimming if they exceed Gemini's token limit
+  // Gemini can handle roughly 30,000 characters safely
+  const MAX_CONTENT_LENGTH = 30000;
+  let processedContent = content;
+  
+  if (content.length > MAX_CONTENT_LENGTH) {
+    console.log(`Content too large (${content.length} chars), truncating to ${MAX_CONTENT_LENGTH} chars`);
+    processedContent = content.substring(0, MAX_CONTENT_LENGTH);
+    console.log(`Truncated content to ${processedContent.length} characters`);
+  }
+  
   // Prepare prompt for Gemini
-  const prompt = buildPrompt(content, settings, languagePrompt);
+  const prompt = buildPrompt(processedContent, settings, languagePrompt);
   
   // Default to Gemini 2.0 Flash model for better performance
   const modelName = 'gemini-2.0-flash';
@@ -99,7 +110,7 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings) {
         ],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 1500  // Increased token limit for better quiz generation
+          maxOutputTokens: 2000  // Increased token limit for better quiz generation
         }
       })
     });
@@ -148,7 +159,12 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings) {
       if (jsonMatch) {
         const extractedJson = jsonMatch[1] || jsonMatch[0];
         console.log('Extracted JSON content:', extractedJson.substring(0, 100) + '...');
-        return JSON.parse(extractedJson);
+        try {
+          return JSON.parse(extractedJson);
+        } catch (jsonError) {
+          console.error('Failed to parse extracted JSON:', jsonError);
+          throw new Error('Failed to parse quiz from Gemini response. The AI response was not in valid JSON format.');
+        }
       }
       
       throw new Error('Failed to parse quiz from Gemini response. Please try again with more detailed content.');
