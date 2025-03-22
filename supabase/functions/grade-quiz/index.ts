@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -29,6 +28,7 @@ serve(async (req) => {
         result = await gradeWithOpenAI(questions, userAnswers);
         break;
       case 'gemini':
+        // Always use backend key for Gemini
         result = await gradeWithGemini(questions, userAnswers);
         break;
       case 'claude':
@@ -173,6 +173,8 @@ async function gradeWithGemini(questions: any[], userAnswers: any[]) {
   if (!GEMINI_API_KEY) {
     throw new Error('Gemini API key is not set in environment variables');
   }
+  
+  console.log('Using Gemini API key from Supabase secrets for grading');
   
   // Format questions and answers for grading
   const formattedQuestions = formatQuestionsForGrading(questions, userAnswers);

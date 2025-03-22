@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -38,7 +39,16 @@ serve(async (req) => {
         result = await generateOpenAIQuiz(content, settings, clientApiKey);
         break;
       case 'gemini':
-        result = await generateGeminiQuiz(content, settings, clientApiKey);
+        // For Gemini, prioritize backend API key
+        const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+        if (!GEMINI_API_KEY) {
+          console.error('Gemini API key not found in Supabase secrets');
+          if (!clientApiKey) {
+            throw new Error('Gemini API key is not provided. Please set it in the Supabase secrets or provide it in the client.');
+          }
+        }
+        // Always use backend key for Gemini
+        result = await generateGeminiQuiz(content, settings, null);
         break;
       case 'claude':
       case 'mistral':
@@ -141,13 +151,15 @@ async function generateOpenAIQuiz(content: string, settings: QuizSettings, clien
 // Gemini quiz generation function
 async function generateGeminiQuiz(content: string, settings: QuizSettings, clientApiKey?: string) {
   const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-  const apiKey = clientApiKey || GEMINI_API_KEY;
+  
+  // Always use backend API key for Gemini
+  const apiKey = GEMINI_API_KEY;
   
   if (!apiKey) {
-    throw new Error('Gemini API key is not provided. Please provide a key in the client or set it in the server environment.');
+    throw new Error('Gemini API key is not configured in Supabase secrets. Please add GEMINI_API_KEY to your Supabase secrets.');
   }
   
-  console.log('Using Gemini API key:', apiKey ? 'Key exists' : 'No key found');
+  console.log('Using Gemini API key from Supabase secrets');
   
   // Detect language and preserve it
   const languagePrompt = "Please detect the language of the content and create the quiz in that same language. Preserve all terminology and concepts in their original language.";

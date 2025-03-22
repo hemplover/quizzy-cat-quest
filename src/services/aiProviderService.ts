@@ -43,7 +43,8 @@ export const AI_PROVIDERS: AIProviderConfig[] = [
     defaultModel: 'gemini-2-flash',
     apiKeyRequired: true,
     supportsFileUpload: false,
-    apiKeyName: 'gemini_api_key'
+    apiKeyName: 'gemini_api_key',
+    useBackendOnly: true  // Force Gemini to use backend API key
   },
   {
     id: 'claude',

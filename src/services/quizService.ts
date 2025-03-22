@@ -1,3 +1,4 @@
+
 import { toast } from 'sonner';
 import { 
   AIProvider, 
@@ -88,13 +89,16 @@ export const generateQuiz = async (
       return null;
     }
     
+    // For Gemini, we'll only use the backend API key
+    const shouldSendApiKey = provider !== 'gemini';
+    
     // Call the edge function for quiz generation
     const { data, error } = await supabase.functions.invoke('generate-quiz', {
       body: {
         content,
         settings,
         provider,
-        apiKey: apiKey // Pass the API key from localStorage if available
+        apiKey: shouldSendApiKey ? apiKey : null // Only pass non-Gemini API keys
       }
     });
     

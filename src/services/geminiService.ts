@@ -1,11 +1,43 @@
-import { getApiKey } from './aiProviderService';
+
+import { getApiKey, isBackendOnlyProvider } from './aiProviderService';
 import { GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export const generateQuizWithGemini = async (
   content: string,
   settings: QuizSettings
 ): Promise<GeneratedQuiz> => {
+  // Check if we should use backend Gemini API
+  if (isBackendOnlyProvider('gemini')) {
+    console.log('Using backend Gemini API key from Supabase secrets');
+    
+    // Call the edge function for quiz generation
+    const { data, error } = await supabase.functions.invoke('generate-quiz', {
+      body: {
+        content,
+        settings,
+        provider: 'gemini',
+        apiKey: null // Don't send API key, use backend key
+      }
+    });
+    
+    if (error) {
+      console.error('Error calling generate-quiz function:', error);
+      toast.error(`Error generating quiz: ${error.message}`);
+      throw new Error(`Error generating quiz: ${error.message}`);
+    }
+    
+    if (!data || !data.quiz || data.quiz.length === 0) {
+      console.error('Failed to generate quiz: Empty or invalid response from API');
+      throw new Error('Failed to generate quiz: Empty or invalid response from API');
+    }
+    
+    return data;
+  }
+  
+  // Original frontend implementation is kept but won't be used
+  // when Gemini is set to backend-only mode
   const apiKey = getApiKey('gemini');
   console.log('Gemini API Key exists:', !!apiKey);
   
@@ -143,6 +175,35 @@ export const gradeQuizWithGemini = async (
   questions: any[], 
   userAnswers: any[]
 ): Promise<QuizResults> => {
+  // Check if we should use backend Gemini API
+  if (isBackendOnlyProvider('gemini')) {
+    console.log('Using backend Gemini API key from Supabase secrets for grading');
+    
+    // Call the edge function for quiz grading
+    const { data, error } = await supabase.functions.invoke('grade-quiz', {
+      body: {
+        questions,
+        userAnswers,
+        provider: 'gemini'
+      }
+    });
+    
+    if (error) {
+      console.error('Error calling grade-quiz function:', error);
+      toast.error(`Error grading quiz: ${error.message}`);
+      throw new Error(`Error grading quiz: ${error.message}`);
+    }
+    
+    if (!data || !data.risultati || !Array.isArray(data.risultati)) {
+      console.error('Invalid quiz results format returned by API');
+      throw new Error('Invalid quiz results format returned by API');
+    }
+    
+    return data;
+  }
+  
+  // Original frontend implementation is kept but won't be used
+  // when Gemini is set to backend-only mode
   const apiKey = getApiKey('gemini');
   if (!apiKey) {
     throw new Error('Gemini API key is not set');
