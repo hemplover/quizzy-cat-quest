@@ -9,7 +9,122 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      documents: {
+        Row: {
+          content: string
+          file_size: number
+          file_type: string
+          id: string
+          name: string
+          subject_id: string
+          uploaded_at: string
+        }
+        Insert: {
+          content: string
+          file_size: number
+          file_type: string
+          id?: string
+          name: string
+          subject_id: string
+          uploaded_at?: string
+        }
+        Update: {
+          content?: string
+          file_size?: number
+          file_type?: string
+          id?: string
+          name?: string
+          subject_id?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quizzes: {
+        Row: {
+          created_at: string
+          document_id: string | null
+          id: string
+          questions: Json
+          results: Json | null
+          settings: Json
+          subject_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          questions: Json
+          results?: Json | null
+          settings: Json
+          subject_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          questions?: Json
+          results?: Json | null
+          settings?: Json
+          subject_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quizzes_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quizzes_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subjects: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

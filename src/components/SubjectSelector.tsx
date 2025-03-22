@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle, Folder, BookOpen } from 'lucide-react';
 import { Subject, getSubjects, createSubject } from '@/services/subjectService';
 import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 interface SubjectSelectorProps {
   selectedSubject: string | null;
@@ -32,7 +33,7 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
   onSubjectChange,
   className
 }) => {
-  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const queryClient = useQueryClient();
   const [newSubjectDialogOpen, setNewSubjectDialogOpen] = useState(false);
   
   // New subject form state
@@ -44,34 +45,16 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
   const icons = ['📚', '📝', '📊', '🧮', '🔬', '🧪', '🔭', '📜', '🌍', '🧠', '⚛️', '🧬', '🔠', '🎨', '🎭', '🎵', '🏛️', '💻', '🌐', '📱'];
   const colors = ['#4f46e5', '#16a34a', '#b45309', '#db2777', '#9333ea', '#059669', '#d97706', '#dc2626', '#0891b2', '#4338ca'];
 
-  useEffect(() => {
-    loadSubjects();
-  }, []);
-  
-  const loadSubjects = () => {
-    const loadedSubjects = getSubjects();
-    setSubjects(loadedSubjects);
-    
-    // If no subject is selected and we have subjects, select the first one
-    if (!selectedSubject && loadedSubjects.length > 0) {
-      onSubjectChange(loadedSubjects[0].id);
-    }
-  };
-  
-  const handleCreateSubject = () => {
-    if (!newSubjectName.trim()) {
-      toast.error('Please enter a subject name');
-      return;
-    }
-    
-    try {
-      createSubject({
-        name: newSubjectName,
-        description: newSubjectDescription,
-        icon: newSubjectIcon,
-        color: newSubjectColor
-      });
-      
+  // Fetch subjects with React Query
+  const { data: subjects = [], isLoading } = useQuery({
+    queryKey: ['subjects'],
+    queryFn: getSubjects
+  });
+
+  // Create subject mutation
+  const createSubjectMutation = useMutation({
+    mutationFn: createSubject,
+    onSuccess: () => {
       // Reset form
       setNewSubjectName('');
       setNewSubjectDescription('');
@@ -81,12 +64,30 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
       // Close dialog
       setNewSubjectDialogOpen(false);
       
-      // Reload subjects
-      loadSubjects();
-    } catch (error) {
-      console.error('Error creating subject:', error);
-      toast.error('Failed to create subject');
+      // Invalidate subjects query to refetch
+      queryClient.invalidateQueries({ queryKey: ['subjects'] });
     }
+  });
+  
+  useEffect(() => {
+    // Select first subject if none selected and we have subjects
+    if (!selectedSubject && subjects.length > 0) {
+      onSubjectChange(subjects[0].id);
+    }
+  }, [subjects, selectedSubject, onSubjectChange]);
+  
+  const handleCreateSubject = () => {
+    if (!newSubjectName.trim()) {
+      toast.error('Please enter a subject name');
+      return;
+    }
+    
+    createSubjectMutation.mutate({
+      name: newSubjectName,
+      description: newSubjectDescription,
+      icon: newSubjectIcon,
+      color: newSubjectColor
+    });
   };
 
   return (
@@ -180,15 +181,20 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
                 type="button" 
                 onClick={handleCreateSubject}
                 className="bg-cat hover:bg-cat/90"
+                disabled={createSubjectMutation.isPending}
               >
-                Create Subject
+                {createSubjectMutation.isPending ? 'Creating...' : 'Create Subject'}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
       
-      {subjects.length > 0 ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center p-4">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cat"></div>
+        </div>
+      ) : subjects.length > 0 ? (
         <Select 
           value={selectedSubject || undefined} 
           onValueChange={onSubjectChange}

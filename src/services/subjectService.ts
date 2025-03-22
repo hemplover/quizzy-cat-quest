@@ -1,5 +1,6 @@
 
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface Subject {
   id: string;
@@ -28,41 +29,101 @@ export interface Quiz {
   title: string;
   questions: any[];
   createdAt: string;
+  settings?: any;
   results?: any;
 }
 
 // Get all subjects
-export const getSubjects = (): Subject[] => {
+export const getSubjects = async (): Promise<Subject[]> => {
   try {
-    const subjects = localStorage.getItem('subjects');
-    if (!subjects) return [];
-    return JSON.parse(subjects);
+    const { data, error } = await supabase
+      .from('subjects')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error getting subjects:', error);
+      toast.error('Failed to load subjects');
+      return [];
+    }
+    
+    // Transform to match our interface
+    return data.map(subject => ({
+      id: subject.id,
+      name: subject.name,
+      description: subject.description || '',
+      icon: subject.icon || '📚',
+      color: subject.color || '#4f46e5',
+      createdAt: subject.created_at,
+      updatedAt: subject.updated_at
+    }));
   } catch (error) {
     console.error('Error getting subjects:', error);
+    toast.error('Failed to load subjects');
     return [];
   }
 };
 
 // Get a subject by ID
-export const getSubjectById = (id: string): Subject | null => {
-  const subjects = getSubjects();
-  return subjects.find(subject => subject.id === id) || null;
+export const getSubjectById = async (id: string): Promise<Subject | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('subjects')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      console.error('Error getting subject:', error);
+      return null;
+    }
+    
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || '',
+      icon: data.icon || '📚',
+      color: data.color || '#4f46e5',
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
+  } catch (error) {
+    console.error('Error getting subject:', error);
+    return null;
+  }
 };
 
 // Create a new subject
-export const createSubject = (subject: Omit<Subject, 'id' | 'createdAt' | 'updatedAt'>): Subject => {
+export const createSubject = async (subject: Omit<Subject, 'id' | 'createdAt' | 'updatedAt'>): Promise<Subject> => {
   try {
-    const subjects = getSubjects();
-    const newSubject: Subject = {
-      ...subject,
-      id: `subject_${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+    const { data, error } = await supabase
+      .from('subjects')
+      .insert({
+        name: subject.name,
+        description: subject.description,
+        icon: subject.icon,
+        color: subject.color
+      })
+      .select()
+      .single();
     
-    localStorage.setItem('subjects', JSON.stringify([...subjects, newSubject]));
+    if (error) {
+      console.error('Error creating subject:', error);
+      toast.error('Failed to create subject');
+      throw error;
+    }
+    
     toast.success(`Subject ${subject.name} created successfully`);
-    return newSubject;
+    
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || '',
+      icon: data.icon || '📚',
+      color: data.color || '#4f46e5',
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
   } catch (error) {
     console.error('Error creating subject:', error);
     toast.error('Failed to create subject');
@@ -71,26 +132,35 @@ export const createSubject = (subject: Omit<Subject, 'id' | 'createdAt' | 'updat
 };
 
 // Update a subject
-export const updateSubject = (id: string, updates: Partial<Omit<Subject, 'id' | 'createdAt' | 'updatedAt'>>): Subject | null => {
+export const updateSubject = async (id: string, updates: Partial<Omit<Subject, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Subject | null> => {
   try {
-    const subjects = getSubjects();
-    const index = subjects.findIndex(subject => subject.id === id);
+    const { data, error } = await supabase
+      .from('subjects')
+      .update({ 
+        ...updates, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', id)
+      .select()
+      .single();
     
-    if (index === -1) {
-      toast.error('Subject not found');
+    if (error) {
+      console.error('Error updating subject:', error);
+      toast.error('Failed to update subject');
       return null;
     }
     
-    const updatedSubject: Subject = {
-      ...subjects[index],
-      ...updates,
-      updatedAt: new Date().toISOString()
-    };
+    toast.success(`Subject ${data.name} updated successfully`);
     
-    subjects[index] = updatedSubject;
-    localStorage.setItem('subjects', JSON.stringify(subjects));
-    toast.success(`Subject ${updatedSubject.name} updated successfully`);
-    return updatedSubject;
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || '',
+      icon: data.icon || '📚',
+      color: data.color || '#4f46e5',
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
   } catch (error) {
     console.error('Error updating subject:', error);
     toast.error('Failed to update subject');
@@ -99,24 +169,18 @@ export const updateSubject = (id: string, updates: Partial<Omit<Subject, 'id' | 
 };
 
 // Delete a subject
-export const deleteSubject = (id: string): boolean => {
+export const deleteSubject = async (id: string): Promise<boolean> => {
   try {
-    const subjects = getSubjects();
-    const newSubjects = subjects.filter(subject => subject.id !== id);
+    const { error } = await supabase
+      .from('subjects')
+      .delete()
+      .eq('id', id);
     
-    if (subjects.length === newSubjects.length) {
-      toast.error('Subject not found');
+    if (error) {
+      console.error('Error deleting subject:', error);
+      toast.error('Failed to delete subject');
       return false;
     }
-    
-    localStorage.setItem('subjects', JSON.stringify(newSubjects));
-    
-    // Also delete associated documents and quizzes
-    const documents = getDocumentsBySubjectId(id);
-    const quizzes = getQuizzesBySubjectId(id);
-    
-    documents.forEach(doc => deleteDocument(doc.id));
-    quizzes.forEach(quiz => deleteQuiz(quiz.id));
     
     toast.success('Subject deleted successfully');
     return true;
@@ -128,11 +192,27 @@ export const deleteSubject = (id: string): boolean => {
 };
 
 // Get all documents
-export const getDocuments = (): Document[] => {
+export const getDocuments = async (): Promise<Document[]> => {
   try {
-    const documents = localStorage.getItem('documents');
-    if (!documents) return [];
-    return JSON.parse(documents);
+    const { data, error } = await supabase
+      .from('documents')
+      .select('*')
+      .order('uploaded_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error getting documents:', error);
+      return [];
+    }
+    
+    return data.map(doc => ({
+      id: doc.id,
+      subjectId: doc.subject_id,
+      name: doc.name,
+      content: doc.content,
+      fileType: doc.file_type,
+      fileSize: doc.file_size,
+      uploadedAt: doc.uploaded_at
+    }));
   } catch (error) {
     console.error('Error getting documents:', error);
     return [];
@@ -140,29 +220,92 @@ export const getDocuments = (): Document[] => {
 };
 
 // Get documents by subject ID
-export const getDocumentsBySubjectId = (subjectId: string): Document[] => {
-  const documents = getDocuments();
-  return documents.filter(doc => doc.subjectId === subjectId);
+export const getDocumentsBySubjectId = async (subjectId: string): Promise<Document[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('subject_id', subjectId)
+      .order('uploaded_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error getting documents by subject ID:', error);
+      return [];
+    }
+    
+    return data.map(doc => ({
+      id: doc.id,
+      subjectId: doc.subject_id,
+      name: doc.name,
+      content: doc.content,
+      fileType: doc.file_type,
+      fileSize: doc.file_size,
+      uploadedAt: doc.uploaded_at
+    }));
+  } catch (error) {
+    console.error('Error getting documents by subject ID:', error);
+    return [];
+  }
 };
 
 // Get a document by ID
-export const getDocumentById = (id: string): Document | null => {
-  const documents = getDocuments();
-  return documents.find(doc => doc.id === id) || null;
+export const getDocumentById = async (id: string): Promise<Document | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      console.error('Error getting document:', error);
+      return null;
+    }
+    
+    return {
+      id: data.id,
+      subjectId: data.subject_id,
+      name: data.name,
+      content: data.content,
+      fileType: data.file_type,
+      fileSize: data.file_size,
+      uploadedAt: data.uploaded_at
+    };
+  } catch (error) {
+    console.error('Error getting document:', error);
+    return null;
+  }
 };
 
 // Create a new document
-export const createDocument = (document: Omit<Document, 'id' | 'uploadedAt'>): Document => {
+export const createDocument = async (document: Omit<Document, 'id' | 'uploadedAt'>): Promise<Document> => {
   try {
-    const documents = getDocuments();
-    const newDocument: Document = {
-      ...document,
-      id: `document_${Date.now()}`,
-      uploadedAt: new Date().toISOString()
-    };
+    const { data, error } = await supabase
+      .from('documents')
+      .insert({
+        subject_id: document.subjectId,
+        name: document.name,
+        content: document.content,
+        file_type: document.fileType,
+        file_size: document.fileSize
+      })
+      .select()
+      .single();
     
-    localStorage.setItem('documents', JSON.stringify([...documents, newDocument]));
-    return newDocument;
+    if (error) {
+      console.error('Error creating document:', error);
+      throw error;
+    }
+    
+    return {
+      id: data.id,
+      subjectId: data.subject_id,
+      name: data.name,
+      content: data.content,
+      fileType: data.file_type,
+      fileSize: data.file_size,
+      uploadedAt: data.uploaded_at
+    };
   } catch (error) {
     console.error('Error creating document:', error);
     throw error;
@@ -170,21 +313,17 @@ export const createDocument = (document: Omit<Document, 'id' | 'uploadedAt'>): D
 };
 
 // Delete a document
-export const deleteDocument = (id: string): boolean => {
+export const deleteDocument = async (id: string): Promise<boolean> => {
   try {
-    const documents = getDocuments();
-    const newDocuments = documents.filter(doc => doc.id !== id);
+    const { error } = await supabase
+      .from('documents')
+      .delete()
+      .eq('id', id);
     
-    if (documents.length === newDocuments.length) {
+    if (error) {
+      console.error('Error deleting document:', error);
       return false;
     }
-    
-    localStorage.setItem('documents', JSON.stringify(newDocuments));
-    
-    // Also delete associated quizzes
-    const quizzes = getQuizzes();
-    const updatedQuizzes = quizzes.filter(quiz => quiz.documentId !== id);
-    localStorage.setItem('quizzes', JSON.stringify(updatedQuizzes));
     
     return true;
   } catch (error) {
@@ -194,11 +333,28 @@ export const deleteDocument = (id: string): boolean => {
 };
 
 // Get all quizzes
-export const getQuizzes = (): Quiz[] => {
+export const getQuizzes = async (): Promise<Quiz[]> => {
   try {
-    const quizzes = localStorage.getItem('quizzes');
-    if (!quizzes) return [];
-    return JSON.parse(quizzes);
+    const { data, error } = await supabase
+      .from('quizzes')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error getting quizzes:', error);
+      return [];
+    }
+    
+    return data.map(quiz => ({
+      id: quiz.id,
+      subjectId: quiz.subject_id,
+      documentId: quiz.document_id,
+      title: quiz.title,
+      questions: quiz.questions,
+      settings: quiz.settings,
+      results: quiz.results,
+      createdAt: quiz.created_at
+    }));
   } catch (error) {
     console.error('Error getting quizzes:', error);
     return [];
@@ -206,29 +362,95 @@ export const getQuizzes = (): Quiz[] => {
 };
 
 // Get quizzes by subject ID
-export const getQuizzesBySubjectId = (subjectId: string): Quiz[] => {
-  const quizzes = getQuizzes();
-  return quizzes.filter(quiz => quiz.subjectId === subjectId);
+export const getQuizzesBySubjectId = async (subjectId: string): Promise<Quiz[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('quizzes')
+      .select('*')
+      .eq('subject_id', subjectId)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error getting quizzes by subject ID:', error);
+      return [];
+    }
+    
+    return data.map(quiz => ({
+      id: quiz.id,
+      subjectId: quiz.subject_id,
+      documentId: quiz.document_id,
+      title: quiz.title,
+      questions: quiz.questions,
+      settings: quiz.settings,
+      results: quiz.results,
+      createdAt: quiz.created_at
+    }));
+  } catch (error) {
+    console.error('Error getting quizzes by subject ID:', error);
+    return [];
+  }
 };
 
 // Get a quiz by ID
-export const getQuizById = (id: string): Quiz | null => {
-  const quizzes = getQuizzes();
-  return quizzes.find(quiz => quiz.id === id) || null;
+export const getQuizById = async (id: string): Promise<Quiz | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('quizzes')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      console.error('Error getting quiz:', error);
+      return null;
+    }
+    
+    return {
+      id: data.id,
+      subjectId: data.subject_id,
+      documentId: data.document_id,
+      title: data.title,
+      questions: data.questions,
+      settings: data.settings,
+      results: data.results,
+      createdAt: data.created_at
+    };
+  } catch (error) {
+    console.error('Error getting quiz:', error);
+    return null;
+  }
 };
 
 // Create a new quiz
-export const createQuiz = (quiz: Omit<Quiz, 'id' | 'createdAt'>): Quiz => {
+export const createQuiz = async (quiz: Omit<Quiz, 'id' | 'createdAt'>): Promise<Quiz> => {
   try {
-    const quizzes = getQuizzes();
-    const newQuiz: Quiz = {
-      ...quiz,
-      id: `quiz_${Date.now()}`,
-      createdAt: new Date().toISOString()
-    };
+    const { data, error } = await supabase
+      .from('quizzes')
+      .insert({
+        subject_id: quiz.subjectId,
+        document_id: quiz.documentId,
+        title: quiz.title,
+        questions: quiz.questions,
+        settings: quiz.settings || {}
+      })
+      .select()
+      .single();
     
-    localStorage.setItem('quizzes', JSON.stringify([...quizzes, newQuiz]));
-    return newQuiz;
+    if (error) {
+      console.error('Error creating quiz:', error);
+      throw error;
+    }
+    
+    return {
+      id: data.id,
+      subjectId: data.subject_id,
+      documentId: data.document_id,
+      title: data.title,
+      questions: data.questions,
+      settings: data.settings,
+      results: data.results,
+      createdAt: data.created_at
+    };
   } catch (error) {
     console.error('Error creating quiz:', error);
     throw error;
@@ -236,23 +458,30 @@ export const createQuiz = (quiz: Omit<Quiz, 'id' | 'createdAt'>): Quiz => {
 };
 
 // Update a quiz with results
-export const updateQuizResults = (id: string, results: any): Quiz | null => {
+export const updateQuizResults = async (id: string, results: any): Promise<Quiz | null> => {
   try {
-    const quizzes = getQuizzes();
-    const index = quizzes.findIndex(quiz => quiz.id === id);
+    const { data, error } = await supabase
+      .from('quizzes')
+      .update({ results })
+      .eq('id', id)
+      .select()
+      .single();
     
-    if (index === -1) {
+    if (error) {
+      console.error('Error updating quiz results:', error);
       return null;
     }
     
-    const updatedQuiz: Quiz = {
-      ...quizzes[index],
-      results
+    return {
+      id: data.id,
+      subjectId: data.subject_id,
+      documentId: data.document_id,
+      title: data.title,
+      questions: data.questions,
+      settings: data.settings,
+      results: data.results,
+      createdAt: data.created_at
     };
-    
-    quizzes[index] = updatedQuiz;
-    localStorage.setItem('quizzes', JSON.stringify(quizzes));
-    return updatedQuiz;
   } catch (error) {
     console.error('Error updating quiz results:', error);
     return null;
@@ -260,16 +489,18 @@ export const updateQuizResults = (id: string, results: any): Quiz | null => {
 };
 
 // Delete a quiz
-export const deleteQuiz = (id: string): boolean => {
+export const deleteQuiz = async (id: string): Promise<boolean> => {
   try {
-    const quizzes = getQuizzes();
-    const newQuizzes = quizzes.filter(quiz => quiz.id !== id);
+    const { error } = await supabase
+      .from('quizzes')
+      .delete()
+      .eq('id', id);
     
-    if (quizzes.length === newQuizzes.length) {
+    if (error) {
+      console.error('Error deleting quiz:', error);
       return false;
     }
     
-    localStorage.setItem('quizzes', JSON.stringify(newQuizzes));
     return true;
   } catch (error) {
     console.error('Error deleting quiz:', error);
@@ -278,39 +509,43 @@ export const deleteQuiz = (id: string): boolean => {
 };
 
 // Initialize with some default subjects if there are none
-export const initializeSubjectsIfNeeded = (): void => {
-  const subjects = getSubjects();
-  
-  if (subjects.length === 0) {
-    const defaultSubjects = [
-      {
-        name: 'Mathematics',
-        description: 'Algebra, Calculus, Geometry, etc.',
-        icon: '📐',
-        color: '#4f46e5'
-      },
-      {
-        name: 'Science',
-        description: 'Physics, Chemistry, Biology, etc.',
-        icon: '🔬',
-        color: '#16a34a'
-      },
-      {
-        name: 'History',
-        description: 'World History, Ancient Civilizations, etc.',
-        icon: '📜',
-        color: '#b45309'
-      },
-      {
-        name: 'Languages',
-        description: 'English, Spanish, French, etc.',
-        icon: '🗣️',
-        color: '#db2777'
-      }
-    ];
+export const initializeSubjectsIfNeeded = async (): Promise<void> => {
+  try {
+    const subjects = await getSubjects();
     
-    defaultSubjects.forEach(subject => {
-      createSubject(subject);
-    });
+    if (subjects.length === 0) {
+      const defaultSubjects = [
+        {
+          name: 'Mathematics',
+          description: 'Algebra, Calculus, Geometry, etc.',
+          icon: '📐',
+          color: '#4f46e5'
+        },
+        {
+          name: 'Science',
+          description: 'Physics, Chemistry, Biology, etc.',
+          icon: '🔬',
+          color: '#16a34a'
+        },
+        {
+          name: 'History',
+          description: 'World History, Ancient Civilizations, etc.',
+          icon: '📜',
+          color: '#b45309'
+        },
+        {
+          name: 'Languages',
+          description: 'English, Spanish, French, etc.',
+          icon: '🗣️',
+          color: '#db2777'
+        }
+      ];
+      
+      for (const subject of defaultSubjects) {
+        await createSubject(subject);
+      }
+    }
+  } catch (error) {
+    console.error('Error initializing subjects:', error);
   }
 };
