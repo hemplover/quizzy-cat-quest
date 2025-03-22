@@ -65,7 +65,9 @@ export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
 // Generate quiz using Supabase Edge Function
 export const generateQuiz = async (
   content: string,
-  settings: QuizSettings
+  settings: QuizSettings,
+  subjectId?: string,
+  documentId?: string
 ): Promise<GeneratedQuiz | null> => {
   console.log(`Generating quiz with Gemini`);
   console.log(`Content type: ${typeof content}`);
@@ -78,11 +80,49 @@ export const generateQuiz = async (
   }
   
   try {
+    // If we have a document ID, check for previous quizzes to avoid duplicates
+    let previousQuestions: string[] = [];
+    
+    if (subjectId && documentId) {
+      console.log(`Checking for previous quizzes on document: ${documentId}`);
+      
+      // Query previous quizzes for this document
+      const { data: previousQuizzes, error } = await supabase
+        .from('quizzes')
+        .select('questions')
+        .eq('document_id', documentId)
+        .eq('subject_id', subjectId);
+      
+      if (error) {
+        console.error('Error fetching previous quizzes:', error);
+      } else if (previousQuizzes && previousQuizzes.length > 0) {
+        console.log(`Found ${previousQuizzes.length} previous quizzes for this document`);
+        
+        // Extract questions from previous quizzes
+        previousQuizzes.forEach(quiz => {
+          const questions = quiz.questions as QuizQuestion[];
+          if (questions && Array.isArray(questions)) {
+            questions.forEach(q => {
+              if (q.question) {
+                previousQuestions.push(q.question);
+              }
+            });
+          }
+        });
+        
+        console.log(`Extracted ${previousQuestions.length} previous questions`);
+        
+        // Update settings to indicate this is a repeat quiz
+        settings.previousQuizzes = previousQuizzes.length;
+      }
+    }
+    
     // Call the edge function for quiz generation
     const { data, error } = await supabase.functions.invoke('generate-quiz', {
       body: {
         content,
-        settings
+        settings,
+        previousQuestions: previousQuestions.length > 0 ? previousQuestions : undefined
       }
     });
     

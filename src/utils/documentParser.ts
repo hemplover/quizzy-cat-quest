@@ -56,7 +56,7 @@ export async function parseDocument(file: File): Promise<string | null> {
     }
   } catch (error) {
     console.error('Error parsing document:', error);
-    toast.error(`Error parsing document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    toast.error(`Error processing document: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return null;
   }
 }
@@ -144,22 +144,30 @@ async function extractTextFromPowerPoint(file: File): Promise<string> {
     // For PowerPoint, we use browser's FileReader to first get the file as ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
     
-    // Use PPTX.js to extract text
-    const PptxGenJS = await import('pptxgenjs');
-    
-    // This is a basic implementation - for more complete text extraction
-    // we would need a more specialized library for PPTX parsing
-    // For now, we'll extract what we can
-    const pptx = await PptxGenJS.default.fromBuffer(arrayBuffer);
-    
+    // Use a simpler approach for PPTX extraction since pptxgenjs lacks direct text extraction
+    // Instead, we'll use a basic approach to extract text from XML parts
     let textContent = '';
     
-    // Extract text from each slide
-    pptx.getSlides().forEach((slide: any) => {
-      if (slide.text) {
-        textContent += slide.text + '\n\n';
+    // Note: This is a simplified method and may not extract all text
+    // For a more robust solution, a specialized PPTX parsing library would be needed
+    const blob = new Blob([arrayBuffer]);
+    const zip = await (await import('jszip')).loadAsync(blob);
+    
+    // Try to extract text from slides
+    const slideRegex = /ppt\/slides\/slide[0-9]+\.xml/;
+    const slideKeys = Object.keys(zip.files).filter(key => slideRegex.test(key));
+    
+    for (const slideKey of slideKeys) {
+      const slideContent = await zip.files[slideKey].async('text');
+      // Simple regex to extract text between <a:t> tags (text elements in PPTX XML)
+      const textMatches = slideContent.match(/<a:t>([^<]*)<\/a:t>/g) || [];
+      for (const match of textMatches) {
+        const text = match.replace(/<a:t>/, '').replace(/<\/a:t>/, '');
+        if (text.trim()) {
+          textContent += text.trim() + '\n';
+        }
       }
-    });
+    }
     
     if (!textContent) {
       throw new Error('Could not extract text from PowerPoint file');

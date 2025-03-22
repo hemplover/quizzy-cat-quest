@@ -12,6 +12,7 @@ interface QuizSettings {
   questionTypes: string[];
   numQuestions: number;
   model?: string;
+  previousQuizzes?: number; // New parameter to track previous quizzes
 }
 
 serve(async (req) => {
@@ -21,7 +22,7 @@ serve(async (req) => {
   }
 
   try {
-    const { content, settings } = await req.json();
+    const { content, settings, previousQuestions } = await req.json();
     
     if (!content || !settings) {
       throw new Error('Missing required parameters: content or settings');
@@ -30,9 +31,10 @@ serve(async (req) => {
     console.log('Generating quiz with Gemini');
     console.log(`Selected question types:`, settings.questionTypes);
     console.log(`Content length: ${content.length} characters`);
+    console.log(`Previous quiz count: ${previousQuestions?.length || 0}`);
     
     // Always use backend Gemini API
-    const result = await generateGeminiQuiz(content, settings);
+    const result = await generateGeminiQuiz(content, settings, previousQuestions);
     
     return new Response(
       JSON.stringify(result),
@@ -50,7 +52,7 @@ serve(async (req) => {
 });
 
 // Gemini quiz generation function
-async function generateGeminiQuiz(content: string, settings: QuizSettings) {
+async function generateGeminiQuiz(content: string, settings: QuizSettings, previousQuestions?: any[]) {
   const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
   
   if (!GEMINI_API_KEY) {
@@ -79,7 +81,7 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings) {
   }
   
   // Prepare prompt for Gemini
-  const prompt = buildPrompt(processedContent, settings, languagePrompt);
+  const prompt = buildPrompt(processedContent, settings, languagePrompt, previousQuestions);
   
   // Default to Gemini 2.0 Flash model for better performance
   const modelName = 'gemini-2.0-flash';
@@ -109,7 +111,7 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings) {
           }
         ],
         generationConfig: {
-          temperature: 0.2,
+          temperature: 0.3, // Slightly higher temperature for more variety in questions
           maxOutputTokens: 2000  // Increased token limit for better quiz generation
         }
       })
@@ -176,7 +178,22 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings) {
 }
 
 // Build prompt for AI providers
-function buildPrompt(content: string, settings: QuizSettings, languagePrompt: string = ""): string {
+function buildPrompt(content: string, settings: QuizSettings, languagePrompt: string = "", previousQuestions?: any[]): string {
+  // Add instructions to avoid repeating questions if previousQuestions exist
+  let previousQuestionsPrompt = "";
+  if (previousQuestions && previousQuestions.length > 0) {
+    previousQuestionsPrompt = `
+### Important:
+- Below is a list of previously asked questions for this content. DO NOT repeat these exact questions.
+- Create entirely new questions that cover different aspects or ask about the same concepts differently.
+- Ensure the new questions have NO OVERLAP with the previous ones in both content and wording.
+
+### Previous Questions:
+${previousQuestions.map((q, i) => `${i+1}. ${q}`).join('\n')}
+
+`;
+  }
+  
   return `You are a university professor responsible for creating exams for students. Based only on the provided study material, generate a realistic university-level exam.
 
 ### Rules:
@@ -188,6 +205,9 @@ function buildPrompt(content: string, settings: QuizSettings, languagePrompt: st
 - The quiz must feel like an official test, not a casual practice exercise.
 - Return ONLY valid JSON with no additional text.
 ${languagePrompt ? `- ${languagePrompt}` : ''}
+${settings.previousQuizzes && settings.previousQuizzes > 0 ? `- This is quiz number ${settings.previousQuizzes + 1} on this content. Make sure to create questions that explore different aspects than previous quizzes.` : ''}
+
+${previousQuestionsPrompt}
 
 ### Question Types to Include:
 ${settings.questionTypes.map(type => `- ${type}`).join('\n')}

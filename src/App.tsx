@@ -13,6 +13,10 @@ import SubjectDetail from "./pages/SubjectDetail";
 import NotFound from "./pages/NotFound";
 import Layout from "./components/Layout";
 import { LanguageProvider } from "./i18n/LanguageContext";
+import { AuthProvider } from "./contexts/AuthContext";
+import AuthRequired from "./components/AuthRequired";
+import Auth from "./pages/Auth";
+import AuthCallback from "./pages/AuthCallback";
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient({
@@ -31,57 +35,71 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route 
-              path="/" 
-              element={
-                <Layout>
-                  <Index />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/upload" 
-              element={
-                <Layout>
-                  <Upload />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/quiz" 
-              element={
-                <Layout>
-                  <Quiz />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/dashboard" 
-              element={
-                <Layout>
-                  <Dashboard />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/subjects" 
-              element={
-                <Layout>
-                  <SubjectManager />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/subjects/:subjectId" 
-              element={
-                <Layout>
-                  <SubjectDetail />
-                </Layout>
-              } 
-            />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <AuthProvider>
+            <Routes>
+              <Route 
+                path="/" 
+                element={
+                  <Layout>
+                    <Index />
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/upload" 
+                element={
+                  <Layout>
+                    <AuthRequired>
+                      <Upload />
+                    </AuthRequired>
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/quiz" 
+                element={
+                  <Layout>
+                    <AuthRequired>
+                      <Quiz />
+                    </AuthRequired>
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/dashboard" 
+                element={
+                  <Layout>
+                    <AuthRequired>
+                      <Dashboard />
+                    </AuthRequired>
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/subjects" 
+                element={
+                  <Layout>
+                    <AuthRequired>
+                      <SubjectManager />
+                    </AuthRequired>
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/subjects/:subjectId" 
+                element={
+                  <Layout>
+                    <AuthRequired>
+                      <SubjectDetail />
+                    </AuthRequired>
+                  </Layout>
+                } 
+              />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
     </LanguageProvider>

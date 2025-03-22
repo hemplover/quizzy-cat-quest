@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { BookOpen, Settings, Sparkles, ArrowRight, FileText, CheckCircle2, Pencil, AlertCircle, Loader2, Upload as UploadIcon } from 'lucide-react';
@@ -142,7 +141,6 @@ const Upload = () => {
     setIsProcessing(true);
     
     try {
-      // Parse the document to extract text
       const extractedText = await parseDocument(file);
       
       if (!extractedText || extractedText.trim().length < 100) {
@@ -200,7 +198,19 @@ const Upload = () => {
       console.log("Generating quiz with settings:", quizSettings);
       console.log("Content length:", processedContent.length, "characters");
       
-      const generatedQuiz = await generateQuiz(processedContent, quizSettings);
+      const docName = documentName || (selectedFile ? selectedFile.name : 'Text Input ' + new Date().toLocaleString());
+      const fileType = selectedFile ? selectedFile.type : 'text/plain';
+      const fileSize = selectedFile ? selectedFile.size : new Blob([textInput]).size;
+      
+      const document = await createDocument({
+        subjectId: selectedSubject,
+        name: docName,
+        content: processedContent,
+        fileType: fileType,
+        fileSize: fileSize
+      });
+      
+      const generatedQuiz = await generateQuiz(processedContent, quizSettings, selectedSubject, document.id);
       
       if (!generatedQuiz) {
         setCatMessage(t('couldNotCreateQuiz'));
@@ -224,19 +234,6 @@ const Upload = () => {
         setIsGeneratingQuiz(false);
         return;
       }
-      
-      // Create document and quiz record
-      const docName = documentName || (selectedFile ? selectedFile.name : 'Text Input ' + new Date().toLocaleString());
-      const fileType = selectedFile ? selectedFile.type : 'text/plain';
-      const fileSize = selectedFile ? selectedFile.size : new Blob([textInput]).size;
-      
-      const document = await createDocument({
-        subjectId: selectedSubject,
-        name: docName,
-        content: processedContent,
-        fileType: fileType,
-        fileSize: fileSize
-      });
       
       await createQuizRecord({
         subjectId: selectedSubject,
