@@ -142,11 +142,22 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings) {
   
   // Prepare prompt for Gemini
   const prompt = buildPrompt(content, settings);
-  const model = settings.model === 'gemini-2-flash' ? 'gemini-1.5-flash' : 'gemini-pro';
   
-  console.log(`Using Gemini model: ${model}`);
+  // Determine which model to use based on settings
+  let modelName;
+  if (settings.model === 'gemini-2-flash') {
+    modelName = 'gemini-2.0-flash';
+  } else if (settings.model === 'gemini-pro') {
+    modelName = 'gemini-pro';
+  } else {
+    // Default to Gemini 2.0 Flash if no specific model selected
+    modelName = 'gemini-2.0-flash';
+  }
+  
+  console.log(`Using Gemini model: ${modelName}`);
 
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+  // Use the updated Google AI API URL for the Gemini 2.0 models
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
   
   const response = await fetch(apiUrl, {
     method: 'POST',
@@ -173,14 +184,27 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings) {
 
   if (!response.ok) {
     const errorData = await response.json();
-    throw new Error(`Gemini API Error: ${errorData.error?.message || 'Unknown error'}`);
+    const errorMessage = errorData.error?.message || 'Unknown error';
+    console.error('Gemini API Error:', errorData);
+    throw new Error(`Gemini API Error: ${errorMessage}`);
   }
 
   const data = await response.json();
   console.log('Gemini API response received');
   
-  // Extract the content
-  const generatedContent = data.candidates[0].content.parts[0].text;
+  // Extract the content - handle different response formats for different Gemini versions
+  let generatedContent;
+  
+  if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+    // Format for newer Gemini versions
+    generatedContent = data.candidates[0].content.parts[0].text;
+  } else if (data.text) {
+    // Simplified response format in some versions
+    generatedContent = data.text;
+  } else {
+    console.error('Unexpected Gemini response format:', data);
+    throw new Error('Unexpected response format from Gemini API');
+  }
   
   try {
     // Parse the response as JSON

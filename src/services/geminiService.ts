@@ -58,7 +58,13 @@ ${content}
   ]
 }`;
 
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
+    // Determine which model endpoint to use
+    const model = settings.model === 'gemini-2-flash' ? 'gemini-2.0-flash' : 'gemini-pro';
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    
+    console.log(`Using Gemini model: ${model}`);
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -83,14 +89,26 @@ ${content}
 
     if (!response.ok) {
       const errorData = await response.json();
+      console.error('Gemini API Error details:', errorData);
       throw new Error(`Gemini API Error: ${errorData.error?.message || 'Unknown error'}`);
     }
 
     const data = await response.json();
     console.log('Gemini API response:', data);
     
-    // Extract the content
-    const generatedContent = data.candidates[0].content.parts[0].text;
+    // Extract the content based on the response format
+    let generatedContent;
+    
+    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+      // Format for newer Gemini versions
+      generatedContent = data.candidates[0].content.parts[0].text;
+    } else if (data.text) {
+      // Simplified response format in some versions
+      generatedContent = data.text;
+    } else {
+      console.error('Unexpected Gemini response format:', data);
+      throw new Error('Unexpected response format from Gemini API');
+    }
     
     try {
       // Parse the response as JSON
@@ -159,7 +177,10 @@ Here are the questions and answers to grade:
 
 ${formattedQuestions}`;
 
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
+    // Use the Gemini 2.0 Flash model by default
+    const apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -184,14 +205,26 @@ ${formattedQuestions}`;
 
     if (!response.ok) {
       const errorData = await response.json();
+      console.error('Gemini API Error details:', errorData);
       throw new Error(`Gemini API Error: ${errorData.error?.message || 'Unknown error'}`);
     }
 
     const data = await response.json();
     console.log('Gemini grading response:', data);
     
-    // Extract the content
-    const generatedContent = data.candidates[0].content.parts[0].text;
+    // Extract the content based on response format
+    let generatedContent;
+    
+    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+      // Format for newer Gemini versions
+      generatedContent = data.candidates[0].content.parts[0].text;
+    } else if (data.text) {
+      // Simplified response format in some versions
+      generatedContent = data.text;
+    } else {
+      console.error('Unexpected Gemini response format:', data);
+      throw new Error('Unexpected response format from Gemini API');
+    }
     
     try {
       // Parse the response as JSON
