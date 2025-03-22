@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { Settings, Key, Check, AlertCircle } from 'lucide-react';
+import { Settings, Key, Check, AlertCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { 
@@ -7,7 +8,8 @@ import {
   AIProvider,
   getSelectedProvider, 
   setApiKey,
-  getApiKey
+  getApiKey,
+  isBackendOnlyProvider
 } from '@/services/aiProviderService';
 import AIProviderSelector from './AIProviderSelector';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,6 +30,7 @@ const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
   const [hasKeys, setHasKeys] = useState<Record<string, boolean>>({});
   const [useBackend, setUseBackend] = useState(true);
   const [isCheckingBackend, setIsCheckingBackend] = useState(true);
+  const isBackendOnly = isBackendOnlyProvider(selectedProvider);
 
   useEffect(() => {
     const keysStatus: Record<string, boolean> = {};
@@ -90,6 +93,12 @@ const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
     const currentProvider = AI_PROVIDERS.find(p => p.id === selectedProvider);
     if (!currentProvider) {
       toast.error("Invalid provider selected");
+      return;
+    }
+    
+    // Skip submission for backend-only providers
+    if (isBackendOnly) {
+      toast.info(`${currentProvider.name} API keys are managed on the server`);
       return;
     }
     
@@ -192,11 +201,19 @@ const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
       />
       
       <form onSubmit={handleSubmit} className="space-y-3">
-        {useBackend ? (
+        {isBackendOnly ? (
+          <Alert className="bg-blue-50 border-blue-100 mb-3">
+            <Info className="w-4 h-4 text-blue-500" />
+            <AlertDescription className="text-xs text-blue-700">
+              {AI_PROVIDERS.find(p => p.id === selectedProvider)?.name} API keys are managed securely on the server. 
+              No frontend configuration is needed.
+            </AlertDescription>
+          </Alert>
+        ) : useBackend ? (
           <Alert className="bg-blue-50 border-blue-100 mb-3">
             <AlertCircle className="w-4 h-4 text-blue-500" />
             <AlertDescription className="text-xs text-blue-700">
-              API keys are now stored securely on the server. Your keys won't be exposed in the browser.
+              API keys are stored securely on the server. Your keys won't be exposed in the browser.
             </AlertDescription>
           </Alert>
         ) : (
@@ -206,30 +223,34 @@ const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
           </p>
         )}
         
-        <div className="relative">
-          <Input
-            type="password"
-            value={apiKeys[selectedProvider] || ''}
-            onChange={(e) => handleInputChange(e, selectedProvider)}
-            placeholder={`${selectedProvider === 'openai' ? 'sk-...' : 'Enter API key'}`}
-            className="w-full text-sm focus:ring-cat focus:border-cat"
-          />
-          
-          {hasKeys[selectedProvider] && (
-            <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
-              <Check className="w-4 h-4 text-green-500" />
-            </div>
-          )}
-        </div>
+        {!isBackendOnly && (
+          <div className="relative">
+            <Input
+              type="password"
+              value={apiKeys[selectedProvider] || ''}
+              onChange={(e) => handleInputChange(e, selectedProvider)}
+              placeholder={`${selectedProvider === 'openai' ? 'sk-...' : 'Enter API key'}`}
+              className="w-full text-sm focus:ring-cat focus:border-cat"
+            />
+            
+            {hasKeys[selectedProvider] && (
+              <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                <Check className="w-4 h-4 text-green-500" />
+              </div>
+            )}
+          </div>
+        )}
         
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            className="cat-button-secondary text-xs py-1 px-3"
-          >
-            Save Key
-          </button>
-        </div>
+        {!isBackendOnly && (
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              className="cat-button-secondary text-xs py-1 px-3"
+            >
+              Save Key
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );

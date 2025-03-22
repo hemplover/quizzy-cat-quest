@@ -57,13 +57,11 @@ const Upload = () => {
   const [subjectName, setSubjectName] = useState<string>('');
   const [documentName, setDocumentName] = useState<string>('');
   
-  // Restore text from a previously uploaded document
   useEffect(() => {
     const initialize = async () => {
       setIsLoading(true);
       setHasApiKey(hasValidApiKey());
       
-      // Initialize subjects if needed
       await initializeSubjectsIfNeeded();
       
       const subjects = await getSubjects();
@@ -71,7 +69,6 @@ const Upload = () => {
         setSelectedSubject(subjects[0].id);
       }
       
-      // If a subject ID is provided, fetch its name
       if (initialSubjectId) {
         const subject = await getSubjectById(initialSubjectId);
         if (subject) {
@@ -79,19 +76,16 @@ const Upload = () => {
         }
       }
       
-      // If document ID is provided, we should fetch that document and populate with its content
       if (documentId) {
         const document = await getDocumentById(documentId);
         if (document) {
           setDocumentName(document.name);
           
           if (document.content) {
-            // If it's text content
             setTextInput(document.content);
             setProcessedContent(document.content);
             setIsReadyToGenerateQuiz(true);
             setCatMessage(t('documentLoaded').replace('{document}', document.name));
-            // Move to settings step
             setUploadStep('settings');
           }
         }
@@ -105,14 +99,13 @@ const Upload = () => {
 
   const handleApiKeySubmit = (key: string, provider: AIProvider) => {
     setSelectedAIProvider(provider);
-    setHasApiKey(true);
+    setHasApiKey(hasValidApiKey());
   };
   
   const handleProviderChange = (provider: AIProvider) => {
     setSelectedAIProvider(provider);
     setHasApiKey(hasValidApiKey());
     
-    // Reset selected model to provider's default
     const providerConfig = AI_PROVIDERS.find(p => p.id === provider);
     if (providerConfig) {
       setSelectedModel(providerConfig.defaultModel);
@@ -158,7 +151,6 @@ const Upload = () => {
       setCatMessage(t('textProcessed'));
       toast.success(t('textProcessedSuccess'));
       
-      // Move to settings step
       setUploadStep('settings');
     } else {
       toast.error(t('enterMoreText'));
@@ -186,7 +178,6 @@ const Upload = () => {
     setCatMessage(t('processingMaterials'));
     setIsGeneratingQuiz(true);
     
-    // Create quiz settings object to pass to the API
     const quizSettings: QuizSettings = {
       difficulty,
       questionTypes: selectedQuestionTypes,
@@ -245,14 +236,12 @@ const Upload = () => {
     }
   };
 
-  // Difficulty level options from translations
   const difficultyLevels = [
     { id: 'beginner', name: t('beginner'), description: t('basicRecall') },
     { id: 'intermediate', name: t('intermediate'), description: t('applicationConcepts') },
     { id: 'advanced', name: t('advanced'), description: t('analysisSynthesis') },
   ];
 
-  // Question type options from translations
   const questionTypes = [
     { id: 'multiple-choice', name: t('multipleChoice') },
     { id: 'true-false', name: t('trueFalse') },

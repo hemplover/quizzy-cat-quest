@@ -1,9 +1,11 @@
+
 import { toast } from 'sonner';
 import { 
   AIProvider, 
   getSelectedProvider, 
   getApiKey,
-  getDefaultModel
+  getDefaultModel,
+  isBackendOnlyProvider
 } from './aiProviderService';
 import { QuizQuestion, GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
 import { supabase } from '@/integrations/supabase/client';
@@ -204,6 +206,12 @@ export const gradeQuiz = async (
 // Check if the provider has a valid API key (for API key management UI)
 export const hasValidApiKey = (): boolean => {
   const provider = getSelectedProvider();
+  
+  // If the provider is backend-only, we assume the backend handles the API key
+  if (isBackendOnlyProvider(provider)) {
+    return true;
+  }
+  
   const apiKey = getApiKey(provider);
   return !!apiKey;
 };

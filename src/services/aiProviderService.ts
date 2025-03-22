@@ -1,3 +1,4 @@
+
 import { toast } from 'sonner';
 
 export type AIProvider = 'openai' | 'gemini' | 'claude' | 'mistral';
@@ -12,6 +13,7 @@ interface AIProviderConfig {
   apiKeyRequired: boolean;
   supportsFileUpload: boolean;
   apiKeyName: string;
+  useBackendOnly?: boolean;
 }
 
 export const AI_PROVIDERS: AIProviderConfig[] = [
@@ -33,15 +35,16 @@ export const AI_PROVIDERS: AIProviderConfig[] = [
     id: 'gemini',
     name: 'Google Gemini',
     icon: '🌐',
-    description: 'Google\'s multimodal AI system',
+    description: 'Google\'s multimodal AI system (Backend Only)',
     models: [
       { id: 'gemini-2-flash', name: 'Gemini 2.0 Flash', description: 'Fast, affordable, high-quality model' },
       { id: 'gemini-pro', name: 'Gemini Pro', description: 'Google\'s advanced language model' },
     ],
     defaultModel: 'gemini-2-flash',
-    apiKeyRequired: true,
+    apiKeyRequired: false,
     supportsFileUpload: false,
-    apiKeyName: 'gemini_api_key'
+    apiKeyName: 'gemini_api_key',
+    useBackendOnly: true
   },
   {
     id: 'claude',
@@ -97,11 +100,26 @@ export const setSelectedProvider = (provider: AIProvider): void => {
 
 // Get the API key for a provider
 export const getApiKey = (provider: AIProvider): string | null => {
+  const providerConfig = getProviderConfig(provider);
+  
+  // If provider is backend-only, return a placeholder value
+  if (providerConfig?.useBackendOnly) {
+    return "BACKEND_MANAGED";
+  }
+  
   return localStorage.getItem(`${provider}_api_key`);
 };
 
 // Set the API key for a provider
 export const setApiKey = (provider: AIProvider, apiKey: string): void => {
+  const providerConfig = getProviderConfig(provider);
+  
+  // Don't allow setting API keys for backend-only providers
+  if (providerConfig?.useBackendOnly) {
+    toast.info(`${providerConfig.name} API keys are managed on the server`);
+    return;
+  }
+  
   localStorage.setItem(`${provider}_api_key`, apiKey);
   toast.success(`${provider.toUpperCase()} API key saved successfully`);
 };
@@ -118,6 +136,13 @@ export const supportsFileUpload = (provider?: AIProvider): boolean => {
   const selectedProvider = provider || getSelectedProvider();
   const providerConfig = getProviderConfig(selectedProvider);
   return providerConfig?.supportsFileUpload || false;
+};
+
+// Check if the provider is backend-only
+export const isBackendOnlyProvider = (provider?: AIProvider): boolean => {
+  const selectedProvider = provider || getSelectedProvider();
+  const providerConfig = getProviderConfig(selectedProvider);
+  return !!providerConfig?.useBackendOnly;
 };
 
 // Get default model for the selected provider
