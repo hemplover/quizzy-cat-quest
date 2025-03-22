@@ -1,6 +1,7 @@
+
 import { GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
 
-// Generate quiz with OpenAI - no longer used
+// Stub functions that throw errors since we're only using Gemini now
 export const generateQuiz = async (
   content: string,
   settings: QuizSettings
@@ -8,7 +9,6 @@ export const generateQuiz = async (
   throw new Error('OpenAI is not supported. Only Gemini is used.');
 };
 
-// Grade quiz with OpenAI - no longer used
 export const gradeQuiz = async (
   questions: any[], 
   userAnswers: any[]

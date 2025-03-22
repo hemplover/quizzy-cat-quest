@@ -1,8 +1,6 @@
-
 import { toast } from 'sonner';
 import { QuizQuestion, GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
 import { supabase } from '@/integrations/supabase/client';
-import { getDefaultModel } from '@/services/aiProviderService';
 
 // Transform generated questions to our app format with improved reliability
 export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
@@ -77,9 +75,7 @@ export const generateQuiz = async (
     const { data, error } = await supabase.functions.invoke('generate-quiz', {
       body: {
         content,
-        settings,
-        provider: 'gemini',
-        apiKey: null  // We're using backend API key only
+        settings
       }
     });
     
@@ -201,8 +197,8 @@ export const hasValidApiKey = (): boolean => {
 };
 
 // Get the appropriate model to use based on provider
-export const getModelToUse = (): string => {
-  return getDefaultModel();
+export const getDefaultModel = (): string => {
+  return 'gemini-2-flash';
 };
 
 // Set the specific model to use

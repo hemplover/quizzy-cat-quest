@@ -28,10 +28,9 @@ serve(async (req) => {
     }
     
     console.log('Generating quiz with Gemini');
-    console.log(`Selected model: ${settings.model || 'gemini-2-flash'}`);
     console.log(`Selected question types:`, settings.questionTypes);
     
-    // Always use Gemini backend
+    // Always use backend Gemini API
     const result = await generateGeminiQuiz(content, settings);
     
     return new Response(
@@ -65,16 +64,8 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings) {
   // Prepare prompt for Gemini
   const prompt = buildPrompt(content, settings, languagePrompt);
   
-  // Determine which model to use based on settings
-  let modelName;
-  if (settings.model === 'gemini-2-flash') {
-    modelName = 'gemini-2.0-flash';
-  } else if (settings.model === 'gemini-pro') {
-    modelName = 'gemini-pro';
-  } else {
-    // Default to Gemini 2.0 Flash if no specific model selected
-    modelName = 'gemini-2.0-flash';
-  }
+  // Default to Gemini 2.0 Flash model
+  const modelName = 'gemini-2.0-flash';
   
   console.log(`Using Gemini model: ${modelName}`);
 

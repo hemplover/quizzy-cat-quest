@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
@@ -7,7 +8,6 @@ import {
   Award, 
   BookOpen,
   CheckCircle2,
-  XCircle,
   TrendingUp,
   AlertCircle,
   FileText,
@@ -64,12 +64,19 @@ const Dashboard = () => {
     const storedXP = parseInt(localStorage.getItem('userXP') || '0');
     setUserXP(storedXP);
     
-    // Load quiz results from sessionStorage
-    const storedResults = JSON.parse(sessionStorage.getItem('quizResults') || '[]');
-    setQuizResults(storedResults);
-    
-    // Load subjects from Supabase
+    // Load subjects and quizzes
     loadSubjects();
+    
+    // Load quiz history from localStorage
+    const storedQuizHistory = localStorage.getItem('quizHistory');
+    if (storedQuizHistory) {
+      try {
+        setQuizResults(JSON.parse(storedQuizHistory));
+      } catch (error) {
+        console.error('Error parsing quiz history:', error);
+        setQuizResults([]);
+      }
+    }
   }, []);
 
   // Calculate level information
@@ -85,18 +92,27 @@ const Dashboard = () => {
       // Calculate stats for each subject
       const subjectsWithStats = await Promise.all(loadedSubjects.map(async (subject) => {
         const quizzes = await getQuizzesBySubjectId(subject.id);
-        const totalScore = quizzes.reduce((sum, quiz) => {
-          if (quiz.results) {
-            return sum + quiz.results.punteggio_totale;
-          }
-          return sum;
-        }, 0);
         
-        const averageScore = quizzes.length > 0 ? (totalScore / quizzes.length) * 100 : 0;
+        console.log(`Subject ${subject.name} has ${quizzes.length} quizzes`);
+        
+        // Calculate total and average score
+        let totalScore = 0;
+        let quizzesWithResults = 0;
+        
+        quizzes.forEach(quiz => {
+          if (quiz.results && typeof quiz.results.punteggio_totale === 'number') {
+            totalScore += quiz.results.punteggio_totale;
+            quizzesWithResults++;
+            console.log(`Quiz ${quiz.id} score: ${quiz.results.punteggio_totale * 100}%`);
+          }
+        });
+        
+        const averageScore = quizzesWithResults > 0 ? (totalScore / quizzesWithResults) * 100 : 0;
         
         return {
           ...subject,
           quizCount: quizzes.length,
+          completedQuizCount: quizzesWithResults,
           averageScore: Math.round(averageScore)
         };
       }));
@@ -120,13 +136,22 @@ const Dashboard = () => {
   // Calculate average score from quizResults
   const calculateAverageScore = () => {
     if (quizResults.length === 0) return 0;
-    const totalPercentage = quizResults.reduce((sum, result) => 
+    
+    const validResults = quizResults.filter(result => 
+      typeof result.score === 'number' && typeof result.totalQuestions === 'number'
+    );
+    
+    if (validResults.length === 0) return 0;
+    
+    const totalPercentage = validResults.reduce((sum, result) => 
       sum + (result.score / result.totalQuestions) * 100, 0);
-    return Math.round(totalPercentage / quizResults.length);
+    
+    return Math.round(totalPercentage / validResults.length);
   };
   
   // Identify weakest subjects (lowest scores)
   const weakestSubjects = [...subjects]
+    .filter(subject => subject.completedQuizCount > 0) // Only consider subjects with graded quizzes
     .sort((a, b) => a.averageScore - b.averageScore)
     .slice(0, 2);
 
@@ -155,40 +180,40 @@ const Dashboard = () => {
             />
           </div>
           
-          {quizResults.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6">
-              <div className="p-4 bg-white rounded-lg border">
-                <div className="flex items-center gap-2 text-cat mb-1">
-                  <BookOpen className="w-4 h-4" />
-                  <span className="text-sm font-medium">{t('recentQuizzes')}</span>
-                </div>
-                <p className="text-2xl font-bold">{quizResults.length}</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6">
+            <div className="p-4 bg-white rounded-lg border">
+              <div className="flex items-center gap-2 text-cat mb-1">
+                <BookOpen className="w-4 h-4" />
+                <span className="text-sm font-medium">{t('subjects')}</span>
               </div>
-              
-              <div className="p-4 bg-white rounded-lg border">
-                <div className="flex items-center gap-2 text-green-600 mb-1">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span className="text-sm font-medium">{t('score')}</span>
-                </div>
-                <p className="text-2xl font-bold">{calculateAverageScore()}%</p>
-              </div>
-              
-              <div className="p-4 bg-white rounded-lg border">
-                <div className="flex items-center gap-2 text-blue-600 mb-1">
-                  <TrendingUp className="w-4 h-4" />
-                  <span className="text-sm font-medium">{t('subjects')}</span>
-                </div>
-                <p className="text-2xl font-bold">{subjects.length}</p>
-              </div>
+              <p className="text-2xl font-bold">{subjects.length}</p>
             </div>
-          ) : (
-            <div className="mt-6 p-4 bg-cat/5 rounded-lg border border-cat/20">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-cat" />
-                <p className="text-sm">{t('createNewQuiz')}</p>
+            
+            <div className="p-4 bg-white rounded-lg border">
+              <div className="flex items-center gap-2 text-green-600 mb-1">
+                <CheckCircle2 className="w-4 h-4" />
+                <span className="text-sm font-medium">{t('quizzes')}</span>
               </div>
+              <p className="text-2xl font-bold">
+                {subjects.reduce((total, subject) => total + subject.quizCount, 0)}
+              </p>
             </div>
-          )}
+            
+            <div className="p-4 bg-white rounded-lg border">
+              <div className="flex items-center gap-2 text-blue-600 mb-1">
+                <TrendingUp className="w-4 h-4" />
+                <span className="text-sm font-medium">{t('averageScore')}</span>
+              </div>
+              <p className="text-2xl font-bold">
+                {subjects.some(s => s.completedQuizCount > 0) 
+                  ? Math.round(subjects
+                      .filter(s => s.completedQuizCount > 0)
+                      .reduce((sum, s) => sum + s.averageScore, 0) / 
+                      subjects.filter(s => s.completedQuizCount > 0).length)
+                  : '-'}%
+              </p>
+            </div>
+          </div>
         </div>
         
         {/* Quick actions card */}
@@ -281,7 +306,7 @@ const Dashboard = () => {
                     </div>
                   </div>
                   
-                  {subject.quizCount > 0 && (
+                  {subject.completedQuizCount > 0 && (
                     <div 
                       className={cn(
                         "px-2 py-1 rounded text-xs font-semibold",
@@ -318,32 +343,50 @@ const Dashboard = () => {
             {t('recentQuizzes')}
           </h2>
           
-          {quizResults.length > 0 ? (
+          {subjects.some(s => s.quizCount > 0) ? (
             <div className="space-y-4">
-              {quizResults.slice().reverse().slice(0, 3).map((result, index) => (
-                <div key={index} className="p-4 bg-white rounded-lg border flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-cat/10 flex items-center justify-center">
-                      <FileText className="w-5 h-5 text-cat" />
+              {subjects
+                .filter(subject => subject.quizCount > 0)
+                .slice(0, 3)
+                .map((subject, index) => (
+                  <Link 
+                    key={index}
+                    to={`/subjects/${subject.id}`}
+                    className="p-4 bg-white rounded-lg border flex justify-between items-center"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-white"
+                        style={{ backgroundColor: subject.color }}
+                      >
+                        {subject.icon}
+                      </div>
+                      <div>
+                        <h3 className="font-medium">{subject.name}</h3>
+                        <p className="text-xs text-muted-foreground">
+                          {subject.quizCount} {t(subject.quizCount === 1 ? 'quiz' : 'quizzes').toLowerCase()}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-medium">Quiz #{quizResults.length - index}</h3>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(result.completedAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="text-right">
-                    <p className="font-bold">
-                      {Math.round((result.score / result.totalQuestions) * 100)}%
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {result.score}/{result.totalQuestions} {t('correctAnswers').toLowerCase()}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                    
+                    {subject.completedQuizCount > 0 && (
+                      <div className="text-right">
+                        <p className="font-bold">{subject.averageScore}%</p>
+                        <p className="text-xs text-muted-foreground">
+                          {subject.completedQuizCount} {t('completed').toLowerCase()}
+                        </p>
+                      </div>
+                    )}
+                  </Link>
+                ))}
+
+              <Link 
+                to="/upload"
+                className="cat-button w-full justify-center mt-4"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                {t('createNewQuiz')}
+              </Link>
             </div>
           ) : (
             <div className="text-center py-8">

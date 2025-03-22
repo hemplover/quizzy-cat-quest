@@ -30,6 +30,11 @@ const QuizReviewModal: React.FC<QuizReviewModalProps> = ({
   
   if (!quiz) return null;
   
+  // Calculate percentage score if available
+  const scorePercentage = quiz.results?.punteggio_totale 
+    ? Math.round(quiz.results.punteggio_totale * 100) 
+    : null;
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
@@ -39,7 +44,7 @@ const QuizReviewModal: React.FC<QuizReviewModalProps> = ({
             {quiz.results && (
               <div className="mt-2">
                 <div className="text-lg font-bold">
-                  {Math.round(quiz.results.punteggio_totale * 100)}% {t('score')}
+                  {scorePercentage}% {t('score')}
                 </div>
                 <div className="text-sm text-muted-foreground">
                   {quiz.results.feedback_generale}
@@ -50,116 +55,113 @@ const QuizReviewModal: React.FC<QuizReviewModalProps> = ({
         </DialogHeader>
         
         <div className="space-y-6 py-4">
-          {quiz.questions.map((question, index) => (
-            <div 
-              key={index} 
-              className={`p-4 rounded-lg border ${
-                quiz.results?.risultati?.[index]?.corretto === true ? 
-                'bg-green-50 border-green-200' : 
-                quiz.results?.risultati?.[index]?.corretto === false ?
-                'bg-red-50 border-red-200' :
-                'bg-white'
-              }`}
-            >
-              <div className="flex items-start gap-2">
-                {quiz.results?.risultati?.[index]?.corretto === true ? (
-                  <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" />
-                ) : quiz.results?.risultati?.[index]?.corretto === false ? (
-                  <XCircle className="w-5 h-5 text-red-600 mt-0.5" />
-                ) : null}
-                
-                <div className="flex-1">
-                  <h3 className="font-medium">
-                    {index + 1}. {question.question}
-                  </h3>
+          {quiz.questions.map((question, index) => {
+            const result = quiz.results?.risultati?.[index];
+            const isCorrect = result?.corretto === true;
+            const isIncorrect = result?.corretto === false;
+            
+            return (
+              <div 
+                key={index} 
+                className={`p-4 rounded-lg border ${
+                  isCorrect ? 'bg-green-50 border-green-200' : 
+                  isIncorrect ? 'bg-red-50 border-red-200' :
+                  'bg-white'
+                }`}
+              >
+                <div className="flex items-start gap-2">
+                  {isCorrect ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" />
+                  ) : isIncorrect ? (
+                    <XCircle className="w-5 h-5 text-red-600 mt-0.5" />
+                  ) : null}
                   
-                  {question.type === 'multiple-choice' && (
-                    <div className="mt-2 space-y-1">
-                      {question.options.map((option: string, optIndex: number) => (
+                  <div className="flex-1">
+                    <h3 className="font-medium">
+                      {index + 1}. {question.question}
+                    </h3>
+                    
+                    {question.type === 'multiple-choice' && (
+                      <div className="mt-2 space-y-1">
+                        {question.options.map((option: string, optIndex: number) => {
+                          const isUserAnswer = result?.risposta_utente === optIndex;
+                          const isCorrectAnswer = optIndex === question.correctAnswer;
+                          
+                          return (
+                            <div 
+                              key={optIndex}
+                              className={`p-2 rounded ${
+                                isUserAnswer ? 
+                                  isCorrectAnswer ? 'bg-green-100' : 'bg-red-100' :
+                                isCorrectAnswer ? 'bg-green-50' : ''
+                              }`}
+                            >
+                              {option}
+                              {isUserAnswer && ' (' + t('yourAnswer') + ')'}
+                              {isCorrectAnswer && ' (' + t('correctAnswer') + ')'}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    
+                    {question.type === 'true-false' && (
+                      <div className="mt-2 space-y-1">
                         <div 
-                          key={optIndex}
                           className={`p-2 rounded ${
-                            quiz.results?.risultati?.[index]?.risposta_utente === optIndex ?
-                              optIndex === question.correctAnswer ? 
-                                'bg-green-100' : 'bg-red-100' :
-                              optIndex === question.correctAnswer ?
-                                'bg-green-50' : ''
+                            result?.risposta_utente === 0 ?
+                              question.correctAnswer === 0 ? 'bg-green-100' : 'bg-red-100' :
+                              question.correctAnswer === 0 ? 'bg-green-50' : ''
                           }`}
                         >
-                          {option}
-                          {quiz.results?.risultati?.[index]?.risposta_utente === optIndex && 
-                            ' (Your answer)'}
-                          {optIndex === question.correctAnswer && 
-                            ' (Correct answer)'}
+                          True
+                          {result?.risposta_utente === 0 && ' (' + t('yourAnswer') + ')'}
+                          {question.correctAnswer === 0 && ' (' + t('correctAnswer') + ')'}
                         </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {question.type === 'true-false' && (
-                    <div className="mt-2 space-y-1">
-                      <div 
-                        className={`p-2 rounded ${
-                          quiz.results?.risultati?.[index]?.risposta_utente === 0 ?
-                            question.correctAnswer === 0 ? 
-                              'bg-green-100' : 'bg-red-100' :
-                            question.correctAnswer === 0 ?
-                              'bg-green-50' : ''
-                        }`}
-                      >
-                        True
-                        {quiz.results?.risultati?.[index]?.risposta_utente === 0 && 
-                          ' (Your answer)'}
-                        {question.correctAnswer === 0 && 
-                          ' (Correct answer)'}
-                      </div>
-                      <div 
-                        className={`p-2 rounded ${
-                          quiz.results?.risultati?.[index]?.risposta_utente === 1 ?
-                            question.correctAnswer === 1 ? 
-                              'bg-green-100' : 'bg-red-100' :
-                            question.correctAnswer === 1 ?
-                              'bg-green-50' : ''
-                        }`}
-                      >
-                        False
-                        {quiz.results?.risultati?.[index]?.risposta_utente === 1 && 
-                          ' (Your answer)'}
-                        {question.correctAnswer === 1 && 
-                          ' (Correct answer)'}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {question.type === 'open-ended' && (
-                    <div className="mt-2 space-y-2">
-                      <div>
-                        <div className="text-sm font-medium">{t('yourAnswer')}</div>
-                        <div className="p-2 border rounded bg-gray-50">
-                          {quiz.results?.risultati?.[index]?.risposta_utente || '-'}
+                        <div 
+                          className={`p-2 rounded ${
+                            result?.risposta_utente === 1 ?
+                              question.correctAnswer === 1 ? 'bg-green-100' : 'bg-red-100' :
+                              question.correctAnswer === 1 ? 'bg-green-50' : ''
+                          }`}
+                        >
+                          False
+                          {result?.risposta_utente === 1 && ' (' + t('yourAnswer') + ')'}
+                          {question.correctAnswer === 1 && ' (' + t('correctAnswer') + ')'}
                         </div>
                       </div>
-                      <div>
-                        <div className="text-sm font-medium">{t('correctAnswer')}</div>
-                        <div className="p-2 border rounded bg-green-50">
-                          {question.correctAnswer}
+                    )}
+                    
+                    {question.type === 'open-ended' && (
+                      <div className="mt-2 space-y-2">
+                        <div>
+                          <div className="text-sm font-medium">{t('yourAnswer')}</div>
+                          <div className="p-2 border rounded bg-gray-50">
+                            {result?.risposta_utente || '-'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium">{t('correctAnswer')}</div>
+                          <div className="p-2 border rounded bg-green-50">
+                            {question.correctAnswer}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                  
-                  {quiz.results?.risultati?.[index]?.spiegazione && (
-                    <div className="mt-3">
-                      <div className="text-sm font-medium">{t('explanation')}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {quiz.results.risultati[index].spiegazione}
+                    )}
+                    
+                    {result?.spiegazione && (
+                      <div className="mt-3">
+                        <div className="text-sm font-medium">{t('explanation')}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {result.spiegazione}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         
         <DialogFooter>
