@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { LogOut, User, Settings } from 'lucide-react';
+import { LogOut, User, Settings, LogIn } from 'lucide-react';
 import { useLanguage } from '@/i18n/LanguageContext';
 
 const UserMenu = () => {
@@ -21,7 +21,12 @@ const UserMenu = () => {
   
   if (!user) {
     return (
-      <Button variant="outline" onClick={() => navigate('/auth')}>
+      <Button 
+        variant="outline" 
+        onClick={() => navigate('/auth')}
+        className="flex items-center"
+      >
+        <LogIn className="h-4 w-4 mr-2" />
         {t('Sign in')}
       </Button>
     );

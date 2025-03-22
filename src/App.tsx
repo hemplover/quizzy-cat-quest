@@ -49,9 +49,7 @@ const App = () => (
                 path="/upload" 
                 element={
                   <Layout>
-                    <AuthRequired>
-                      <Upload />
-                    </AuthRequired>
+                    <Upload />
                   </Layout>
                 } 
               />
@@ -59,9 +57,7 @@ const App = () => (
                 path="/quiz" 
                 element={
                   <Layout>
-                    <AuthRequired>
-                      <Quiz />
-                    </AuthRequired>
+                    <Quiz />
                   </Layout>
                 } 
               />

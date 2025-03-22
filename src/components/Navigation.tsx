@@ -20,7 +20,7 @@ const Navigation = () => {
         <div className="flex gap-6 md:gap-10">
           <Link to="/" className="items-center space-x-2 flex">
             <span className="hidden font-bold sm:inline-block text-xl">
-              Quiz<span className="text-cat">Genius</span>
+              Quizzy<span className="text-cat">Cat</span>
             </span>
           </Link>
           <div className="flex gap-1 md:gap-2">
@@ -36,20 +36,20 @@ const Navigation = () => {
               </Link>
             </Button>
             
+            <Button
+              asChild
+              variant={isActive('/upload') ? 'default' : 'ghost'}
+              className="text-sm"
+              size="sm"
+            >
+              <Link to="/upload">
+                <Upload className="h-4 w-4 mr-1" />
+                {t('Create Quiz')}
+              </Link>
+            </Button>
+            
             {user && (
               <>
-                <Button
-                  asChild
-                  variant={isActive('/upload') ? 'default' : 'ghost'}
-                  className="text-sm"
-                  size="sm"
-                >
-                  <Link to="/upload">
-                    <Upload className="h-4 w-4 mr-1" />
-                    {t('Create Quiz')}
-                  </Link>
-                </Button>
-                
                 <Button
                   asChild
                   variant={isActive('/subjects') ? 'default' : 'ghost'}

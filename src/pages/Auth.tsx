@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useLanguage } from '@/i18n/LanguageContext';
@@ -20,11 +21,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 
 const Auth = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectPath = searchParams.get('redirect') || '/dashboard';
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,7 +39,7 @@ const Auth = () => {
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
-        navigate('/dashboard');
+        navigate(redirectPath);
       }
     };
     
@@ -45,7 +49,7 @@ const Auth = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (session) {
-          navigate('/dashboard');
+          navigate(redirectPath);
         }
       }
     );
@@ -53,7 +57,7 @@ const Auth = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, redirectPath]);
   
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,9 +156,20 @@ const Auth = () => {
   return (
     <div className="flex items-center justify-center min-h-screen p-4 bg-muted/10">
       <div className="w-full max-w-md">
-        <Link to="/" className="flex justify-center mb-8">
-          <h1 className="text-3xl font-bold text-center text-cat">Quiz<span className="text-primary">Genius</span></h1>
-        </Link>
+        <div className="flex justify-between items-center mb-8">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate('/')}
+            className="flex items-center"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            {t('Back to home')}
+          </Button>
+          <Link to="/" className="flex justify-center">
+            <h1 className="text-3xl font-bold text-center">Quizzy<span className="text-primary">Cat</span></h1>
+          </Link>
+        </div>
         
         <Card>
           <CardHeader>
