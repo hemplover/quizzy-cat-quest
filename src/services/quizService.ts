@@ -195,9 +195,9 @@ export const gradeQuiz = async (
   userAnswers: any[]
 ): Promise<QuizResults | null> => {
   try {
-    console.log('Starting quiz grading...');
-    console.log('Questions:', questions);
-    console.log('User answers:', userAnswers);
+    console.log('Starting quiz grading process...');
+    console.log('Questions to grade:', questions);
+    console.log('User answers to grade:', userAnswers);
     
     // Call the edge function for quiz grading
     const { data, error } = await supabase.functions.invoke('grade-quiz', {

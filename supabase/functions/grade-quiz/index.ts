@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -21,6 +20,8 @@ serve(async (req) => {
     }
     
     console.log(`Grading quiz with provider: ${provider}`);
+    console.log('Questions received:', JSON.stringify(questions));
+    console.log('User answers received:', JSON.stringify(userAnswers));
     
     let result = null;
     
@@ -102,7 +103,13 @@ serve(async (req) => {
         totalPoints += score;
         
         // Make sure corretto field is set appropriately based on score
-        r.corretto = score === 5 ? true : score === 0 ? false : "Parzialmente";
+        if (score === 5) {
+          r.corretto = true;
+        } else if (score === 0) {
+          r.corretto = false;
+        } else {
+          r.corretto = "Parzialmente";
+        }
       } else {
         // For multiple-choice and true-false, either 0 or 1
         // Ensure boolean for corretto field
@@ -139,7 +146,7 @@ serve(async (req) => {
 });
 
 // Grade quiz with OpenAI
-async function gradeWithOpenAI(questions: any[], userAnswers: any[]) {
+async function gradeWithOpenAI(questions, userAnswers) {
   const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
   if (!OPENAI_API_KEY) {
     throw new Error('OpenAI API key is not set in environment variables');
@@ -156,14 +163,15 @@ DIFFERENT QUESTION TYPES HAVE DIFFERENT POINT VALUES:
 - Open-ended questions: Worth 5 points maximum (grade on a scale from 0-5 where 5 is perfect)
 
 For open-ended questions, you MUST:
-1. Grade on a scale from 0 to 5 points
+1. Grade on a scale from 0 to 5 points (use integers only: 0, 1, 2, 3, 4, or 5)
 2. Provide detailed feedback explaining why you assigned that score
 3. Be fair but rigorous - a score of 5/5 should only be for truly excellent, comprehensive answers
+4. Always include what the correct answer should have included
 
 Return your grading as JSON with the following format:
 {
   "risultati": [
-    {"domanda": "Question text", "risposta_utente": "User's answer", "corretto": true/false, "punteggio": score (based on question type), "spiegazione": "Detailed explanation of the score"}, 
+    {"domanda": "Question text", "risposta_utente": "User's answer", "corretto": true/false or "Parzialmente", "punteggio": score (based on question type), "spiegazione": "Detailed explanation of the score, including what the correct answer should be"}, 
     ...
   ],
   "punteggio_totale": total_score (0 to 1),
@@ -228,7 +236,7 @@ ${formattedQuestions}`;
 }
 
 // Grade quiz with Gemini
-async function gradeWithGemini(questions: any[], userAnswers: any[]) {
+async function gradeWithGemini(questions, userAnswers) {
   const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
   if (!GEMINI_API_KEY) {
     throw new Error('Gemini API key is not set in environment variables');
@@ -250,11 +258,12 @@ For open-ended questions, you MUST:
 1. Grade on a scale from 0 to 5 points (use integers only: 0, 1, 2, 3, 4, or 5)
 2. Provide detailed feedback explaining why you assigned that score
 3. Be fair but rigorous - a score of 5/5 should only be for truly excellent, comprehensive answers
+4. Always include what the correct answer should have included
 
 Return your grading as JSON with the following format:
 {
   "risultati": [
-    {"domanda": "Question text", "risposta_utente": "User's answer", "corretto": true/false, "punteggio": score (based on question type), "spiegazione": "Detailed explanation of the score"}, 
+    {"domanda": "Question text", "risposta_utente": "User's answer", "corretto": true/false or "Parzialmente", "punteggio": score (based on question type), "spiegazione": "Detailed explanation of the score, including what the correct answer should be"}, 
     ...
   ],
   "punteggio_totale": total_score (0 to 1),
@@ -335,7 +344,7 @@ ${formattedQuestions}`;
 }
 
 // Helper to format questions for grading
-function formatQuestionsForGrading(questions: any[], userAnswers: any[]): string {
+function formatQuestionsForGrading(questions, userAnswers) {
   return questions.map((q, i) => {
     let questionText = `Question ${i + 1}: ${q.question}`;
     

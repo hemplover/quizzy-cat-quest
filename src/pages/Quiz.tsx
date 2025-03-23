@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -13,7 +14,7 @@ import {
 import CatTutor from '@/components/CatTutor';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { gradeQuiz } from '@/services/openaiService';
+import { gradeQuiz } from '@/services/quizService';
 
 interface BaseQuestion {
   id: number;
@@ -39,7 +40,6 @@ type Question = MultipleChoiceQuestion | OpenEndedQuestion;
 interface UserAnswer {
   questionId: number;
   userAnswer: string | number;
-  isCorrect?: boolean;
 }
 
 const catMessages = {
@@ -219,8 +219,9 @@ const Quiz = () => {
         return;
       }
       
-      const isCorrectAnswer = true;
-      setIsCorrect(isCorrectAnswer);
+      // For open-ended questions, we don't determine correctness immediately
+      // We'll let the AI grade it later
+      setIsCorrect(null);
       
       setUserAnswers([...userAnswers, {
         questionId: currentQuestion.id,
@@ -234,20 +235,25 @@ const Quiz = () => {
       
       const isCorrectAnswer = selectedOption === currentQuestion.correctAnswer;
       setIsCorrect(isCorrectAnswer);
-      if (isCorrectAnswer) setScore(prev => prev + 1);
       
       setUserAnswers([...userAnswers, {
         questionId: currentQuestion.id,
-        userAnswer: selectedOption,
-        isCorrect: isCorrectAnswer
+        userAnswer: selectedOption
       }]);
     }
     
     setIsAnswerSubmitted(true);
     
-    const messageType = isCorrect ? 'correct' : 'incorrect';
-    const randomIndex = Math.floor(Math.random() * catMessages[messageType].length);
-    setCatMessage(catMessages[messageType][randomIndex]);
+    // Set cat message based on if we know correctness now
+    if (currentQuestion.type !== 'open-ended') {
+      const messageType = isCorrect ? 'correct' : 'incorrect';
+      const randomIndex = Math.floor(Math.random() * catMessages[messageType].length);
+      setCatMessage(catMessages[messageType][randomIndex]);
+    } else {
+      // For open-ended, just show an encouraging message
+      const randomIndex = Math.floor(Math.random() * catMessages.encouragement.length);
+      setCatMessage(`${catMessages.encouragement[randomIndex]} I'll grade your answer at the end.`);
+    }
   };
 
   const handleNextQuestion = () => {
@@ -270,8 +276,21 @@ const Quiz = () => {
     setCatMessage(`${catMessages.completion[randomIndex]} I'm grading your answers now...`);
     
     try {
-      const results = await gradeQuiz(questions, userAnswers);
+      console.log("Sending questions and answers for grading:", questions, userAnswers);
+      
+      // Map user answers to match the order of questions for grading
+      const answersForGrading = questions.map((question, index) => {
+        const userAnswer = userAnswers.find(answer => answer.questionId === question.id);
+        return userAnswer ? userAnswer.userAnswer : '';
+      });
+      
+      console.log("Prepared answers for grading:", answersForGrading);
+      
+      // Send to API for grading
+      const results = await gradeQuiz(questions, answersForGrading);
+      
       if (results) {
+        console.log("Received grading results:", results);
         setAiGradingResults(results);
         
         let totalPoints = 0;
@@ -303,6 +322,7 @@ const Quiz = () => {
       }
     } catch (error) {
       console.error("Error grading quiz:", error);
+      toast.error("Failed to grade quiz. Please try again.");
     } finally {
       setIsGrading(false);
       const completionIndex = Math.floor(Math.random() * catMessages.completion.length);
@@ -389,12 +409,12 @@ const Quiz = () => {
                       cx="50" 
                       cy="50" 
                       strokeDasharray={`${2 * Math.PI * 42}`}
-                      strokeDashoffset={`${2 * Math.PI * 42 * (1 - score / questions.length)}`}
+                      strokeDashoffset={`${2 * Math.PI * 42 * (1 - score / 100)}`}
                       strokeLinecap="round"
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-3xl font-bold">{Math.round((score / questions.length) * 100)}%</span>
+                    <span className="text-3xl font-bold">{score}%</span>
                   </div>
                 </div>
               </div>
@@ -572,7 +592,7 @@ const Quiz = () => {
           </div>
         )}
         
-        {isAnswerSubmitted && currentQuestion.explanation && (
+        {isAnswerSubmitted && currentQuestion.type !== 'open-ended' && currentQuestion.explanation && (
           <div className={cn(
             "mt-6 p-4 rounded-lg animate-fade-in",
             isCorrect ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"
@@ -591,6 +611,18 @@ const Quiz = () => {
               )}
             </h3>
             <p className="text-gray-700">{currentQuestion.explanation}</p>
+          </div>
+        )}
+        
+        {isAnswerSubmitted && currentQuestion.type === 'open-ended' && (
+          <div className="mt-6 p-4 rounded-lg bg-blue-50 border border-blue-200 animate-fade-in">
+            <h3 className="font-medium mb-2 flex items-center gap-2">
+              <HelpCircle className="w-5 h-5 text-blue-500" />
+              <span className="text-blue-700">Open-ended Response</span>
+            </h3>
+            <p className="text-gray-700">
+              Your answer has been recorded and will be evaluated at the end of the quiz.
+            </p>
           </div>
         )}
       </div>
