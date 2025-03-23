@@ -199,11 +199,51 @@ export const gradeQuiz = async (
     console.log('Questions to grade:', questions);
     console.log('User answers to grade:', userAnswers);
     
+    // Make sure we have valid data to send
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+      console.error('Invalid questions data:', questions);
+      toast.error('Invalid questions data. Please try again.');
+      return null;
+    }
+    
+    if (!userAnswers || !Array.isArray(userAnswers)) {
+      console.error('Invalid user answers:', userAnswers);
+      toast.error('Invalid user answers. Please try again.');
+      return null;
+    }
+    
+    // Ensure all questions have the required properties
+    const validatedQuestions = questions.map(q => {
+      // Make sure each question has the necessary properties
+      return {
+        id: q.id || 0,
+        type: q.type || 'multiple-choice',
+        question: q.question || 'Unknown question',
+        options: q.options || [],
+        correctAnswer: q.correctAnswer !== undefined ? q.correctAnswer : '',
+        explanation: q.explanation || ''
+      };
+    });
+    
+    // Ensure all user answers are in the correct format
+    const validatedAnswers = userAnswers.map((answer, index) => {
+      const questionType = validatedQuestions[index]?.type;
+      
+      // Convert to appropriate format based on question type
+      if (questionType === 'multiple-choice' || questionType === 'true-false') {
+        // For multiple choice, ensure we have a number
+        return typeof answer === 'number' ? answer : 0;
+      } else {
+        // For open-ended, ensure we have a string
+        return String(answer || '');
+      }
+    });
+    
     // Call the edge function for quiz grading
     const { data, error } = await supabase.functions.invoke('grade-quiz', {
       body: {
-        questions,
-        userAnswers,
+        questions: validatedQuestions,
+        userAnswers: validatedAnswers,
         provider: 'gemini'
       }
     });
@@ -257,7 +297,25 @@ export const gradeQuiz = async (
         const pointValue = question.type === 'open-ended' ? 5 : 1;
         
         maxPoints += pointValue;
-        totalPoints += result.punteggio;
+        
+        // Ensure punteggio is a number
+        let score = 0;
+        if (typeof result.punteggio === 'number') {
+          score = result.punteggio;
+        } else if (typeof result.punteggio === 'string') {
+          score = parseFloat(result.punteggio);
+          if (isNaN(score)) score = 0;
+        }
+        
+        // Make sure the score is within the valid range
+        if (question.type === 'open-ended') {
+          score = Math.min(5, Math.max(0, Math.round(score)));
+        } else {
+          score = score > 0 ? 1 : 0;
+        }
+        
+        result.punteggio = score;
+        totalPoints += score;
         
         console.log(`Question ${index+1} (${question.type}): ${result.punteggio}/${pointValue} points`);
       });

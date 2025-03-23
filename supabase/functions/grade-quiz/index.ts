@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -13,42 +14,121 @@ serve(async (req) => {
   }
 
   try {
-    const { questions, userAnswers, provider } = await req.json();
+    // Parse request body
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      console.log('Request body parsed successfully');
+    } catch (parseError) {
+      console.error('Error parsing request body:', parseError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
-    if (!questions || !userAnswers || !provider) {
-      throw new Error('Missing required parameters: questions, userAnswers, or provider');
+    const { questions, userAnswers, provider } = requestBody;
+    
+    // Validate input parameters
+    if (!questions || !Array.isArray(questions)) {
+      console.error('Missing or invalid questions parameter:', questions);
+      return new Response(
+        JSON.stringify({ error: 'Missing or invalid questions parameter' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!userAnswers || !Array.isArray(userAnswers)) {
+      console.error('Missing or invalid userAnswers parameter:', userAnswers);
+      return new Response(
+        JSON.stringify({ error: 'Missing or invalid userAnswers parameter' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!provider) {
+      console.error('Missing provider parameter');
+      return new Response(
+        JSON.stringify({ error: 'Missing provider parameter' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
     
     console.log(`Grading quiz with provider: ${provider}`);
-    console.log('Questions received:', JSON.stringify(questions));
-    console.log('User answers received:', JSON.stringify(userAnswers));
+    console.log('Questions received:', JSON.stringify(questions).substring(0, 200) + '...');
+    console.log('User answers received:', JSON.stringify(userAnswers).substring(0, 200) + '...');
+    
+    // Ensure userAnswers has the same length as questions
+    if (userAnswers.length !== questions.length) {
+      console.warn(`Answer count mismatch: ${userAnswers.length} answers for ${questions.length} questions`);
+      
+      // Pad with empty answers if needed
+      while (userAnswers.length < questions.length) {
+        userAnswers.push('');
+      }
+      
+      // Truncate if too many answers
+      if (userAnswers.length > questions.length) {
+        userAnswers = userAnswers.slice(0, questions.length);
+      }
+    }
     
     let result = null;
     
-    switch (provider) {
-      case 'openai':
-        result = await gradeWithOpenAI(questions, userAnswers);
-        break;
-      case 'gemini':
-        // Always use backend key for Gemini
-        result = await gradeWithGemini(questions, userAnswers);
-        break;
-      case 'claude':
-      case 'mistral':
-        return new Response(
-          JSON.stringify({ error: `Integration with ${provider} is coming soon!` }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      default:
-        return new Response(
-          JSON.stringify({ error: 'Unknown AI provider' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+    try {
+      switch (provider) {
+        case 'openai':
+          result = await gradeWithOpenAI(questions, userAnswers);
+          break;
+        case 'gemini':
+          // Always use backend key for Gemini
+          result = await gradeWithGemini(questions, userAnswers);
+          break;
+        case 'claude':
+        case 'mistral':
+          return new Response(
+            JSON.stringify({ error: `Integration with ${provider} is coming soon!` }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        default:
+          return new Response(
+            JSON.stringify({ error: 'Unknown AI provider' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+      }
+    } catch (gradingError) {
+      console.error(`Error grading with ${provider}:`, gradingError);
+      return new Response(
+        JSON.stringify({ error: `Error grading with ${provider}: ${gradingError.message}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Check if we got a valid result
+    if (!result) {
+      console.error('No result returned from grading function');
+      return new Response(
+        JSON.stringify({ error: 'No result returned from grading function' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
     
     // Validate the quiz results
-    if (!result || !result.risultati || !Array.isArray(result.risultati)) {
-      throw new Error('Invalid quiz results format returned by AI');
+    if (!result.risultati || !Array.isArray(result.risultati)) {
+      console.error('Invalid quiz results format returned by AI:', JSON.stringify(result).substring(0, 200));
+      
+      // Create a fallback response if needed
+      result = {
+        risultati: questions.map((q, i) => ({
+          domanda: q.question,
+          risposta_utente: String(userAnswers[i]),
+          corretto: false,
+          punteggio: 0,
+          spiegazione: 'Error: Could not evaluate this answer'
+        })),
+        punteggio_totale: 0,
+        feedback_generale: 'There was an error grading your quiz. Please try again.'
+      };
     }
     
     // Make sure we have the same number of results as questions
@@ -98,6 +178,17 @@ serve(async (req) => {
         else if (typeof r.punteggio === 'number') {
           score = Math.min(5, Math.max(0, Math.round(r.punteggio)));
         }
+        // If punteggio is not a number, default to 0
+        else if (r.punteggio === undefined || r.punteggio === null || isNaN(Number(r.punteggio))) {
+          score = 0;
+        }
+        // If it's a string that can be converted to a number
+        else if (typeof r.punteggio === 'string') {
+          const parsed = parseFloat(r.punteggio);
+          if (!isNaN(parsed)) {
+            score = Math.min(5, Math.max(0, Math.round(parsed)));
+          }
+        }
         
         r.punteggio = score;
         totalPoints += score;
@@ -139,7 +230,11 @@ serve(async (req) => {
     console.error('Error in grade-quiz function:', error);
     
     return new Response(
-      JSON.stringify({ error: error.message || 'Unknown error' }),
+      JSON.stringify({ 
+        error: error.message || 'Unknown error',
+        stack: error.stack,
+        info: 'There was an error processing your request. Please try again.'
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
@@ -182,56 +277,62 @@ Here are the questions and answers to grade:
 
 ${formattedQuestions}`;
 
-  // Call OpenAI API
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${OPENAI_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [
-        { 
-          role: 'system', 
-          content: 'You are a helpful assistant that grades quizzes and provides feedback.' 
-        },
-        { 
-          role: 'user', 
-          content: prompt 
-        }
-      ],
-      temperature: 0
-    })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(`OpenAI API Error: ${errorData.error?.message || 'Unknown error'}`);
-  }
-
-  const data = await response.json();
-  console.log('OpenAI grading response received');
-  
-  // Extract the content
-  const generatedContent = data.choices[0].message.content;
-  
   try {
-    // Parse the response as JSON
-    return JSON.parse(generatedContent);
-  } catch (error) {
-    console.error('Error parsing grading JSON from OpenAI:', error);
-    
-    // Try to extract JSON from the text
-    const jsonMatch = generatedContent.match(/```json\n([\s\S]*)\n```/) || 
-                       generatedContent.match(/\{[\s\S]*\}/);
-    
-    if (jsonMatch) {
-      const extractedJson = jsonMatch[1] || jsonMatch[0];
-      return JSON.parse(extractedJson);
+    // Call OpenAI API
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { 
+            role: 'system', 
+            content: 'You are a helpful assistant that grades quizzes and provides feedback.' 
+          },
+          { 
+            role: 'user', 
+            content: prompt 
+          }
+        ],
+        temperature: 0
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`OpenAI API Error: ${errorData.error?.message || 'Unknown error'}`);
     }
+
+    const data = await response.json();
+    console.log('OpenAI grading response received');
     
-    throw new Error('Failed to parse grading response from OpenAI');
+    // Extract the content
+    const generatedContent = data.choices[0].message.content;
+    
+    try {
+      // Parse the response as JSON
+      return JSON.parse(generatedContent);
+    } catch (error) {
+      console.error('Error parsing grading JSON from OpenAI:', error);
+      console.log('Raw content from OpenAI:', generatedContent.substring(0, 500));
+      
+      // Try to extract JSON from the text
+      const jsonMatch = generatedContent.match(/```json\n([\s\S]*)\n```/) || 
+                       generatedContent.match(/\{[\s\S]*\}/);
+      
+      if (jsonMatch) {
+        const extractedJson = jsonMatch[1] || jsonMatch[0];
+        return JSON.parse(extractedJson);
+      }
+      
+      throw new Error('Failed to parse grading response from OpenAI');
+    }
+  } catch (error) {
+    console.error('OpenAI grading error:', error);
+    throw error;
   }
 }
 
@@ -274,72 +375,78 @@ Here are the questions and answers to grade:
 
 ${formattedQuestions}`;
 
-  // Use the updated Gemini 2.0 Flash model by default
-  const modelName = 'gemini-2.0-flash';
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
-
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': GEMINI_API_KEY
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            {
-              text: prompt
-            }
-          ]
-        }
-      ],
-      generationConfig: {
-        temperature: 0,
-        maxOutputTokens: 1000
-      }
-    })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    console.error('Gemini API Error details:', errorData);
-    throw new Error(`Gemini API Error: ${errorData.error?.message || 'Unknown error'}`);
-  }
-
-  const data = await response.json();
-  console.log('Gemini grading response received');
-  
-  // Extract the content - handle different response formats
-  let generatedContent;
-  
-  if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-    // Format for newer Gemini versions
-    generatedContent = data.candidates[0].content.parts[0].text;
-  } else if (data.text) {
-    // Simplified response format in some versions
-    generatedContent = data.text;
-  } else {
-    console.error('Unexpected Gemini response format:', data);
-    throw new Error('Unexpected response format from Gemini API');
-  }
-  
   try {
-    // Parse the response as JSON
-    return JSON.parse(generatedContent);
-  } catch (error) {
-    console.error('Error parsing grading JSON from Gemini:', error);
+    // Use the updated Gemini 2.0 Flash model by default
+    const modelName = 'gemini-2.0-flash';
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': GEMINI_API_KEY
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: 1000
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Gemini API Error details:', errorData);
+      throw new Error(`Gemini API Error: ${errorData.error?.message || JSON.stringify(errorData)}`);
+    }
+
+    const data = await response.json();
+    console.log('Gemini grading response received');
     
-    // Try to extract JSON from the text
-    const jsonMatch = generatedContent.match(/```json\n([\s\S]*)\n```/) || 
-                       generatedContent.match(/\{[\s\S]*\}/);
+    // Extract the content - handle different response formats
+    let generatedContent;
     
-    if (jsonMatch) {
-      const extractedJson = jsonMatch[1] || jsonMatch[0];
-      return JSON.parse(extractedJson);
+    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+      // Format for newer Gemini versions
+      generatedContent = data.candidates[0].content.parts[0].text;
+    } else if (data.text) {
+      // Simplified response format in some versions
+      generatedContent = data.text;
+    } else {
+      console.error('Unexpected Gemini response format:', JSON.stringify(data).substring(0, 500));
+      throw new Error('Unexpected response format from Gemini API');
     }
     
-    throw new Error('Failed to parse grading response from Gemini');
+    try {
+      // Parse the response as JSON
+      return JSON.parse(generatedContent);
+    } catch (error) {
+      console.error('Error parsing grading JSON from Gemini:', error);
+      console.log('Raw content from Gemini:', generatedContent.substring(0, 500));
+      
+      // Try to extract JSON from the text
+      const jsonMatch = generatedContent.match(/```json\n([\s\S]*)\n```/) || 
+                       generatedContent.match(/\{[\s\S]*\}/);
+      
+      if (jsonMatch) {
+        const extractedJson = jsonMatch[1] || jsonMatch[0];
+        return JSON.parse(extractedJson);
+      }
+      
+      throw new Error('Failed to parse grading response from Gemini');
+    }
+  } catch (error) {
+    console.error('Gemini grading error:', error);
+    throw error;
   }
 }
 
