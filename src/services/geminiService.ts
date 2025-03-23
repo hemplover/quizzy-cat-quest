@@ -1,3 +1,4 @@
+
 import { getApiKey, isBackendOnlyProvider } from './aiProviderService';
 import { GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
 import { toast } from 'sonner';
@@ -213,7 +214,7 @@ export const gradeQuizWithGemini = async (
     const formattedQuestions = questions.map((q, i) => {
       let questionText = `Question ${i + 1}: ${q.question}`;
       
-      // Add question type 
+      // Add question type and point value
       questionText += `\nQuestion Type: ${q.type}`;
       questionText += q.type === 'open-ended' ? ' (worth 5 points)' : ' (worth 1 point)';
       
@@ -240,7 +241,7 @@ DIFFERENT QUESTION TYPES HAVE DIFFERENT POINT VALUES:
 - Open-ended questions: Worth 5 points maximum (grade on a scale from 0-5 where 5 is perfect)
 
 For open-ended questions, you MUST:
-1. Grade on a scale from 0 to 5 points
+1. Grade on a scale from 0 to 5 points (use integers only: 0, 1, 2, 3, 4, or 5)
 2. Provide detailed feedback explaining why you assigned that score
 3. Be fair but rigorous - a score of 5/5 should only be for truly excellent, comprehensive answers
 

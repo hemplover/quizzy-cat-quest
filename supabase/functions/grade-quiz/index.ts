@@ -86,12 +86,27 @@ serve(async (req) => {
       // For open-ended questions, score can be 0-5
       // For other questions, score is 0 or 1
       if (questionType === 'open-ended') {
-        // Normalize AI score to 0-5 range
-        // The score coming from AI is usually 0-1, multiply by 5
-        r.punteggio = Math.min(5, Math.max(0, Math.round(r.punteggio * 5)));
-        totalPoints += r.punteggio;
+        // Ensure the score is properly formatted as a number between 0-5
+        let score = 0;
+        
+        // If the AI returned a score between 0-1, multiply by 5 to get 0-5 range
+        if (typeof r.punteggio === 'number' && r.punteggio <= 1) {
+          score = Math.round(r.punteggio * 5);
+        } 
+        // If the AI returned a score already in 0-5 range, use it directly
+        else if (typeof r.punteggio === 'number') {
+          score = Math.min(5, Math.max(0, Math.round(r.punteggio)));
+        }
+        
+        r.punteggio = score;
+        totalPoints += score;
+        
+        // Make sure corretto field is set appropriately based on score
+        r.corretto = score === 5 ? true : score === 0 ? false : "Parzialmente";
       } else {
         // For multiple-choice and true-false, either 0 or 1
+        // Ensure boolean for corretto field
+        r.corretto = r.corretto === true || r.corretto === "true" || r.corretto === "Completamente";
         r.punteggio = r.corretto ? 1 : 0;
         totalPoints += r.punteggio;
       }
@@ -232,7 +247,7 @@ DIFFERENT QUESTION TYPES HAVE DIFFERENT POINT VALUES:
 - Open-ended questions: Worth 5 points maximum (grade on a scale from 0-5 where 5 is perfect)
 
 For open-ended questions, you MUST:
-1. Grade on a scale from 0 to 5 points
+1. Grade on a scale from 0 to 5 points (use integers only: 0, 1, 2, 3, 4, or 5)
 2. Provide detailed feedback explaining why you assigned that score
 3. Be fair but rigorous - a score of 5/5 should only be for truly excellent, comprehensive answers
 

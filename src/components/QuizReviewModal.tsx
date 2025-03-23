@@ -36,8 +36,8 @@ const QuizReviewModal: React.FC<QuizReviewModalProps> = ({
     : null;
     
   // Get points data if available
-  const totalPoints = quiz.results?.total_points;
-  const maxPoints = quiz.results?.max_points;
+  const totalPoints = quiz.results?.total_points || 0;
+  const maxPoints = quiz.results?.max_points || 0;
   
   // Helper to get point value based on question type
   const getQuestionPointValue = (type: string) => {
@@ -73,6 +73,7 @@ const QuizReviewModal: React.FC<QuizReviewModalProps> = ({
             const result = quiz.results?.risultati?.[index];
             const isCorrect = result?.corretto === true;
             const isIncorrect = result?.corretto === false;
+            const isPartiallyCorrect = result?.corretto === "Parzialmente";
             const pointValue = getQuestionPointValue(question.type);
             const score = result?.punteggio || 0;
             
@@ -81,6 +82,7 @@ const QuizReviewModal: React.FC<QuizReviewModalProps> = ({
                 key={index} 
                 className={`p-4 rounded-lg border ${
                   isCorrect ? 'bg-green-50 border-green-200' : 
+                  isPartiallyCorrect ? 'bg-yellow-50 border-yellow-200' :
                   isIncorrect ? 'bg-red-50 border-red-200' :
                   'bg-white'
                 }`}
@@ -90,6 +92,10 @@ const QuizReviewModal: React.FC<QuizReviewModalProps> = ({
                     <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" />
                   ) : isIncorrect ? (
                     <XCircle className="w-5 h-5 text-red-600 mt-0.5" />
+                  ) : isPartiallyCorrect ? (
+                    <div className="w-5 h-5 rounded-full bg-yellow-400 text-white flex items-center justify-center mt-0.5">
+                      <span className="text-xs font-bold">!</span>
+                    </div>
                   ) : null}
                   
                   <div className="flex-1">
@@ -168,7 +174,11 @@ const QuizReviewModal: React.FC<QuizReviewModalProps> = ({
                         <div>
                           <div className="text-sm font-medium flex items-center justify-between">
                             <span>{t('score')}</span>
-                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              score === 5 ? 'bg-green-100 text-green-700' :
+                              score === 0 ? 'bg-red-100 text-red-700' :
+                              'bg-blue-100 text-blue-700'
+                            }`}>
                               {score}/{pointValue} points
                             </span>
                           </div>

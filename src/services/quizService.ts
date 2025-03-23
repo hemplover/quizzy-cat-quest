@@ -195,6 +195,10 @@ export const gradeQuiz = async (
   userAnswers: any[]
 ): Promise<QuizResults | null> => {
   try {
+    console.log('Starting quiz grading...');
+    console.log('Questions:', questions);
+    console.log('User answers:', userAnswers);
+    
     // Call the edge function for quiz grading
     const { data, error } = await supabase.functions.invoke('grade-quiz', {
       body: {
@@ -217,6 +221,8 @@ export const gradeQuiz = async (
       return null;
     }
     
+    console.log('Received quiz results:', data);
+    
     // Make sure we have the same number of results as questions
     if (data.risultati.length !== questions.length) {
       console.warn(`Result count mismatch: ${data.risultati.length} results for ${questions.length} questions`);
@@ -237,10 +243,32 @@ export const gradeQuiz = async (
         // Truncate if we have too many
         data.risultati = data.risultati.slice(0, questions.length);
       }
+    }
+    
+    // Double-check that total_points and max_points are properly calculated
+    if (data.total_points === undefined || data.max_points === undefined) {
+      console.log('Calculating total_points and max_points...');
       
-      // Recalculate total score
-      const totalScore = data.risultati.reduce((sum, r) => sum + (r.punteggio || 0), 0) / questions.length;
-      data.punteggio_totale = totalScore;
+      let totalPoints = 0;
+      let maxPoints = 0;
+      
+      data.risultati.forEach((result, index) => {
+        const question = questions[index];
+        const pointValue = question.type === 'open-ended' ? 5 : 1;
+        
+        maxPoints += pointValue;
+        totalPoints += result.punteggio;
+        
+        console.log(`Question ${index+1} (${question.type}): ${result.punteggio}/${pointValue} points`);
+      });
+      
+      data.total_points = totalPoints;
+      data.max_points = maxPoints;
+      
+      // Recalculate total score as a ratio
+      data.punteggio_totale = maxPoints > 0 ? totalPoints / maxPoints : 0;
+      
+      console.log(`Total score: ${totalPoints}/${maxPoints} (${data.punteggio_totale.toFixed(2)})`);
     }
     
     return data;
