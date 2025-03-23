@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 
 /**
@@ -83,33 +82,38 @@ async function readTextFile(file: File): Promise<string> {
   });
 }
 
-// Extract text from PDF using PDF.js
+// Extract text from PDF using PDF.js with more detailed logging
 async function extractTextFromPdf(file: File): Promise<string> {
   try {
-    console.log('Starting PDF text extraction process...');
+    console.log('Starting PDF text extraction process...', file.name, file.size);
     
     // Import PDF.js dynamically with explicit version to avoid potential conflicts
+    console.log('Loading PDF.js library...');
     const pdfjsLib = await import('pdfjs-dist');
-    console.log('PDF.js library loaded');
+    console.log('PDF.js library loaded successfully');
     
     // Set worker source path
+    console.log('Configuring PDF.js worker...');
     const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry');
     pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-    console.log('PDF.js worker configured');
+    console.log('PDF.js worker configured successfully');
     
     // Read file as ArrayBuffer
+    console.log('Loading file as ArrayBuffer...');
     const arrayBuffer = await file.arrayBuffer();
     console.log(`File loaded as ArrayBuffer, size: ${arrayBuffer.byteLength} bytes`);
     
     // Load PDF document with proper error handling
+    console.log('Creating PDF loading task...');
     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
     
     loadingTask.onProgress = (progressData) => {
       console.log(`PDF loading progress: ${progressData.loaded} of ${progressData.total}`);
     };
     
+    console.log('Waiting for PDF document to load...');
     const pdf = await loadingTask.promise;
-    console.log(`PDF document loaded with ${pdf.numPages} pages`);
+    console.log(`PDF document loaded successfully with ${pdf.numPages} pages`);
     
     let textContent = '';
     
@@ -117,6 +121,7 @@ async function extractTextFromPdf(file: File): Promise<string> {
     for (let i = 1; i <= pdf.numPages; i++) {
       console.log(`Processing page ${i} of ${pdf.numPages}...`);
       const page = await pdf.getPage(i);
+      console.log(`Extracting text content from page ${i}...`);
       const content = await page.getTextContent();
       
       // Concatenate text items with spaces
@@ -137,6 +142,7 @@ async function extractTextFromPdf(file: File): Promise<string> {
     const errorMessage = error instanceof Error 
       ? `Failed to extract text from PDF: ${error.message}` 
       : 'Failed to extract text from PDF: Unknown error';
+    console.error('PDF extraction error details:', errorMessage);
     throw new Error(errorMessage);
   }
 }

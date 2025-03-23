@@ -135,21 +135,26 @@ const Upload = () => {
   };
 
   const handleFileUpload = async (file: File) => {
+    console.log("Starting file upload process for:", file.name, "type:", file.type);
     setSelectedFile(file);
     setDocumentName(file.name);
     setCatMessage(`I'll analyze this ${file.type.split('/')[1]} file and create a quiz based on its content.`);
     setIsProcessing(true);
     
     try {
+      console.log("Calling parseDocument for file:", file.name);
       const extractedText = await parseDocument(file);
+      console.log("Extraction completed, text length:", extractedText?.length || 0);
       
       if (!extractedText || extractedText.trim().length < 100) {
+        console.error("Extracted text is too short or empty:", extractedText);
         toast.error('The document content is too short or could not be extracted properly.');
         setCatMessage('I couldn\'t extract enough text from this document. Please try a different file or paste text directly.');
         setIsProcessing(false);
         return;
       }
       
+      console.log("Setting text input and processed content with extracted text");
       setTextInput(extractedText);
       setProcessedContent(extractedText);
       setIsReadyToGenerateQuiz(true);

@@ -48,6 +48,7 @@ const Dashboard = () => {
     setIsLoading(true);
     try {
       const loadedSubjects = await getSubjects();
+      console.log('Loaded subjects:', loadedSubjects);
       
       // Calculate stats for each subject
       const subjectsWithStats = await Promise.all(loadedSubjects.map(async (subject) => {
@@ -63,26 +64,34 @@ const Dashboard = () => {
         quizzes.forEach(quiz => {
           if (quiz.results && quiz.questions && quiz.questions.length > 0) {
             if (typeof quiz.results.punteggio_totale === 'number') {
+              console.log(`Quiz ${quiz.title || quiz.id} has results:`, quiz.results);
               totalCorrectAnswers += quiz.results.punteggio_totale;
               totalQuestions += quiz.questions.length;
               quizzesWithResults++;
-              console.log(`Quiz ${quiz.id} score: ${(quiz.results.punteggio_totale / quiz.questions.length) * 100}%`);
+              console.log(`Quiz ${quiz.id} score: ${quiz.results.punteggio_totale} correct out of ${quiz.questions.length} questions (${(quiz.results.punteggio_totale / quiz.questions.length) * 100}%)`);
             }
           }
         });
+        
+        console.log(`Subject ${subject.name}: ${totalCorrectAnswers} correct answers out of ${totalQuestions} total questions`);
         
         // Calculate average score as a percentage
         const averageScore = totalQuestions > 0 ? 
           Math.round((totalCorrectAnswers / totalQuestions) * 100) : 0;
         
+        console.log(`Subject ${subject.name} average score: ${averageScore}%`);
+        
         return {
           ...subject,
           quizCount: quizzes.length,
           completedQuizCount: quizzesWithResults,
-          averageScore: averageScore
+          averageScore: averageScore,
+          totalQuestions: totalQuestions, // Add this for the UserProgressCard calculation
+          totalCorrectAnswers: totalCorrectAnswers // Add this for the UserProgressCard calculation
         };
       }));
       
+      console.log('Subjects with stats:', subjectsWithStats);
       setSubjects(subjectsWithStats);
     } catch (error) {
       console.error("Error loading subjects:", error);

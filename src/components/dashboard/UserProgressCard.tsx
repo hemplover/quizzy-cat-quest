@@ -30,10 +30,14 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
   
   // Calculate the average score for all subjects with completed quizzes
   const calculateOverallAverageScore = () => {
-    // Get all subjects with scores
+    console.log('Calculating overall average score with subjects:', subjects);
+    
+    // Get all subjects with completed quizzes
     const subjectsWithScores = subjects.filter(s => s.completedQuizCount > 0);
+    console.log('Filtered subjects with scores:', subjectsWithScores);
     
     if (subjectsWithScores.length === 0) {
+      console.log('No subjects with completed quizzes found');
       return '-';
     }
     
@@ -42,18 +46,29 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
     let totalQuestions = 0;
     
     subjectsWithScores.forEach(subject => {
-      // Use the corrected averageScore which is already a percentage
-      totalCorrectAnswers += (subject.averageScore / 100) * subject.totalQuestions || 0;
+      console.log(`Subject ${subject.name} - averageScore: ${subject.averageScore}, totalQuestions: ${subject.totalQuestions || 0}`);
+      
+      // We need to get the raw number of correct answers by reversing the percentage calculation
+      const subjectCorrectAnswers = subject.totalQuestions ? (subject.averageScore / 100) * subject.totalQuestions : 0;
+      
+      totalCorrectAnswers += subjectCorrectAnswers;
       totalQuestions += subject.totalQuestions || 0;
+      
+      console.log(`Added ${subjectCorrectAnswers.toFixed(2)} correct answers and ${subject.totalQuestions || 0} questions`);
     });
+    
+    console.log(`Final totals: ${totalCorrectAnswers.toFixed(2)} correct answers out of ${totalQuestions} questions`);
     
     // If no questions were answered, return '-'
     if (totalQuestions === 0) {
+      console.log('No questions found in any subject');
       return '-';
     }
     
     // Calculate and return the overall average as a percentage
-    return Math.round((totalCorrectAnswers / totalQuestions) * 100);
+    const overallPercentage = Math.round((totalCorrectAnswers / totalQuestions) * 100);
+    console.log(`Overall percentage: ${overallPercentage}%`);
+    return overallPercentage;
   };
 
   return (

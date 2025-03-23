@@ -83,9 +83,14 @@ const SubjectDetail = () => {
   
   // Calculate the average score for this subject - properly fixed calculation
   const calculateSubjectScore = () => {
-    if (!quizzes || quizzes.length === 0) return 0;
+    if (!quizzes || quizzes.length === 0) {
+      console.log('No quizzes found for this subject');
+      return 0;
+    }
     
-    // Filter quizzes that have valid results and questions
+    console.log('All quizzes for this subject:', quizzes);
+    
+    // Filter quizzes with valid results
     const quizzesWithResults = quizzes.filter(quiz => 
       quiz.results && 
       typeof quiz.results.punteggio_totale === 'number' && 
@@ -93,19 +98,33 @@ const SubjectDetail = () => {
       quiz.questions.length > 0
     );
     
-    if (quizzesWithResults.length === 0) return 0;
+    console.log('Quizzes with results:', quizzesWithResults);
+    
+    if (quizzesWithResults.length === 0) {
+      console.log('No quizzes with valid results found');
+      return 0;
+    }
     
     // Calculate total correct answers and total questions
     let totalCorrectAnswers = 0;
     let totalQuestions = 0;
     
     quizzesWithResults.forEach(quiz => {
-      totalCorrectAnswers += quiz.results.punteggio_totale;
-      totalQuestions += quiz.questions.length;
+      const correctAnswers = quiz.results.punteggio_totale;
+      const questions = quiz.questions.length;
+      
+      console.log(`Quiz "${quiz.title}": ${correctAnswers} correct out of ${questions} questions`);
+      
+      totalCorrectAnswers += correctAnswers;
+      totalQuestions += questions;
     });
     
+    console.log(`Total for subject: ${totalCorrectAnswers} correct answers out of ${totalQuestions} questions`);
+    
     // Calculate the average percentage
-    return Math.round((totalCorrectAnswers / totalQuestions) * 100);
+    const averagePercentage = Math.round((totalCorrectAnswers / totalQuestions) * 100);
+    console.log(`Average score: ${averagePercentage}%`);
+    return averagePercentage;
   };
   
   const subjectScore = calculateSubjectScore();
