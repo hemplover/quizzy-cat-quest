@@ -18,6 +18,7 @@ export async function parseDocument(file: File): Promise<string | null> {
     
     // PDF files
     else if (fileType.includes('application/pdf') || fileName.endsWith('.pdf')) {
+      console.log('Detected PDF file, beginning extraction...');
       return await extractTextFromPdf(file);
     }
     
@@ -85,38 +86,58 @@ async function readTextFile(file: File): Promise<string> {
 // Extract text from PDF using PDF.js
 async function extractTextFromPdf(file: File): Promise<string> {
   try {
-    // Using PDF.js in browser context
+    console.log('Starting PDF text extraction process...');
+    
+    // Import PDF.js dynamically with explicit version to avoid potential conflicts
     const pdfjsLib = await import('pdfjs-dist');
+    console.log('PDF.js library loaded');
     
     // Set worker source path
     const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry');
     pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+    console.log('PDF.js worker configured');
     
     // Read file as ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
+    console.log(`File loaded as ArrayBuffer, size: ${arrayBuffer.byteLength} bytes`);
     
-    // Load PDF document
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    // Load PDF document with proper error handling
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    
+    loadingTask.onProgress = (progressData) => {
+      console.log(`PDF loading progress: ${progressData.loaded} of ${progressData.total}`);
+    };
+    
+    const pdf = await loadingTask.promise;
+    console.log(`PDF document loaded with ${pdf.numPages} pages`);
     
     let textContent = '';
     
     // Extract text from each page
     for (let i = 1; i <= pdf.numPages; i++) {
+      console.log(`Processing page ${i} of ${pdf.numPages}...`);
       const page = await pdf.getPage(i);
-      const text = await page.getTextContent();
+      const content = await page.getTextContent();
       
       // Concatenate text items with spaces
-      const pageText = text.items
+      const pageText = content.items
         .map((item: any) => item.str)
         .join(' ');
       
       textContent += pageText + '\n\n';
+      console.log(`Extracted ${pageText.length} characters from page ${i}`);
     }
     
-    return textContent.trim();
+    const result = textContent.trim();
+    console.log(`Total extracted text: ${result.length} characters`);
+    return result;
   } catch (error) {
     console.error('Error extracting text from PDF:', error);
-    throw new Error('Failed to extract text from PDF');
+    // Provide more detailed error information
+    const errorMessage = error instanceof Error 
+      ? `Failed to extract text from PDF: ${error.message}` 
+      : 'Failed to extract text from PDF: Unknown error';
+    throw new Error(errorMessage);
   }
 }
 
