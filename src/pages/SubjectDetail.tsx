@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
@@ -82,7 +81,7 @@ const SubjectDetail = () => {
     );
   }
   
-  // Calculate the average score for this subject
+  // Calculate the average score for this subject - fixed calculation
   const calculateSubjectScore = () => {
     if (!quizzes || quizzes.length === 0) return 0;
     

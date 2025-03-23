@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
@@ -510,44 +509,7 @@ export const deleteQuiz = async (id: string): Promise<boolean> => {
   }
 };
 
-// Initialize with some default subjects if there are none
+// Initialize without any default subjects
 export const initializeSubjectsIfNeeded = async (): Promise<void> => {
-  try {
-    const subjects = await getSubjects();
-    
-    if (subjects.length === 0) {
-      const defaultSubjects = [
-        {
-          name: 'Mathematics',
-          description: 'Algebra, Calculus, Geometry, etc.',
-          icon: '📐',
-          color: '#4f46e5'
-        },
-        {
-          name: 'Science',
-          description: 'Physics, Chemistry, Biology, etc.',
-          icon: '🔬',
-          color: '#16a34a'
-        },
-        {
-          name: 'History',
-          description: 'World History, Ancient Civilizations, etc.',
-          icon: '📜',
-          color: '#b45309'
-        },
-        {
-          name: 'Languages',
-          description: 'English, Spanish, French, etc.',
-          icon: '🗣️',
-          color: '#db2777'
-        }
-      ];
-      
-      for (const subject of defaultSubjects) {
-        await createSubject(subject);
-      }
-    }
-  } catch (error) {
-    console.error('Error initializing subjects:', error);
-  }
+  return;
 };
