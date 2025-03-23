@@ -226,8 +226,19 @@ export const gradeQuiz = async (
     });
     
     // Ensure all user answers are in the correct format
+    // Replace null/undefined with empty strings for open-ended questions
+    // or 0 for multiple-choice questions
     const validatedAnswers = userAnswers.map((answer, index) => {
       const questionType = validatedQuestions[index]?.type;
+      
+      if (answer === null || answer === undefined) {
+        // Provide default values for null/undefined answers
+        if (questionType === 'multiple-choice' || questionType === 'true-false') {
+          return 0; // Default to first option for choice questions
+        } else {
+          return ''; // Empty string for open-ended
+        }
+      }
       
       // Convert to appropriate format based on question type
       if (questionType === 'multiple-choice' || questionType === 'true-false') {
@@ -238,6 +249,9 @@ export const gradeQuiz = async (
         return String(answer || '');
       }
     });
+    
+    console.log('Validated questions:', validatedQuestions);
+    console.log('Validated answers:', validatedAnswers);
     
     // Call the edge function for quiz grading
     const { data, error } = await supabase.functions.invoke('grade-quiz', {
@@ -272,7 +286,7 @@ export const gradeQuiz = async (
         // Pad with dummy results if we have too few
         const padding = Array(questions.length - data.risultati.length).fill(0).map((_, i) => ({
           domanda: questions[data.risultati.length + i].question,
-          risposta_utente: String(userAnswers[data.risultati.length + i]),
+          risposta_utente: String(userAnswers[data.risultati.length + i] || ''),
           corretto: false,
           punteggio: 0,
           spiegazione: 'Answer could not be evaluated'

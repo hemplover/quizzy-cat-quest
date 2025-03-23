@@ -55,34 +55,40 @@ serve(async (req) => {
     }
     
     console.log(`Grading quiz with provider: ${provider}`);
-    console.log('Questions received:', JSON.stringify(questions).substring(0, 200) + '...');
-    console.log('User answers received:', JSON.stringify(userAnswers).substring(0, 200) + '...');
+    console.log('Questions count:', questions.length);
+    console.log('User answers count:', userAnswers.length);
     
     // Ensure userAnswers has the same length as questions
-    if (userAnswers.length !== questions.length) {
-      console.warn(`Answer count mismatch: ${userAnswers.length} answers for ${questions.length} questions`);
+    let processedUserAnswers = [...userAnswers];
+    if (processedUserAnswers.length !== questions.length) {
+      console.warn(`Answer count mismatch: ${processedUserAnswers.length} answers for ${questions.length} questions`);
       
       // Pad with empty answers if needed
-      while (userAnswers.length < questions.length) {
-        userAnswers.push('');
+      while (processedUserAnswers.length < questions.length) {
+        processedUserAnswers.push('');
       }
       
       // Truncate if too many answers
-      if (userAnswers.length > questions.length) {
-        userAnswers = userAnswers.slice(0, questions.length);
+      if (processedUserAnswers.length > questions.length) {
+        processedUserAnswers = processedUserAnswers.slice(0, questions.length);
       }
     }
+    
+    // Check for null or undefined values in answers and convert them to empty strings
+    processedUserAnswers = processedUserAnswers.map(answer => 
+      answer === null || answer === undefined ? '' : answer
+    );
     
     let result = null;
     
     try {
       switch (provider) {
         case 'openai':
-          result = await gradeWithOpenAI(questions, userAnswers);
+          result = await gradeWithOpenAI(questions, processedUserAnswers);
           break;
         case 'gemini':
           // Always use backend key for Gemini
-          result = await gradeWithGemini(questions, userAnswers);
+          result = await gradeWithGemini(questions, processedUserAnswers);
           break;
         case 'claude':
         case 'mistral':
@@ -98,10 +104,23 @@ serve(async (req) => {
       }
     } catch (gradingError) {
       console.error(`Error grading with ${provider}:`, gradingError);
-      return new Response(
-        JSON.stringify({ error: `Error grading with ${provider}: ${gradingError.message}` }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      
+      // Create a fallback response for grading failures
+      result = {
+        risultati: questions.map((q, i) => ({
+          domanda: q.question || 'Unknown question',
+          risposta_utente: String(processedUserAnswers[i] || ''),
+          corretto: false,
+          punteggio: 0,
+          spiegazione: `Error grading this answer: ${gradingError.message}`
+        })),
+        punteggio_totale: 0,
+        total_points: 0,
+        max_points: questions.length,
+        feedback_generale: 'There was an error grading your quiz. Some questions may not have been properly evaluated.'
+      };
+      
+      console.log('Using fallback grading result due to error');
     }
     
     // Check if we got a valid result
@@ -115,20 +134,24 @@ serve(async (req) => {
     
     // Validate the quiz results
     if (!result.risultati || !Array.isArray(result.risultati)) {
-      console.error('Invalid quiz results format returned by AI:', JSON.stringify(result).substring(0, 200));
+      console.error('Invalid quiz results format returned by AI:', result);
       
       // Create a fallback response if needed
       result = {
         risultati: questions.map((q, i) => ({
-          domanda: q.question,
-          risposta_utente: String(userAnswers[i]),
+          domanda: q.question || 'Unknown question',
+          risposta_utente: String(processedUserAnswers[i] || ''),
           corretto: false,
           punteggio: 0,
           spiegazione: 'Error: Could not evaluate this answer'
         })),
         punteggio_totale: 0,
+        total_points: 0,
+        max_points: questions.length,
         feedback_generale: 'There was an error grading your quiz. Please try again.'
       };
+      
+      console.log('Using fallback grading result due to invalid format');
     }
     
     // Make sure we have the same number of results as questions
@@ -139,8 +162,8 @@ serve(async (req) => {
       if (result.risultati.length < questions.length) {
         // Pad with dummy results if we have too few
         const padding = Array(questions.length - result.risultati.length).fill(0).map((_, i) => ({
-          domanda: questions[result.risultati.length + i].question,
-          risposta_utente: String(userAnswers[result.risultati.length + i]),
+          domanda: questions[result.risultati.length + i].question || 'Unknown question',
+          risposta_utente: String(processedUserAnswers[result.risultati.length + i] || ''),
           corretto: false,
           punteggio: 0,
           spiegazione: 'Answer could not be evaluated'
@@ -380,6 +403,9 @@ ${formattedQuestions}`;
     const modelName = 'gemini-2.0-flash';
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
 
+    console.log(`Making request to Gemini API with model: ${modelName}`);
+    console.log(`API URL: ${apiUrl}`);
+
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -404,9 +430,16 @@ ${formattedQuestions}`;
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Gemini API Error details:', errorData);
-      throw new Error(`Gemini API Error: ${errorData.error?.message || JSON.stringify(errorData)}`);
+      const errorText = await response.text();
+      console.error('Gemini API Error - Status:', response.status);
+      console.error('Error Response:', errorText);
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        throw new Error(`Gemini API Error: ${errorData.error?.message || JSON.stringify(errorData)}`);
+      } catch (parseError) {
+        throw new Error(`Gemini API Error: Status ${response.status} - ${errorText.substring(0, 200)}...`);
+      }
     }
 
     const data = await response.json();
@@ -439,7 +472,12 @@ ${formattedQuestions}`;
       
       if (jsonMatch) {
         const extractedJson = jsonMatch[1] || jsonMatch[0];
-        return JSON.parse(extractedJson);
+        try {
+          return JSON.parse(extractedJson);
+        } catch (parseError) {
+          console.error('Error parsing extracted JSON:', parseError);
+          throw new Error('Failed to parse extracted JSON from Gemini response');
+        }
       }
       
       throw new Error('Failed to parse grading response from Gemini');
@@ -462,13 +500,17 @@ function formatQuestionsForGrading(questions, userAnswers) {
     if (q.type === 'multiple-choice') {
       questionText += `\nOptions: ${q.options.join(', ')}`;
       questionText += `\nCorrect answer: ${q.options[q.correctAnswer]}`;
-      questionText += `\nUser's answer: ${q.options[userAnswers[i]]}`;
+      const userAnswer = userAnswers[i] !== null && userAnswers[i] !== undefined && q.options[userAnswers[i]] 
+        ? q.options[userAnswers[i]] 
+        : 'No answer provided';
+      questionText += `\nUser's answer: ${userAnswer}`;
     } else if (q.type === 'true-false') {
       questionText += `\nCorrect answer: ${q.correctAnswer === 0 ? 'True' : 'False'}`;
-      questionText += `\nUser's answer: ${userAnswers[i] === 0 ? 'True' : 'False'}`;
+      const userAnswer = userAnswers[i] === 0 ? 'True' : userAnswers[i] === 1 ? 'False' : 'No answer provided';
+      questionText += `\nUser's answer: ${userAnswer}`;
     } else {
       questionText += `\nExpected answer: ${q.correctAnswer}`;
-      questionText += `\nUser's answer: ${userAnswers[i]}`;
+      questionText += `\nUser's answer: ${userAnswers[i] || 'No answer provided'}`;
     }
     
     return questionText;
