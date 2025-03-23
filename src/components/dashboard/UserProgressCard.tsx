@@ -30,13 +30,19 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
   
   // Calculate the average score for all subjects with completed quizzes
   const calculateOverallAverageScore = () => {
+    // Filter subjects that have quizzes with results
     const subjectsWithScores = subjects.filter(s => s.completedQuizCount > 0);
     
     if (subjectsWithScores.length === 0) {
       return '-';
     }
     
-    const totalScore = subjectsWithScores.reduce((sum, subject) => sum + subject.averageScore, 0);
+    // Calculate the total score across all subjects
+    const totalScore = subjectsWithScores.reduce((sum, subject) => {
+      return sum + (subject.averageScore || 0);
+    }, 0);
+    
+    // Return the average as a rounded percentage
     return Math.round(totalScore / subjectsWithScores.length);
   };
 
@@ -77,7 +83,7 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
             <span className="text-sm font-medium">{t('quizzes')}</span>
           </div>
           <p className="text-2xl font-bold">
-            {subjects.reduce((total, subject) => total + subject.quizCount, 0)}
+            {subjects.reduce((total, subject) => total + (subject.quizCount || 0), 0)}
           </p>
         </div>
         
@@ -87,7 +93,8 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
             <span className="text-sm font-medium">{t('averageScore')}</span>
           </div>
           <p className="text-2xl font-bold">
-            {calculateOverallAverageScore()}%
+            {calculateOverallAverageScore()}
+            {calculateOverallAverageScore() !== '-' ? '%' : ''}
           </p>
         </div>
       </div>

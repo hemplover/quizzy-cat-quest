@@ -17,6 +17,12 @@ import {
 import { toast } from 'sonner';
 import CatTutor from '@/components/CatTutor';
 import { cn } from '@/lib/utils';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent
+} from '@/components/ui/chart';
+import { BarChart as ReBarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 
 const SubjectDetail = () => {
   const { subjectId } = useParams();
@@ -80,6 +86,7 @@ const SubjectDetail = () => {
   const calculateSubjectScore = () => {
     if (!quizzes || quizzes.length === 0) return 0;
     
+    // Filter quizzes that have valid results and questions
     const quizzesWithResults = quizzes.filter(quiz => 
       quiz.results && 
       typeof quiz.results.punteggio_totale === 'number' && 
@@ -89,18 +96,51 @@ const SubjectDetail = () => {
     
     if (quizzesWithResults.length === 0) return 0;
     
-    let totalScore = 0;
-    let totalPossibleScore = 0;
+    // Calculate total score as a percentage
+    const totalScorePercentage = quizzesWithResults.reduce((sum, quiz) => {
+      const questionCount = quiz.questions.length;
+      const score = quiz.results.punteggio_totale;
+      const percentage = (score / questionCount) * 100;
+      return sum + percentage;
+    }, 0);
     
-    quizzesWithResults.forEach(quiz => {
-      totalScore += quiz.results.punteggio_totale;
-      totalPossibleScore += quiz.questions.length;
-    });
-    
-    return Math.round((totalScore / totalPossibleScore) * 100);
+    // Calculate the average percentage
+    return Math.round(totalScorePercentage / quizzesWithResults.length);
   };
   
   const subjectScore = calculateSubjectScore();
+  
+  // Prepare data for charts
+  const prepareQuizScoreData = () => {
+    return quizzes
+      .filter(quiz => quiz.results && quiz.questions && quiz.questions.length > 0)
+      .map(quiz => {
+        const score = Math.round((quiz.results.punteggio_totale / quiz.questions.length) * 100);
+        return {
+          name: quiz.title.length > 20 ? quiz.title.substring(0, 20) + '...' : quiz.title,
+          score: score,
+          fullTitle: quiz.title
+        };
+      });
+  };
+  
+  // Get all completed quizzes for analytics
+  const completedQuizzes = quizzes.filter(q => 
+    q.results && 
+    q.questions && 
+    q.questions.length > 0 && 
+    typeof q.results.punteggio_totale === 'number'
+  );
+  
+  // Get total questions answered across all quizzes
+  const totalQuestionsAnswered = completedQuizzes.reduce((sum, q) => sum + q.questions.length, 0);
+  
+  // Get best score from all quizzes
+  const bestScore = completedQuizzes.length > 0 
+    ? Math.max(...completedQuizzes.map(q => 
+        Math.round((q.results.punteggio_totale / q.questions.length) * 100)
+      ))
+    : 0;
   
   return (
     <div className="max-w-5xl mx-auto">
@@ -347,7 +387,7 @@ const SubjectDetail = () => {
             <div className="space-y-6">
               <h2 className="text-xl font-semibold">Performance Analytics</h2>
               
-              {quizzes.length === 0 ? (
+              {completedQuizzes.length === 0 ? (
                 <div className="text-center py-8 glass-card rounded-lg">
                   <BarChart className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                   <p className="text-muted-foreground">Complete some quizzes to see your analytics</p>
@@ -378,12 +418,14 @@ const SubjectDetail = () => {
                       <div>
                         <span className="text-sm font-medium">Quiz History</span>
                         <div className="mt-2 space-y-2">
-                          {quizzes.filter(q => q.results && q.questions && q.questions.length > 0).map((quiz) => {
+                          {completedQuizzes.map((quiz) => {
                             const score = Math.round((quiz.results.punteggio_totale / quiz.questions.length) * 100);
                             return (
                               <div key={quiz.id} className="flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-cat"></div>
-                                <div className="text-xs text-muted-foreground">{quiz.title}</div>
+                                <div className="text-xs text-muted-foreground truncate max-w-[120px]" title={quiz.title}>
+                                  {quiz.title}
+                                </div>
                                 <div className="flex-1 h-1.5 bg-gray-200 rounded-full">
                                   <div 
                                     className={cn(
@@ -401,37 +443,69 @@ const SubjectDetail = () => {
                         </div>
                       </div>
                     </div>
+                    
+                    {/* Score Chart */}
+                    {completedQuizzes.length >= 2 && (
+                      <div className="mt-6">
+                        <span className="text-sm font-medium">Score Comparison</span>
+                        <div className="h-60 mt-2">
+                          <ChartContainer config={{
+                            score: { 
+                              theme: { light: '#7C3AED', dark: '#8B5CF6' },
+                              label: 'Score'
+                            }
+                          }}>
+                            <ReBarChart data={prepareQuizScoreData()}>
+                              <XAxis 
+                                dataKey="name" 
+                                fontSize={12}
+                                tickLine={false}
+                                axisLine={false}
+                              />
+                              <YAxis 
+                                domain={[0, 100]}
+                                tickCount={6}
+                                fontSize={12}
+                                tickLine={false}
+                                axisLine={false}
+                              />
+                              <Bar dataKey="score" radius={[4, 4, 0, 0]} fill="var(--color-score)" />
+                              <ChartTooltip
+                                content={
+                                  <ChartTooltipContent
+                                    labelKey="fullTitle"
+                                  />
+                                }
+                              />
+                            </ReBarChart>
+                          </ChartContainer>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   
-                  {quizzes.filter(q => q.results && q.questions && q.questions.length > 0).length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="glass-card p-4 rounded-lg">
-                        <h3 className="text-sm font-medium mb-2">Quizzes Completed</h3>
-                        <p className="text-2xl font-bold text-cat">
-                          {quizzes.filter(q => q.results && q.questions && q.questions.length > 0).length}
-                        </p>
-                      </div>
-                      
-                      <div className="glass-card p-4 rounded-lg">
-                        <h3 className="text-sm font-medium mb-2">Questions Answered</h3>
-                        <p className="text-2xl font-bold text-purple-600">
-                          {quizzes.filter(q => q.results && q.questions && q.questions.length > 0)
-                            .reduce((sum, q) => sum + q.questions.length, 0)}
-                        </p>
-                      </div>
-                      
-                      <div className="glass-card p-4 rounded-lg">
-                        <h3 className="text-sm font-medium mb-2">Best Score</h3>
-                        <p className="text-2xl font-bold text-green-600">
-                          {quizzes.filter(q => q.results && q.questions && q.questions.length > 0).length > 0 ? 
-                            Math.max(...quizzes
-                              .filter(q => q.results && q.questions && q.questions.length > 0)
-                              .map(q => Math.round((q.results.punteggio_totale / q.questions.length) * 100))
-                            ) : 0}%
-                        </p>
-                      </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="glass-card p-4 rounded-lg">
+                      <h3 className="text-sm font-medium mb-2">Quizzes Completed</h3>
+                      <p className="text-2xl font-bold text-cat">
+                        {completedQuizzes.length}
+                      </p>
                     </div>
-                  )}
+                    
+                    <div className="glass-card p-4 rounded-lg">
+                      <h3 className="text-sm font-medium mb-2">Questions Answered</h3>
+                      <p className="text-2xl font-bold text-purple-600">
+                        {totalQuestionsAnswered}
+                      </p>
+                    </div>
+                    
+                    <div className="glass-card p-4 rounded-lg">
+                      <h3 className="text-sm font-medium mb-2">Best Score</h3>
+                      <p className="text-2xl font-bold text-green-600">
+                        {bestScore}%
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

@@ -1,23 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  BarChart3, 
-  Upload, 
-  Clock, 
-  Award, 
-  BookOpen,
-  CheckCircle2,
-  TrendingUp,
-  AlertCircle,
-  FileText,
-  PlusCircle,
-  FolderPlus
-} from 'lucide-react';
-import { useLanguage } from '@/i18n/LanguageContext';
-import CreateSubjectModal from '@/components/CreateSubjectModal';
 import { getSubjects, getQuizzesBySubjectId, getSubjectById } from '@/services/subjectService';
 import { getLevelInfo } from '@/services/experienceService';
+import { useLanguage } from '@/i18n/LanguageContext';
+import CreateSubjectModal from '@/components/CreateSubjectModal';
 import UserProgressCard from '@/components/dashboard/UserProgressCard';
 import QuickActionsCard from '@/components/dashboard/QuickActionsCard';
 import SubjectsSection from '@/components/dashboard/SubjectsSection';
@@ -70,14 +57,14 @@ const Dashboard = () => {
         
         // Calculate total and average score
         let totalScore = 0;
-        let totalPossibleScore = 0;
+        let totalQuestions = 0;
         let quizzesWithResults = 0;
         
         quizzes.forEach(quiz => {
           if (quiz.results && quiz.questions && quiz.questions.length > 0) {
             if (typeof quiz.results.punteggio_totale === 'number') {
               totalScore += quiz.results.punteggio_totale;
-              totalPossibleScore += quiz.questions.length;
+              totalQuestions += quiz.questions.length;
               quizzesWithResults++;
               console.log(`Quiz ${quiz.id} score: ${(quiz.results.punteggio_totale / quiz.questions.length) * 100}%`);
             }
@@ -85,7 +72,7 @@ const Dashboard = () => {
         });
         
         const averageScore = quizzesWithResults > 0 ? 
-          Math.round((totalScore / totalPossibleScore) * 100) : 0;
+          Math.round((totalScore / totalQuestions) * 100) : 0;
         
         return {
           ...subject,
