@@ -138,7 +138,7 @@ const Upload = () => {
     console.log("Starting file upload process for:", file.name, "type:", file.type);
     setSelectedFile(file);
     setDocumentName(file.name);
-    setCatMessage(`I'll analyze this ${file.type.split('/')[1]} file and create a quiz based on its content.`);
+    setCatMessage(`I'll analyze this ${file.type.split('/')[1] || 'document'} file and create a quiz based on its content.`);
     setIsProcessing(true);
     
     try {
