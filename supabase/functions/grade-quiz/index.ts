@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -69,11 +70,43 @@ serve(async (req) => {
         // Truncate if we have too many
         result.risultati = result.risultati.slice(0, questions.length);
       }
-      
-      // Recalculate total score
-      const totalScore = result.risultati.reduce((sum, r) => sum + (r.punteggio || 0), 0) / questions.length;
-      result.punteggio_totale = totalScore;
     }
+    
+    // Calculate total weighted score based on question types
+    // Open-ended worth 5 points, others worth 1 point
+    let totalPoints = 0;
+    let maxPoints = 0;
+    
+    result.risultati.forEach((r, i) => {
+      const questionType = questions[i].type;
+      const pointValue = questionType === 'open-ended' ? 5 : 1;
+      
+      maxPoints += pointValue;
+      
+      // For open-ended questions, score can be 0-5
+      // For other questions, score is 0 or 1
+      if (questionType === 'open-ended') {
+        // Normalize AI score to 0-5 range
+        // The score coming from AI is usually 0-1, multiply by 5
+        r.punteggio = Math.min(5, Math.max(0, Math.round(r.punteggio * 5)));
+        totalPoints += r.punteggio;
+      } else {
+        // For multiple-choice and true-false, either 0 or 1
+        r.punteggio = r.corretto ? 1 : 0;
+        totalPoints += r.punteggio;
+      }
+      
+      // Log the scoring for debugging
+      console.log(`Question ${i+1} (${questionType}): ${r.punteggio}/${pointValue} points`);
+    });
+    
+    // Calculate weighted total score as a ratio (0-1)
+    const weightedScore = maxPoints > 0 ? totalPoints / maxPoints : 0;
+    result.punteggio_totale = weightedScore;
+    result.max_points = maxPoints;
+    result.total_points = totalPoints;
+    
+    console.log(`Total score: ${totalPoints}/${maxPoints} (${weightedScore.toFixed(2)})`);
     
     return new Response(
       JSON.stringify(result),
@@ -100,14 +133,26 @@ async function gradeWithOpenAI(questions: any[], userAnswers: any[]) {
   // Format questions and answers for grading
   const formattedQuestions = formatQuestionsForGrading(questions, userAnswers);
   
-  const prompt = `You are a university professor grading an exam. Provide detailed feedback and score for each answer. Return your grading as JSON with the following format:
+  const prompt = `You are a university professor grading an exam. 
+
+DIFFERENT QUESTION TYPES HAVE DIFFERENT POINT VALUES:
+- True/False questions: Worth 1 point maximum (0 = incorrect, 1 = correct)
+- Multiple-choice questions: Worth 1 point maximum (0 = incorrect, 1 = correct)
+- Open-ended questions: Worth 5 points maximum (grade on a scale from 0-5 where 5 is perfect)
+
+For open-ended questions, you MUST:
+1. Grade on a scale from 0 to 5 points
+2. Provide detailed feedback explaining why you assigned that score
+3. Be fair but rigorous - a score of 5/5 should only be for truly excellent, comprehensive answers
+
+Return your grading as JSON with the following format:
 {
   "risultati": [
-    {"domanda": "Question text", "risposta_utente": "User's answer", "corretto": true/false, "punteggio": score (0 to 1), "spiegazione": "Explanation"}, 
+    {"domanda": "Question text", "risposta_utente": "User's answer", "corretto": true/false, "punteggio": score (based on question type), "spiegazione": "Detailed explanation of the score"}, 
     ...
   ],
   "punteggio_totale": total_score (0 to 1),
-  "feedback_generale": "General feedback"
+  "feedback_generale": "General feedback on overall performance"
 }
 
 Here are the questions and answers to grade:
@@ -179,14 +224,26 @@ async function gradeWithGemini(questions: any[], userAnswers: any[]) {
   // Format questions and answers for grading
   const formattedQuestions = formatQuestionsForGrading(questions, userAnswers);
   
-  const prompt = `You are a university professor grading an exam. Provide detailed feedback and score for each answer. Return your grading as JSON with the following format:
+  const prompt = `You are a university professor grading an exam. 
+
+DIFFERENT QUESTION TYPES HAVE DIFFERENT POINT VALUES:
+- True/False questions: Worth 1 point maximum (0 = incorrect, 1 = correct)
+- Multiple-choice questions: Worth 1 point maximum (0 = incorrect, 1 = correct)
+- Open-ended questions: Worth 5 points maximum (grade on a scale from 0-5 where 5 is perfect)
+
+For open-ended questions, you MUST:
+1. Grade on a scale from 0 to 5 points
+2. Provide detailed feedback explaining why you assigned that score
+3. Be fair but rigorous - a score of 5/5 should only be for truly excellent, comprehensive answers
+
+Return your grading as JSON with the following format:
 {
   "risultati": [
-    {"domanda": "Question text", "risposta_utente": "User's answer", "corretto": true/false, "punteggio": score (0 to 1), "spiegazione": "Explanation"}, 
+    {"domanda": "Question text", "risposta_utente": "User's answer", "corretto": true/false, "punteggio": score (based on question type), "spiegazione": "Detailed explanation of the score"}, 
     ...
   ],
   "punteggio_totale": total_score (0 to 1),
-  "feedback_generale": "General feedback"
+  "feedback_generale": "General feedback on overall performance"
 }
 
 Here are the questions and answers to grade:
@@ -266,6 +323,10 @@ ${formattedQuestions}`;
 function formatQuestionsForGrading(questions: any[], userAnswers: any[]): string {
   return questions.map((q, i) => {
     let questionText = `Question ${i + 1}: ${q.question}`;
+    
+    // Add question type 
+    questionText += `\nQuestion Type: ${q.type}`;
+    questionText += q.type === 'open-ended' ? ' (worth 5 points)' : ' (worth 1 point)';
     
     if (q.type === 'multiple-choice') {
       questionText += `\nOptions: ${q.options.join(', ')}`;

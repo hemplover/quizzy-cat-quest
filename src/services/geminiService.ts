@@ -1,4 +1,3 @@
-
 import { getApiKey, isBackendOnlyProvider } from './aiProviderService';
 import { GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
 import { toast } from 'sonner';
@@ -214,6 +213,10 @@ export const gradeQuizWithGemini = async (
     const formattedQuestions = questions.map((q, i) => {
       let questionText = `Question ${i + 1}: ${q.question}`;
       
+      // Add question type 
+      questionText += `\nQuestion Type: ${q.type}`;
+      questionText += q.type === 'open-ended' ? ' (worth 5 points)' : ' (worth 1 point)';
+      
       if (q.type === 'multiple-choice') {
         questionText += `\nOptions: ${q.options.join(', ')}`;
         questionText += `\nCorrect answer: ${q.options[q.correctAnswer]}`;
@@ -229,14 +232,26 @@ export const gradeQuizWithGemini = async (
       return questionText;
     }).join('\n\n');
     
-    const prompt = `You are a university professor grading an exam. Provide detailed feedback and score for each answer. Return your grading as JSON with the following format:
+    const prompt = `You are a university professor grading an exam. 
+
+DIFFERENT QUESTION TYPES HAVE DIFFERENT POINT VALUES:
+- True/False questions: Worth 1 point maximum (0 = incorrect, 1 = correct)
+- Multiple-choice questions: Worth 1 point maximum (0 = incorrect, 1 = correct)
+- Open-ended questions: Worth 5 points maximum (grade on a scale from 0-5 where 5 is perfect)
+
+For open-ended questions, you MUST:
+1. Grade on a scale from 0 to 5 points
+2. Provide detailed feedback explaining why you assigned that score
+3. Be fair but rigorous - a score of 5/5 should only be for truly excellent, comprehensive answers
+
+Return your grading as JSON with the following format:
 {
   "risultati": [
-    {"domanda": "Question text", "risposta_utente": "User's answer", "corretto": true/false, "punteggio": score (0 to 1), "spiegazione": "Explanation"}, 
+    {"domanda": "Question text", "risposta_utente": "User's answer", "corretto": true/false, "punteggio": score (based on question type), "spiegazione": "Detailed explanation of the score"}, 
     ...
   ],
   "punteggio_totale": total_score (0 to 1),
-  "feedback_generale": "General feedback"
+  "feedback_generale": "General feedback on overall performance"
 }
 
 Here are the questions and answers to grade:

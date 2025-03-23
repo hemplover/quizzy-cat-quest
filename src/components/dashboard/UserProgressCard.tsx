@@ -41,32 +41,38 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
       return '-';
     }
     
-    // Total correct answers and total questions across all subjects
-    let totalCorrectAnswers = 0;
-    let totalQuestions = 0;
+    // Total points earned and total maximum points across all subjects
+    let totalPointsEarned = 0;
+    let totalMaxPoints = 0;
     
     subjectsWithScores.forEach(subject => {
-      console.log(`Subject ${subject.name} - averageScore: ${subject.averageScore}, totalQuestions: ${subject.totalQuestions || 0}`);
+      console.log(`Subject ${subject.name}:`, subject);
       
-      // We need to get the raw number of correct answers by reversing the percentage calculation
-      const subjectCorrectAnswers = subject.totalQuestions ? (subject.averageScore / 100) * subject.totalQuestions : 0;
-      
-      totalCorrectAnswers += subjectCorrectAnswers;
-      totalQuestions += subject.totalQuestions || 0;
-      
-      console.log(`Added ${subjectCorrectAnswers.toFixed(2)} correct answers and ${subject.totalQuestions || 0} questions`);
+      if (subject.totalPoints !== undefined && subject.maxPoints !== undefined) {
+        // If we have the new weighted point system
+        totalPointsEarned += subject.totalPoints;
+        totalMaxPoints += subject.maxPoints;
+        console.log(`Added ${subject.totalPoints} points earned out of ${subject.maxPoints} maximum points`);
+      } else if (subject.averageScore !== undefined && subject.totalQuestions !== undefined) {
+        // Legacy calculation (pre-weighted scoring)
+        // Convert percentage to points (assuming 1 point per question)
+        const subjectPointsEarned = (subject.averageScore / 100) * subject.totalQuestions;
+        totalPointsEarned += subjectPointsEarned;
+        totalMaxPoints += subject.totalQuestions;
+        console.log(`Legacy calculation: Added ${subjectPointsEarned.toFixed(2)} points earned out of ${subject.totalQuestions} maximum points`);
+      }
     });
     
-    console.log(`Final totals: ${totalCorrectAnswers.toFixed(2)} correct answers out of ${totalQuestions} questions`);
+    console.log(`Final totals: ${totalPointsEarned.toFixed(2)} points earned out of ${totalMaxPoints} maximum points`);
     
     // If no questions were answered, return '-'
-    if (totalQuestions === 0) {
-      console.log('No questions found in any subject');
+    if (totalMaxPoints === 0) {
+      console.log('No points found in any subject');
       return '-';
     }
     
     // Calculate and return the overall average as a percentage
-    const overallPercentage = Math.round((totalCorrectAnswers / totalQuestions) * 100);
+    const overallPercentage = Math.round((totalPointsEarned / totalMaxPoints) * 100);
     console.log(`Overall percentage: ${overallPercentage}%`);
     return overallPercentage;
   };

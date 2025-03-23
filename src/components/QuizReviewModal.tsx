@@ -34,6 +34,15 @@ const QuizReviewModal: React.FC<QuizReviewModalProps> = ({
   const scorePercentage = quiz.results?.punteggio_totale 
     ? Math.round(quiz.results.punteggio_totale * 100) 
     : null;
+    
+  // Get points data if available
+  const totalPoints = quiz.results?.total_points;
+  const maxPoints = quiz.results?.max_points;
+  
+  // Helper to get point value based on question type
+  const getQuestionPointValue = (type: string) => {
+    return type === 'open-ended' ? 5 : 1;
+  };
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -45,6 +54,11 @@ const QuizReviewModal: React.FC<QuizReviewModalProps> = ({
               <div className="mt-2">
                 <div className="text-lg font-bold">
                   {scorePercentage}% {t('score')}
+                  {totalPoints !== undefined && maxPoints !== undefined && (
+                    <span className="ml-2 text-sm font-normal">
+                      ({totalPoints}/{maxPoints} points)
+                    </span>
+                  )}
                 </div>
                 <div className="text-sm text-muted-foreground">
                   {quiz.results.feedback_generale}
@@ -59,6 +73,8 @@ const QuizReviewModal: React.FC<QuizReviewModalProps> = ({
             const result = quiz.results?.risultati?.[index];
             const isCorrect = result?.corretto === true;
             const isIncorrect = result?.corretto === false;
+            const pointValue = getQuestionPointValue(question.type);
+            const score = result?.punteggio || 0;
             
             return (
               <div 
@@ -77,8 +93,11 @@ const QuizReviewModal: React.FC<QuizReviewModalProps> = ({
                   ) : null}
                   
                   <div className="flex-1">
-                    <h3 className="font-medium">
-                      {index + 1}. {question.question}
+                    <h3 className="font-medium flex items-center gap-2">
+                      <span>{index + 1}. {question.question}</span>
+                      <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                        {question.type === 'open-ended' ? '5 points' : '1 point'}
+                      </span>
                     </h3>
                     
                     {question.type === 'multiple-choice' && (
@@ -144,6 +163,14 @@ const QuizReviewModal: React.FC<QuizReviewModalProps> = ({
                           <div className="text-sm font-medium">{t('correctAnswer')}</div>
                           <div className="p-2 border rounded bg-green-50">
                             {question.correctAnswer}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium flex items-center justify-between">
+                            <span>{t('score')}</span>
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                              {score}/{pointValue} points
+                            </span>
                           </div>
                         </div>
                       </div>

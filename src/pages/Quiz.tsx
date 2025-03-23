@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -16,7 +15,6 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { gradeQuiz } from '@/services/openaiService';
 
-// Fix: Type definitions for quiz questions
 interface BaseQuestion {
   id: number;
   type: string;
@@ -44,7 +42,6 @@ interface UserAnswer {
   isCorrect?: boolean;
 }
 
-// Cat reaction messages based on performance
 const catMessages = {
   correct: [
     "Purr-fect! You're getting this!",
@@ -72,7 +69,6 @@ const catMessages = {
   ]
 };
 
-// Mock questions as fallback
 const mockQuestions: Question[] = [
   {
     id: 1,
@@ -147,7 +143,6 @@ const Quiz = () => {
   const [isGrading, setIsGrading] = useState(false);
   const [aiGradingResults, setAiGradingResults] = useState<any>(null);
   
-  // Fetch quiz questions based on session storage data
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
@@ -160,13 +155,11 @@ const Quiz = () => {
           return;
         }
         
-        // Try to get generated questions first
         const storedQuestionsStr = sessionStorage.getItem('quizQuestions');
         if (storedQuestionsStr) {
           const parsedQuestions = JSON.parse(storedQuestionsStr);
           setQuestions(parsedQuestions);
         } else {
-          // Fallback to mock questions
           setQuestions(mockQuestions);
         }
         
@@ -184,7 +177,6 @@ const Quiz = () => {
   const currentQuestion = questions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === questions.length - 1;
   
-  // Timer effect
   useEffect(() => {
     if (!quizCompleted && !isLoading && questions.length > 0) {
       const timer = setInterval(() => {
@@ -195,14 +187,12 @@ const Quiz = () => {
     }
   }, [quizCompleted, isLoading, questions]);
   
-  // Format time as mm:ss
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
   
-  // Update cat message when question changes
   useEffect(() => {
     if (!isAnswerSubmitted && !isLoading && questions.length > 0) {
       const randomIndex = Math.floor(Math.random() * catMessages.encouragement.length);
@@ -229,18 +219,14 @@ const Quiz = () => {
         return;
       }
       
-      // For open-ended questions, we'll evaluate later with OpenAI
-      // For now, mark as potentially correct
       const isCorrectAnswer = true;
       setIsCorrect(isCorrectAnswer);
       
-      // Save user's answer for later review
       setUserAnswers([...userAnswers, {
         questionId: currentQuestion.id,
         userAnswer: openEndedAnswer
       }]);
     } else {
-      // For multiple choice and true/false
       if (selectedOption === null) {
         toast.error("Please select an answer");
         return;
@@ -250,7 +236,6 @@ const Quiz = () => {
       setIsCorrect(isCorrectAnswer);
       if (isCorrectAnswer) setScore(prev => prev + 1);
       
-      // Save user's answer for later review
       setUserAnswers([...userAnswers, {
         questionId: currentQuestion.id,
         userAnswer: selectedOption,
@@ -260,7 +245,6 @@ const Quiz = () => {
     
     setIsAnswerSubmitted(true);
     
-    // Set cat message based on correctness
     const messageType = isCorrect ? 'correct' : 'incorrect';
     const randomIndex = Math.floor(Math.random() * catMessages[messageType].length);
     setCatMessage(catMessages[messageType][randomIndex]);
@@ -281,7 +265,6 @@ const Quiz = () => {
   };
 
   const handleQuizCompletion = async () => {
-    // Grade the quiz with OpenAI
     setIsGrading(true);
     const randomIndex = Math.floor(Math.random() * catMessages.completion.length);
     setCatMessage(`${catMessages.completion[randomIndex]} I'm grading your answers now...`);
@@ -290,9 +273,33 @@ const Quiz = () => {
       const results = await gradeQuiz(questions, userAnswers);
       if (results) {
         setAiGradingResults(results);
-        // Update score based on AI grading
-        const totalScore = results.risultati.reduce((sum, item) => sum + item.punteggio, 0);
-        setScore(Math.round(totalScore));
+        
+        let totalPoints = 0;
+        let maxPoints = 0;
+        
+        if (results.total_points !== undefined && results.max_points !== undefined) {
+          totalPoints = results.total_points;
+          maxPoints = results.max_points;
+          console.log(`Using pre-calculated scores: ${totalPoints}/${maxPoints}`);
+        } else {
+          results.risultati.forEach((result, index) => {
+            const question = questions[index];
+            const pointValue = question.type === 'open-ended' ? 5 : 1;
+            
+            maxPoints += pointValue;
+            totalPoints += result.punteggio;
+            
+            console.log(`Question ${index+1} (${question.type}): ${result.punteggio}/${pointValue} points`);
+          });
+          console.log(`Calculated scores: ${totalPoints}/${maxPoints}`);
+        }
+        
+        results.total_points = totalPoints;
+        results.max_points = maxPoints;
+        
+        const percentageScore = Math.round((totalPoints / maxPoints) * 100);
+        setScore(percentageScore);
+        console.log(`Final percentage score: ${percentageScore}%`);
       }
     } catch (error) {
       console.error("Error grading quiz:", error);
@@ -314,21 +321,21 @@ const Quiz = () => {
   };
 
   const handleFinishQuiz = async () => {
-    // Save results to session storage for the dashboard
     const results = {
       score,
       totalQuestions: questions.length,
       timeSpent,
       completedAt: new Date().toISOString(),
-      aiGrading: aiGradingResults
+      aiGrading: aiGradingResults,
+      totalPoints: aiGradingResults?.total_points || 0,
+      maxPoints: aiGradingResults?.max_points || 0
     };
     
     const savedResults = JSON.parse(sessionStorage.getItem('quizResults') || '[]');
     sessionStorage.setItem('quizResults', JSON.stringify([...savedResults, results]));
     
-    // Add XP
     const currentXP = parseInt(localStorage.getItem('userXP') || '0');
-    const earnedXP = score * 10;
+    const earnedXP = Math.round((results.totalPoints / results.maxPoints) * (questions.length * 10));
     localStorage.setItem('userXP', (currentXP + earnedXP).toString());
     
     toast.success(`Quiz completed! You earned ${earnedXP} XP!`);
@@ -348,7 +355,6 @@ const Quiz = () => {
   }
 
   if (quizCompleted) {
-    // Quiz completion screen
     return (
       <div className="max-w-2xl mx-auto">
         <div className="glass-card p-8 rounded-xl mb-6 text-center">
@@ -396,7 +402,7 @@ const Quiz = () => {
               <div className="space-y-4 mb-8">
                 <div className="flex justify-center items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-green-500" />
-                  <span>Score: {score}/{questions.length}</span>
+                  <span>Score: {score}% ({aiGradingResults?.total_points || 0}/{aiGradingResults?.max_points || questions.length} points)</span>
                 </div>
                 <div className="flex justify-center items-center gap-2">
                   <Timer className="w-5 h-5 text-cat" />
@@ -486,7 +492,6 @@ const Quiz = () => {
 
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Quiz header */}
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold">Quiz in Progress</h1>
@@ -501,7 +506,6 @@ const Quiz = () => {
         </div>
       </div>
       
-      {/* Progress bar */}
       <div className="w-full h-2 bg-gray-200 rounded-full mb-8">
         <div 
           className="h-full bg-cat rounded-full transition-all duration-300"
@@ -509,12 +513,10 @@ const Quiz = () => {
         ></div>
       </div>
       
-      {/* Cat tutor */}
       <div className="mb-6">
         <CatTutor message={catMessage} emotion={isCorrect === true ? 'happy' : isCorrect === false ? 'confused' : 'thinking'} />
       </div>
       
-      {/* Question card */}
       <div className="glass-card p-6 rounded-xl mb-8 animate-fade-in">
         <h2 className="text-xl font-medium mb-6 flex items-start gap-2">
           <span className="mt-1 flex-shrink-0">
@@ -570,7 +572,6 @@ const Quiz = () => {
           </div>
         )}
         
-        {/* Explanation after answering */}
         {isAnswerSubmitted && currentQuestion.explanation && (
           <div className={cn(
             "mt-6 p-4 rounded-lg animate-fade-in",
@@ -594,7 +595,6 @@ const Quiz = () => {
         )}
       </div>
       
-      {/* Quiz controls */}
       <div className="flex justify-between">
         <button
           onClick={handlePrevQuestion}
