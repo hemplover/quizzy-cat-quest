@@ -511,5 +511,6 @@ export const deleteQuiz = async (id: string): Promise<boolean> => {
 
 // Initialize without any default subjects
 export const initializeSubjectsIfNeeded = async (): Promise<void> => {
+  // Do nothing - no default subjects
   return;
 };

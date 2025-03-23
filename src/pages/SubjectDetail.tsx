@@ -81,7 +81,7 @@ const SubjectDetail = () => {
     );
   }
   
-  // Calculate the average score for this subject - fixed calculation
+  // Calculate the average score for this subject - properly fixed calculation
   const calculateSubjectScore = () => {
     if (!quizzes || quizzes.length === 0) return 0;
     
@@ -95,16 +95,17 @@ const SubjectDetail = () => {
     
     if (quizzesWithResults.length === 0) return 0;
     
-    // Calculate total score as a percentage
-    const totalScorePercentage = quizzesWithResults.reduce((sum, quiz) => {
-      const questionCount = quiz.questions.length;
-      const score = quiz.results.punteggio_totale;
-      const percentage = (score / questionCount) * 100;
-      return sum + percentage;
-    }, 0);
+    // Calculate total correct answers and total questions
+    let totalCorrectAnswers = 0;
+    let totalQuestions = 0;
+    
+    quizzesWithResults.forEach(quiz => {
+      totalCorrectAnswers += quiz.results.punteggio_totale;
+      totalQuestions += quiz.questions.length;
+    });
     
     // Calculate the average percentage
-    return Math.round(totalScorePercentage / quizzesWithResults.length);
+    return Math.round((totalCorrectAnswers / totalQuestions) * 100);
   };
   
   const subjectScore = calculateSubjectScore();

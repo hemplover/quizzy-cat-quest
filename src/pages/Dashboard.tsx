@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSubjects, getQuizzesBySubjectId, getSubjectById } from '@/services/subjectService';
@@ -54,15 +55,15 @@ const Dashboard = () => {
         
         console.log(`Subject ${subject.name} has ${quizzes.length} quizzes`);
         
-        // Calculate total and average score
-        let totalScore = 0;
+        // Calculate scores properly
+        let totalCorrectAnswers = 0;
         let totalQuestions = 0;
         let quizzesWithResults = 0;
         
         quizzes.forEach(quiz => {
           if (quiz.results && quiz.questions && quiz.questions.length > 0) {
             if (typeof quiz.results.punteggio_totale === 'number') {
-              totalScore += quiz.results.punteggio_totale;
+              totalCorrectAnswers += quiz.results.punteggio_totale;
               totalQuestions += quiz.questions.length;
               quizzesWithResults++;
               console.log(`Quiz ${quiz.id} score: ${(quiz.results.punteggio_totale / quiz.questions.length) * 100}%`);
@@ -70,8 +71,9 @@ const Dashboard = () => {
           }
         });
         
-        const averageScore = quizzesWithResults > 0 ? 
-          Math.round((totalScore / totalQuestions) * 100) : 0;
+        // Calculate average score as a percentage
+        const averageScore = totalQuestions > 0 ? 
+          Math.round((totalCorrectAnswers / totalQuestions) * 100) : 0;
         
         return {
           ...subject,

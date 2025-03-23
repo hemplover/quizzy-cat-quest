@@ -30,20 +30,30 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
   
   // Calculate the average score for all subjects with completed quizzes
   const calculateOverallAverageScore = () => {
-    // Filter subjects that have quizzes with results
+    // Get all subjects with scores
     const subjectsWithScores = subjects.filter(s => s.completedQuizCount > 0);
     
     if (subjectsWithScores.length === 0) {
       return '-';
     }
     
-    // Calculate the total score across all subjects
-    const totalScore = subjectsWithScores.reduce((sum, subject) => {
-      return sum + (subject.averageScore || 0);
-    }, 0);
+    // Total correct answers and total questions across all subjects
+    let totalCorrectAnswers = 0;
+    let totalQuestions = 0;
     
-    // Return the average as a rounded percentage
-    return Math.round(totalScore / subjectsWithScores.length);
+    subjectsWithScores.forEach(subject => {
+      // Use the corrected averageScore which is already a percentage
+      totalCorrectAnswers += (subject.averageScore / 100) * subject.totalQuestions || 0;
+      totalQuestions += subject.totalQuestions || 0;
+    });
+    
+    // If no questions were answered, return '-'
+    if (totalQuestions === 0) {
+      return '-';
+    }
+    
+    // Calculate and return the overall average as a percentage
+    return Math.round((totalCorrectAnswers / totalQuestions) * 100);
   };
 
   return (
