@@ -27,6 +27,8 @@ export interface QuizResults {
   }>;
   punteggio_totale: number;
   feedback_generale?: string;
+  total_points?: number;   // Add this property
+  max_points?: number;     // Add this property
 }
 
 export interface QuizSettings {
@@ -34,7 +36,7 @@ export interface QuizSettings {
   questionTypes: string[];
   numQuestions: number;
   model?: string;
-  previousQuizzes?: number;  // Added this property to fix the TypeScript error
+  previousQuizzes?: number;
 }
 
 export interface ProcessedFile {
