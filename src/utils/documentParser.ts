@@ -148,10 +148,11 @@ async function extractTextFromPowerPoint(file: File): Promise<string> {
     // Instead, we'll use a basic approach to extract text from XML parts
     let textContent = '';
     
-    // Note: This is a simplified method and may not extract all text
-    // For a more robust solution, a specialized PPTX parsing library would be needed
-    const blob = new Blob([arrayBuffer]);
-    const zip = await (await import('jszip')).loadAsync(blob);
+    // Import jszip dynamically
+    const JSZip = await (await import('jszip')).default;
+    
+    // Load the file as a zip
+    const zip = await JSZip.loadAsync(arrayBuffer);
     
     // Try to extract text from slides
     const slideRegex = /ppt\/slides\/slide[0-9]+\.xml/;
