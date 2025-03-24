@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -14,7 +14,8 @@ import {
 import CatTutor from '@/components/CatTutor';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { gradeQuiz, saveQuizResults } from '@/services/quizService';
+import { gradeQuiz, saveQuizResults, getSelectedModel } from '@/services/quizService';
+import { useLanguage } from '@/i18n/LanguageContext';
 
 interface BaseQuestion {
   id: number;
@@ -69,65 +70,12 @@ const catMessages = {
   ]
 };
 
-const mockQuestions: Question[] = [
-  {
-    id: 1,
-    type: 'multiple-choice',
-    question: 'What is the primary function of mitochondria in a cell?',
-    options: [
-      'Protein synthesis',
-      'Energy production',
-      'Cell division',
-      'Waste removal'
-    ],
-    correctAnswer: 1,
-    explanation: 'Mitochondria are known as the "powerhouse of the cell" because they generate most of the cell\'s supply of ATP, used as a source of chemical energy.'
-  },
-  {
-    id: 2,
-    type: 'true-false',
-    question: 'The Great Wall of China is visible from space with the naked eye.',
-    options: ['True', 'False'],
-    correctAnswer: 1,
-    explanation: 'Contrary to popular belief, the Great Wall of China is not visible from space with the naked eye. It requires at least optical aids to be seen from low Earth orbit.'
-  },
-  {
-    id: 3,
-    type: 'multiple-choice',
-    question: 'Which of the following is NOT a primary color in the RGB color model?',
-    options: [
-      'Red',
-      'Green',
-      'Yellow',
-      'Blue'
-    ],
-    correctAnswer: 2,
-    explanation: 'In the RGB color model, the primary colors are Red, Green, and Blue. Yellow is a secondary color created by mixing red and green light.'
-  },
-  {
-    id: 4,
-    type: 'open-ended',
-    question: 'Explain the concept of supply and demand in economics.',
-    correctAnswer: 'Supply and demand is an economic model that explains how prices are determined in a market. When demand increases and supply remains unchanged, a shortage occurs, leading to a higher price. When supply increases and demand remains unchanged, a surplus occurs, leading to a lower price.',
-    explanation: 'Supply and demand is a fundamental concept in economics that helps explain price determination in markets.'
-  },
-  {
-    id: 5,
-    type: 'multiple-choice',
-    question: 'Which planet has the most moons in our solar system?',
-    options: [
-      'Jupiter',
-      'Saturn',
-      'Uranus',
-      'Neptune'
-    ],
-    correctAnswer: 1,
-    explanation: 'Saturn has the most confirmed moons, with 82 confirmed moons compared to Jupiter\'s 79 (as of recent data).'
-  }
-];
-
 const Quiz = () => {
+  const { t } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const quizId = searchParams.get('id');
+  
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -142,11 +90,47 @@ const Quiz = () => {
   const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
   const [isGrading, setIsGrading] = useState(false);
   const [aiGradingResults, setAiGradingResults] = useState<any>(null);
+  const [quizTitle, setQuizTitle] = useState('Quiz');
+  const [quizData, setQuizData] = useState<any>(null);
   
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
         setIsLoading(true);
+        
+        // First check if we have a quiz ID in the URL
+        if (quizId) {
+          // Try to fetch from Supabase
+          const { data, error } = await supabase.from('quizzes')
+            .select('*')
+            .eq('id', quizId)
+            .single();
+            
+          if (error) {
+            console.error('Error fetching quiz:', error);
+            throw new Error('Failed to fetch quiz. Please try again.');
+          }
+          
+          if (data) {
+            setQuizData(data);
+            setQuizTitle(data.title);
+            
+            if (Array.isArray(data.questions)) {
+              // Ensure all questions have an ID
+              const questionsWithIds = data.questions.map((q: any, index: number) => ({
+                ...q,
+                id: q.id || index + 1
+              }));
+              
+              setQuestions(questionsWithIds);
+              console.log("Loaded questions from database:", questionsWithIds);
+              setIsLoading(false);
+              return;
+            }
+          }
+        }
+        
+        // If no quiz ID or couldn't fetch from database, try session storage
         const quizDataStr = sessionStorage.getItem('quizData');
         
         if (!quizDataStr) {
@@ -155,34 +139,36 @@ const Quiz = () => {
           return;
         }
         
+        const parsedData = JSON.parse(quizDataStr);
+        setQuizData(parsedData);
+        setQuizTitle(parsedData.title || 'Quiz');
+        
         const storedQuestionsStr = sessionStorage.getItem('quizQuestions');
         if (storedQuestionsStr) {
           const parsedQuestions = JSON.parse(storedQuestionsStr);
           
           // Ensure all questions have an ID for tracking user answers
-          const questionsWithIds = parsedQuestions.map((q: any, index: number) => {
-            if (!q.id) {
-              return { ...q, id: index + 1 };
-            }
-            return q;
-          });
+          const questionsWithIds = parsedQuestions.map((q: any, index: number) => ({
+            ...q,
+            id: q.id || index + 1
+          }));
           
           setQuestions(questionsWithIds);
-          console.log("Loaded questions:", questionsWithIds);
+          console.log("Loaded questions from session storage:", questionsWithIds);
         } else {
-          setQuestions(mockQuestions);
+          throw new Error('No questions found for this quiz');
         }
         
         setIsLoading(false);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error loading quiz:", error);
-        toast.error("Failed to load quiz. Please try again.");
+        toast.error(error.message || "Failed to load quiz. Please try again.");
         navigate('/upload');
       }
     };
     
     fetchQuestions();
-  }, [navigate]);
+  }, [navigate, quizId]);
   
   const currentQuestion = questions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === questions.length - 1;
@@ -225,7 +211,7 @@ const Quiz = () => {
     
     if (currentQuestion.type === 'open-ended') {
       if (openEndedAnswer.trim().length < 10) {
-        toast.error("Please provide a more detailed answer");
+        toast.error(t('provideDetailedAnswer') || "Please provide a more detailed answer");
         return;
       }
       
@@ -242,7 +228,7 @@ const Quiz = () => {
       console.log(`Submitted open-ended answer for question ${currentQuestion.id}:`, openEndedAnswer);
     } else {
       if (selectedOption === null) {
-        toast.error("Please select an answer");
+        toast.error(t('pleaseSelectAnswer') || "Please select an answer");
         return;
       }
       
@@ -292,9 +278,6 @@ const Quiz = () => {
     setCatMessage(`${catMessages.completion[randomIndex]} I'm grading your answers now...`);
     
     try {
-      // Log all user answers to ensure they're in the correct format
-      console.log("Sending questions and answers for grading:", questions, userAnswers);
-      
       // Make sure we have an answer for every question
       const answersForAllQuestions = questions.map(question => {
         const existingAnswer = userAnswers.find(answer => answer.questionId === question.id);
@@ -308,25 +291,24 @@ const Quiz = () => {
         return { questionId: question.id, userAnswer: -1 };
       });
       
+      console.log("Sending questions and answers for grading:", questions, answersForAllQuestions);
       console.log("Prepared answers for grading:", answersForAllQuestions.map(a => a.userAnswer));
       
       // Send to API for grading
-      const results = await gradeQuiz(questions, answersForAllQuestions);
+      const results = await gradeQuiz(questions, answersForAllQuestions, getSelectedModel() as any);
       
       if (results) {
         console.log("Received grading results:", results);
         setAiGradingResults(results);
         
-        // Get the quiz ID from session storage if available
-        const quizDataStr = sessionStorage.getItem('quizData');
-        if (quizDataStr) {
-          const quizData = JSON.parse(quizDataStr);
-          if (quizData.quizId) {
-            // Save the results to the database
-            await saveQuizResults(quizData.quizId, results);
-          }
+        // Save results if we have a quiz ID
+        if (quizId) {
+          await saveQuizResults(quizId, results);
+        } else if (quizData && quizData.quizId) {
+          await saveQuizResults(quizData.quizId, results);
         }
         
+        // Calculate total score
         let totalPoints = 0;
         let maxPoints = 0;
         
@@ -356,7 +338,7 @@ const Quiz = () => {
       }
     } catch (error) {
       console.error("Error grading quiz:", error);
-      toast.error("Failed to grade quiz. Please try again.");
+      toast.error(t('failedToGradeQuiz') || "Failed to grade quiz. Please try again.");
     } finally {
       setIsGrading(false);
       const completionIndex = Math.floor(Math.random() * catMessages.completion.length);
@@ -391,16 +373,22 @@ const Quiz = () => {
     // Calculate and award XP
     const earnedXP = Math.round((results.totalPoints / results.maxPoints) * (questions.length * 10));
     
-    toast.success(`Quiz completed! You earned ${earnedXP} XP!`);
-    navigate('/dashboard');
+    toast.success(`${t('quizCompleted')}! ${t('youEarned')} ${earnedXP} XP!`);
+    
+    // Navigate to the subject detail page if we have subject ID
+    if (quizData && quizData.subjectId) {
+      navigate(`/subjects/${quizData.subjectId}`);
+    } else {
+      navigate('/dashboard');
+    }
   };
 
   if (isLoading) {
     return (
       <div className="max-w-2xl mx-auto text-center py-12">
         <div className="animate-pulse">
-          <h2 className="text-2xl font-bold mb-4">Loading your quiz...</h2>
-          <p className="text-muted-foreground mb-8">Preparing your personalized questions...</p>
+          <h2 className="text-2xl font-bold mb-4">{t('loadingQuiz')}...</h2>
+          <p className="text-muted-foreground mb-8">{t('preparingQuestions')}...</p>
           <div className="w-12 h-12 border-4 border-cat border-t-transparent rounded-full animate-spin mx-auto"></div>
         </div>
       </div>
@@ -411,13 +399,13 @@ const Quiz = () => {
     return (
       <div className="max-w-2xl mx-auto">
         <div className="glass-card p-8 rounded-xl mb-6 text-center">
-          <h1 className="text-3xl font-bold mb-4">Quiz Completed!</h1>
+          <h1 className="text-3xl font-bold mb-4">{t('quizCompleted')}!</h1>
           
           {isGrading ? (
             <div className="my-8 text-center">
               <div className="w-12 h-12 border-4 border-cat border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-lg">Analyzing your answers...</p>
-              <p className="text-muted-foreground">Our AI cat professor is grading your work</p>
+              <p className="text-lg">{t('analyzingAnswers')}...</p>
+              <p className="text-muted-foreground">{t('aiGradingMessage')}</p>
             </div>
           ) : (
             <>
@@ -455,18 +443,18 @@ const Quiz = () => {
               <div className="space-y-4 mb-8">
                 <div className="flex justify-center items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-green-500" />
-                  <span>Score: {score}% ({aiGradingResults?.total_points || 0}/{aiGradingResults?.max_points || questions.length} points)</span>
+                  <span>{t('score')}: {score}% ({aiGradingResults?.total_points || 0}/{aiGradingResults?.max_points || questions.length} {t('points')})</span>
                 </div>
                 <div className="flex justify-center items-center gap-2">
                   <Timer className="w-5 h-5 text-cat" />
-                  <span>Time Spent: {formatTime(timeSpent)}</span>
+                  <span>{t('timeSpent')}: {formatTime(timeSpent)}</span>
                 </div>
               </div>
             </>
           )}
           
           <div className="mb-8 relative">
-            <CatTutor message={catMessage} />
+            <CatTutor message={catMessage} emotion={isCorrect === true ? "happy" : isCorrect === false ? "sad" : isAnswerSubmitted ? "thinking" : "neutral"} />
           </div>
           
           <button
@@ -474,13 +462,13 @@ const Quiz = () => {
             className="cat-button mx-auto"
             disabled={isGrading}
           >
-            View Your Progress
+            {t('viewYourProgress')}
           </button>
         </div>
         
         {aiGradingResults && (
           <div className="glass-card p-6 rounded-xl mb-8">
-            <h2 className="text-xl font-bold mb-4">Detailed Feedback</h2>
+            <h2 className="text-xl font-bold mb-4">{t('detailedFeedback')}</h2>
             <div className="space-y-4">
               {aiGradingResults.risultati.map((result: any, index: number) => (
                 <div key={index} className={cn(
@@ -493,7 +481,7 @@ const Quiz = () => {
                 )}>
                   <p className="font-medium mb-1">{result.domanda}</p>
                   <p className="text-sm mb-2">
-                    <span className="font-medium">Your answer:</span> {result.risposta_utente}
+                    <span className="font-medium">{t('yourAnswer')}:</span> {result.risposta_utente}
                   </p>
                   <div className="flex items-start gap-2 text-sm">
                     {result.corretto === true || result.corretto === "Completamente" ? (
@@ -508,13 +496,13 @@ const Quiz = () => {
                     <div>
                       <p className="font-medium">
                         {result.corretto === true || result.corretto === "Completamente"
-                          ? "Correct"
+                          ? t('correct')
                           : result.corretto === "Parzialmente"
-                          ? "Partially Correct"
-                          : "Incorrect"}
+                          ? t('partiallyCorrect')
+                          : t('incorrect')}
                         {result.punteggio !== undefined && (
                           <span className="ml-1">
-                            ({result.punteggio} {result.punteggio === 1 ? "point" : "points"})
+                            ({result.punteggio} {result.punteggio === 1 ? t('point') : t('points')})
                           </span>
                         )}
                       </p>
@@ -527,7 +515,7 @@ const Quiz = () => {
             
             {aiGradingResults.feedback_generale && (
               <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-lg">
-                <h3 className="font-medium mb-2">Overall Feedback</h3>
+                <h3 className="font-medium mb-2">{t('overallFeedback')}</h3>
                 <p className="text-sm">{aiGradingResults.feedback_generale}</p>
               </div>
             )}
@@ -541,9 +529,9 @@ const Quiz = () => {
     <div className="max-w-2xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold mb-1">Quiz</h1>
+          <h1 className="text-3xl font-bold mb-1">{quizTitle}</h1>
           <div className="flex items-center text-muted-foreground">
-            <span>Question {currentQuestionIndex + 1} of {questions.length}</span>
+            <span>{t('question')} {currentQuestionIndex + 1} {t('of')} {questions.length}</span>
             <div className="mx-2 h-1 w-1 rounded-full bg-muted-foreground"></div>
             <Timer className="w-4 h-4 mr-1" />
             <span>{formatTime(timeSpent)}</span>
@@ -566,9 +554,9 @@ const Quiz = () => {
             <div>
               <div className="text-lg font-medium">{currentQuestion.question}</div>
               <div className="text-sm text-muted-foreground mt-1">
-                {currentQuestion.type === 'multiple-choice' && 'Select the best option'}
-                {currentQuestion.type === 'true-false' && 'Select True or False'}
-                {currentQuestion.type === 'open-ended' && 'Write your answer in the text box'}
+                {currentQuestion.type === 'multiple-choice' && t('selectBestOption')}
+                {currentQuestion.type === 'true-false' && t('selectTrueOrFalse')}
+                {currentQuestion.type === 'open-ended' && t('writeYourAnswer')}
               </div>
             </div>
           </div>
@@ -618,13 +606,13 @@ const Quiz = () => {
               <div>
                 <textarea
                   className="w-full h-32 p-4 border rounded-lg focus:ring-cat focus:border-cat focus:outline-none transition-colors"
-                  placeholder="Enter your answer here..."
+                  placeholder={t('enterYourAnswer')}
                   value={openEndedAnswer}
                   onChange={handleOpenEndedChange}
                   disabled={isAnswerSubmitted}
                 />
                 <p className="text-xs text-muted-foreground mt-2">
-                  Minimum 10 characters required. The more detailed your answer, the better your score.
+                  {t('minimumCharacters')}
                 </p>
               </div>
             )}
@@ -635,7 +623,7 @@ const Quiz = () => {
               <div className="flex items-start gap-2">
                 <HelpCircle className="w-5 h-5 text-blue-500 mt-0.5" />
                 <div>
-                  <p className="font-medium">Explanation</p>
+                  <p className="font-medium">{t('explanation')}</p>
                   <p className="text-sm mt-1">{currentQuestion.explanation}</p>
                 </div>
               </div>
@@ -654,7 +642,7 @@ const Quiz = () => {
           )}
         >
           <ChevronLeft className="w-5 h-5 mr-2" />
-          Previous
+          {t('previous')}
         </button>
         
         {!isAnswerSubmitted ? (
@@ -666,7 +654,7 @@ const Quiz = () => {
             }
             className="cat-button"
           >
-            Submit Answer
+            {t('submitAnswer')}
           </button>
         ) : (
           <button
@@ -674,7 +662,7 @@ const Quiz = () => {
             disabled={isGrading}
             className="cat-button"
           >
-            {isLastQuestion ? 'Finish Quiz' : 'Next Question'}
+            {isLastQuestion ? t('finishQuiz') : t('nextQuestion')}
             <ChevronRight className="w-5 h-5 ml-2" />
           </button>
         )}

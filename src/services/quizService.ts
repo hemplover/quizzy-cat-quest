@@ -1,3 +1,4 @@
+
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -72,6 +73,12 @@ export const generateQuiz = async (
       if (data.quiz.length !== settings.numQuestions) {
         console.warn(`Quiz contains ${data.quiz.length} questions, but ${settings.numQuestions} were requested.`);
       }
+      
+      // Ensure each question has an ID
+      data.quiz = data.quiz.map((q, index) => ({
+        ...q,
+        id: index + 1
+      }));
     }
     
     return data;
@@ -103,7 +110,7 @@ export const transformQuizQuestions = (generatedQuiz: any): any[] => {
       }
       
       const question: any = {
-        id: index + 1,
+        id: q.id || index + 1,
         type: questionType,
         question: q.question,
         explanation: q.explanation || ''
@@ -251,65 +258,211 @@ export const gradeQuiz = async (
     
     console.log('Grading quiz with processed answers:', processedAnswers);
     
-    const { data, error } = await supabase.functions.invoke('grade-quiz', {
-      body: {
-        questions,
-        userAnswers: processedAnswers,
-        provider
-      }
-    });
-    
-    if (error) {
-      console.error('Error grading quiz:', error);
-      toast.error(`Error grading quiz: ${error.message || 'Unknown error'}`);
-      return null;
-    }
-    
-    if (!data) {
-      console.error('No data returned from quiz grading');
-      toast.error('Quiz grading failed');
-      return null;
-    }
-    
-    if (!data.risultati || !Array.isArray(data.risultati)) {
-      console.error('Invalid quiz results format:', data);
-      toast.error('Invalid quiz results format. Please try again.');
-      return null;
-    }
-    
-    let validationFailed = false;
-    data.risultati.forEach((result: any, index: number) => {
-      const question = questions[index];
-      if (!question) {
-        console.error(`No matching question for result at index ${index}`);
-        validationFailed = true;
-        return;
+    try {
+      const { data, error } = await supabase.functions.invoke('grade-quiz', {
+        body: {
+          questions,
+          userAnswers: processedAnswers,
+          provider
+        }
+      });
+      
+      if (error) {
+        throw new Error(error.message || 'Unknown error grading quiz');
       }
       
-      if (question.type === 'open-ended') {
-        if (typeof result.punteggio !== 'number' || result.punteggio < 0 || result.punteggio > 5) {
-          console.error(`Invalid score for open-ended question: ${result.punteggio}`);
-          result.punteggio = Math.min(5, Math.max(0, Math.round(result.punteggio || 0)));
-        }
-      } else {
-        if (typeof result.punteggio !== 'number' || (result.punteggio !== 0 && result.punteggio !== 1)) {
-          console.error(`Invalid score for ${question.type} question: ${result.punteggio}`);
-          result.punteggio = result.corretto ? 1 : 0;
-        }
+      if (!data) {
+        throw new Error('No data returned from quiz grading');
       }
-    });
-    
-    if (validationFailed) {
-      toast.error('There was an issue with the quiz grading. Results may not be accurate.');
+      
+      if (!data.risultati || !Array.isArray(data.risultati)) {
+        throw new Error('Invalid quiz results format');
+      }
+      
+      // Validate and fix results if needed
+      const validatedResults = validateAndFixResults(data, questions, processedAnswers);
+      
+      console.log('Quiz graded successfully:', validatedResults);
+      return validatedResults;
+    } catch (aiError) {
+      console.error('AI grading error, falling back to manual grading:', aiError);
+      // Fallback to manual grading
+      return manualGrading(questions, processedAnswers);
     }
-    
-    console.log('Quiz graded successfully:', data);
-    return data;
   } catch (error: any) {
     console.error('Error grading quiz:', error);
     toast.error(`Error grading quiz: ${error.message || 'Unknown error'}`);
     return null;
   }
+};
+
+const validateAndFixResults = (data: any, questions: any[], userAnswers: any[]): any => {
+  // Initialize the structure if it doesn't exist
+  if (!data.risultati || !Array.isArray(data.risultati)) {
+    data.risultati = [];
+  }
+  
+  // Ensure we have results for each question
+  if (data.risultati.length < questions.length) {
+    console.warn(`AI grading returned fewer results (${data.risultati.length}) than questions (${questions.length}). Adding missing results.`);
+    for (let i = data.risultati.length; i < questions.length; i++) {
+      data.risultati.push({
+        domanda: questions[i].question,
+        risposta_utente: userAnswers[i],
+        corretto: false,
+        punteggio: 0,
+        spiegazione: "Result was not provided by grading service"
+      });
+    }
+  }
+  
+  // Calculate points properly for each question
+  let totalPoints = 0;
+  let maxPoints = 0;
+  
+  data.risultati.forEach((result: any, index: number) => {
+    const question = questions[index];
+    if (!question) return;
+    
+    const pointValue = question.type === 'open-ended' ? 5 : 1;
+    maxPoints += pointValue;
+    
+    // Fix issues with result format
+    if (result.domanda === undefined && question.question) {
+      result.domanda = question.question;
+    }
+    
+    if (result.risposta_utente === undefined && userAnswers[index] !== undefined) {
+      result.risposta_utente = userAnswers[index];
+    }
+    
+    // Validate and fix scores
+    if (question.type === 'open-ended') {
+      // For open-ended, ensure score is between 0-5
+      if (typeof result.punteggio !== 'number' || result.punteggio < 0 || result.punteggio > 5) {
+        console.warn(`Invalid score for open-ended question: ${result.punteggio}, fixing...`);
+        result.punteggio = Math.min(5, Math.max(0, Math.round(result.punteggio || 0)));
+      }
+    } else {
+      // For multiple-choice and true-false, scores should be either 0 or 1
+      if (typeof result.punteggio !== 'number' || (result.punteggio !== 0 && result.punteggio !== 1)) {
+        console.warn(`Invalid score for ${question.type} question: ${result.punteggio}, fixing...`);
+        
+        if (question.type === 'multiple-choice' || question.type === 'true-false') {
+          const userAnswer = userAnswers[index];
+          const correctAnswer = question.correctAnswer;
+          result.punteggio = userAnswer === correctAnswer ? 1 : 0;
+          result.corretto = userAnswer === correctAnswer;
+        } else {
+          result.punteggio = 0;
+          result.corretto = false;
+        }
+      }
+    }
+    
+    // Ensure explanation exists
+    if (!result.spiegazione) {
+      result.spiegazione = question.explanation || 'No explanation provided';
+    }
+    
+    totalPoints += result.punteggio;
+  });
+  
+  // Update total points and max points
+  data.total_points = totalPoints;
+  data.max_points = maxPoints;
+  
+  // If punteggio_totale isn't set, calculate it as normalized score (0-1)
+  if (typeof data.punteggio_totale !== 'number' && maxPoints > 0) {
+    data.punteggio_totale = totalPoints / maxPoints;
+  }
+  
+  // Ensure feedback exists
+  if (!data.feedback_generale) {
+    const scorePercentage = Math.round((totalPoints / maxPoints) * 100);
+    let feedbackMessage = '';
+    
+    if (scorePercentage >= 80) {
+      feedbackMessage = 'Excellent work! You demonstrated a strong understanding of the material.';
+    } else if (scorePercentage >= 60) {
+      feedbackMessage = 'Good job! You have a good grasp of most concepts, but there\'s still room for improvement.';
+    } else if (scorePercentage >= 40) {
+      feedbackMessage = 'You\'re making progress, but you should review the material more thoroughly to strengthen your understanding.';
+    } else {
+      feedbackMessage = 'This topic seems challenging for you. Consider revisiting the material and trying again.';
+    }
+    
+    data.feedback_generale = feedbackMessage;
+  }
+  
+  return data;
+};
+
+const manualGrading = (questions: any[], userAnswers: any[]): any => {
+  console.log('Using manual grading as fallback');
+  
+  const results = {
+    risultati: [],
+    total_points: 0,
+    max_points: 0,
+    punteggio_totale: 0,
+    feedback_generale: ''
+  };
+  
+  let totalPoints = 0;
+  let maxPoints = 0;
+  
+  questions.forEach((question, index) => {
+    const userAnswer = userAnswers[index];
+    const pointValue = question.type === 'open-ended' ? 5 : 1;
+    maxPoints += pointValue;
+    
+    let isCorrect = false;
+    let points = 0;
+    let explanation = '';
+    
+    if (question.type === 'multiple-choice' || question.type === 'true-false') {
+      isCorrect = userAnswer === question.correctAnswer;
+      points = isCorrect ? 1 : 0;
+      explanation = question.explanation || (isCorrect ? 
+        'Your answer is correct.' : 
+        `The correct answer is: ${question.options[question.correctAnswer]}`);
+    } else if (question.type === 'open-ended') {
+      // For open-ended, we give partial credit of 2 out of 5 without AI grading
+      points = 2;
+      isCorrect = 'Partially';
+      explanation = 'We were unable to fully assess your answer. Please review the correct answer.';
+    }
+    
+    results.risultati.push({
+      domanda: question.question,
+      risposta_utente: userAnswer,
+      corretto: isCorrect,
+      punteggio: points,
+      spiegazione: explanation
+    });
+    
+    totalPoints += points;
+  });
+  
+  results.total_points = totalPoints;
+  results.max_points = maxPoints;
+  results.punteggio_totale = maxPoints > 0 ? totalPoints / maxPoints : 0;
+  
+  // Generate overall feedback
+  const scorePercentage = Math.round((totalPoints / maxPoints) * 100);
+  
+  if (scorePercentage >= 80) {
+    results.feedback_generale = 'Excellent work! You demonstrated a strong understanding of the material.';
+  } else if (scorePercentage >= 60) {
+    results.feedback_generale = 'Good job! You have a good grasp of most concepts, but there\'s still room for improvement.';
+  } else if (scorePercentage >= 40) {
+    results.feedback_generale = 'You\'re making progress, but you should review the material more thoroughly to strengthen your understanding.';
+  } else {
+    results.feedback_generale = 'This topic seems challenging for you. Consider revisiting the material and trying again.';
+  }
+  
+  return results;
 };
 
 export const saveQuizToHistory = async (quiz: any): Promise<void> => {
@@ -435,11 +588,17 @@ export const createNewQuizFromQuestions = async (
       questionCount: questions.length
     });
     
+    // Ensure all questions have an ID
+    const questionsWithIds = questions.map((q, index) => ({
+      ...q,
+      id: q.id || index + 1
+    }));
+    
     const newQuiz = await createQuiz({
       title,
       subjectId,
       documentId,
-      questions,
+      questions: questionsWithIds,
       settings
     });
     
@@ -476,6 +635,11 @@ export const validateQuiz = (quiz: any): boolean => {
   for (const question of quiz.questions) {
     if (!question.question) {
       console.error('Question missing text:', question);
+      return false;
+    }
+    
+    if (!question.id) {
+      console.error('Question missing ID:', question);
       return false;
     }
     
