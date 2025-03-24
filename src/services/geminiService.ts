@@ -188,6 +188,13 @@ export const gradeQuizWithGemini = async (
         return answer;
       });
       
+      console.log('Sending to grade-quiz edge function:', {
+        questionsCount: questions.length,
+        firstQuestion: questions[0],
+        answersCount: processedAnswers.length,
+        firstAnswer: processedAnswers[0]
+      });
+      
       // Call the edge function for quiz grading
       const { data, error } = await supabase.functions.invoke('grade-quiz', {
         body: {
@@ -208,9 +215,29 @@ export const gradeQuizWithGemini = async (
         throw new Error('No data returned from grade-quiz function');
       }
       
+      console.log('Received grading result:', data);
+      
       if (!data.risultati || !Array.isArray(data.risultati)) {
         console.error('Invalid quiz results format returned by API:', data);
         throw new Error('Invalid quiz results format returned by API');
+      }
+      
+      // Ensure we have correct total_points and max_points
+      if (data.total_points === undefined || data.max_points === undefined) {
+        let totalPoints = 0;
+        let maxPoints = 0;
+        
+        data.risultati.forEach((result: any, index: number) => {
+          const question = questions[index];
+          const pointValue = question.type === 'open-ended' ? 5 : 1;
+          
+          maxPoints += pointValue;
+          totalPoints += result.punteggio;
+        });
+        
+        data.total_points = totalPoints;
+        data.max_points = maxPoints;
+        data.punteggio_totale = maxPoints > 0 ? totalPoints / maxPoints : 0;
       }
       
       return data;

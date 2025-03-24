@@ -370,41 +370,46 @@ async function gradeWithGemini(questions, userAnswers) {
   // Format questions and answers for grading
   const formattedQuestions = formatQuestionsForGrading(questions, userAnswers);
   
-  const prompt = `You are a university professor grading an exam. 
+  // Create a simpler, more direct prompt focused on JSON output
+  const prompt = `You are a professor grading an exam with different question types. Grade each question and return ONLY valid JSON with no preamble or explanations outside the JSON.
 
-DIFFERENT QUESTION TYPES HAVE DIFFERENT POINT VALUES:
-- True/False questions: Worth 1 point maximum (0 = incorrect, 1 = correct)
-- Multiple-choice questions: Worth 1 point maximum (0 = incorrect, 1 = correct)
-- Open-ended questions: Worth 5 points maximum (grade on a scale from 0-5 where 5 is perfect)
+Question Types and Points:
+- True/False: 1 point (0=incorrect, 1=correct)
+- Multiple-choice: 1 point (0=incorrect, 1=correct)
+- Open-ended: 5 points (grade 0-5, where 5 is perfect)
 
-For open-ended questions, you MUST:
-1. Grade on a scale from 0 to 5 points (use integers only: 0, 1, 2, 3, 4, or 5)
-2. Provide detailed feedback explaining why you assigned that score
-3. Be fair but rigorous - a score of 5/5 should only be for truly excellent, comprehensive answers
-4. Always include what the correct answer should have included
+For open-ended questions:
+1. Grade on scale 0-5
+2. Provide detailed feedback
+3. Be fair but rigorous
 
-YOUR RESPONSE MUST ONLY CONTAIN VALID JSON in this exact format:
+ONLY RETURN THIS JSON STRUCTURE, NOTHING ELSE:
 {
   "risultati": [
-    {"domanda": "Question text", "risposta_utente": "User's answer", "corretto": true/false or "Parzialmente", "punteggio": score (based on question type), "spiegazione": "Detailed explanation of the score, including what the correct answer should be"}, 
-    ...
+    {
+      "domanda": "Question text",
+      "risposta_utente": "User answer",
+      "corretto": true/false/\"Parzialmente\",
+      "punteggio": number,
+      "spiegazione": "Explanation"
+    }
+    // Additional results...
   ],
-  "punteggio_totale": total_score (0 to 1),
-  "feedback_generale": "General feedback on overall performance"
+  "punteggio_totale": number,
+  "feedback_generale": "Overall feedback"
 }
 
-Here are the questions and answers to grade:
-
+Questions to grade:
 ${formattedQuestions}`;
 
   try {
-    // Use the updated Gemini 2.0 Flash model by default
+    // Use the updated Gemini 2.0 Flash model
     const modelName = 'gemini-2.0-flash';
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
 
     console.log(`Making request to Gemini API with model: ${modelName}`);
-    console.log(`API URL: ${apiUrl}`);
-
+    
+    // First attempt with strict parameters to get clean JSON
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -423,9 +428,10 @@ ${formattedQuestions}`;
         ],
         generationConfig: {
           temperature: 0,
-          maxOutputTokens: 1000,
-          topP: 0.8,
-          topK: 40
+          maxOutputTokens: 2048,
+          topP: 0.1,
+          topK: 1,
+          responseMimeType: "application/json"
         }
       })
     });
@@ -434,91 +440,185 @@ ${formattedQuestions}`;
       const errorText = await response.text();
       console.error('Gemini API Error - Status:', response.status);
       console.error('Error Response:', errorText);
-      
-      try {
-        const errorData = JSON.parse(errorText);
-        throw new Error(`Gemini API Error: ${errorData.error?.message || JSON.stringify(errorData)}`);
-      } catch (parseError) {
-        throw new Error(`Gemini API Error: Status ${response.status} - ${errorText.substring(0, 200)}...`);
-      }
+      throw new Error(`Gemini API Error: Status ${response.status}`);
     }
 
     const data = await response.json();
     console.log('Gemini grading response received');
     
-    // Extract the content - handle different response formats
+    // Extract the content from Gemini response
     let generatedContent;
-    
     if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-      // Format for newer Gemini versions
       generatedContent = data.candidates[0].content.parts[0].text;
     } else if (data.text) {
-      // Simplified response format in some versions
       generatedContent = data.text;
     } else {
-      console.error('Unexpected Gemini response format:', JSON.stringify(data).substring(0, 500));
+      console.error('Unexpected Gemini response format:', JSON.stringify(data).substring(0, 200));
       throw new Error('Unexpected response format from Gemini API');
     }
     
-    // Log part of the raw response for debugging
-    console.log('Raw Gemini response content (first 200 chars):', generatedContent.substring(0, 200));
+    // Clean up the response text and remove any non-JSON content
+    let cleanedContent = generatedContent.trim();
     
-    // Clean up the response text before parsing
-    const cleanedContent = generatedContent
-      .replace(/```json/g, '')   // Remove Markdown code indicators
-      .replace(/```/g, '')       // Remove Markdown code indicators
-      .trim();                   // Remove any leading/trailing whitespace
+    // Remove markdown code blocks if present
+    cleanedContent = cleanedContent.replace(/```json\s*|\s*```/g, '');
     
-    console.log('Cleaned response (first 200 chars):', cleanedContent.substring(0, 200));
+    // Handle case where response might have text before or after JSON
+    // Find JSON by looking for opening and closing braces
+    const jsonStartIndex = cleanedContent.indexOf('{');
+    const jsonEndIndex = cleanedContent.lastIndexOf('}');
     
-    // Force the model to return valid JSON by using a more explicit JSON-only prompt
+    if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
+      cleanedContent = cleanedContent.substring(jsonStartIndex, jsonEndIndex + 1);
+    }
+    
+    // Try to parse the JSON
     try {
-      // First attempt: try to parse directly
-      return JSON.parse(cleanedContent);
-    } catch (directParseError) {
-      console.error('Direct JSON parsing failed:', directParseError);
+      const parsedResult = JSON.parse(cleanedContent);
       
-      try {
-        // Second attempt: extract JSON object - find the first '{' and last '}'
-        const firstBrace = cleanedContent.indexOf('{');
-        const lastBrace = cleanedContent.lastIndexOf('}');
-        
-        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-          const jsonString = cleanedContent.substring(firstBrace, lastBrace + 1);
-          console.log('Extracted JSON string (first 200 chars):', jsonString.substring(0, 200));
-          
-          // Try to parse the extracted JSON
-          try {
-            return JSON.parse(jsonString);
-          } catch (extractedJsonError) {
-            console.error('Error parsing extracted JSON:', extractedJsonError);
-            throw new Error('Failed to parse extracted JSON from Gemini response');
-          }
-        } else {
-          console.error('Could not find valid JSON structure in response');
-          throw new Error('No valid JSON structure found in Gemini response');
-        }
-      } catch (extractError) {
-        console.error('JSON extraction and parsing failed:', extractError);
-        
-        // Create a fallback response
-        return {
-          risultati: questions.map((q, i) => ({
-            domanda: q.question || 'Unknown question',
-            risposta_utente: String(userAnswers[i] || ''),
-            corretto: false,
-            punteggio: 0,
-            spiegazione: 'Unable to grade this answer due to AI response parsing issues.'
-          })),
-          punteggio_totale: 0,
-          feedback_generale: 'There was an error processing the AI grading response. Your answers could not be properly evaluated.'
-        };
+      // Validate the expected structure
+      if (!parsedResult.risultati || !Array.isArray(parsedResult.risultati)) {
+        throw new Error('Invalid response structure: missing or invalid risultati array');
       }
+      
+      return parsedResult;
+    } catch (parseError) {
+      console.error('JSON parsing error:', parseError);
+      console.error('Content that failed to parse:', cleanedContent.substring(0, 500));
+      
+      // If we can't parse the JSON, make a second attempt with a different prompt
+      return await fallbackGrading(questions, userAnswers, GEMINI_API_KEY);
     }
   } catch (error) {
-    console.error('Gemini grading error:', error);
-    throw error;
+    console.error('Primary Gemini grading error:', error);
+    
+    // Try the fallback method
+    try {
+      return await fallbackGrading(questions, userAnswers, GEMINI_API_KEY);
+    } catch (fallbackError) {
+      console.error('Fallback grading also failed:', fallbackError);
+      
+      // If all attempts fail, create a manual grading response
+      return createManualGradingResponse(questions, userAnswers);
+    }
   }
+}
+
+// Fallback grading method with a simplified approach
+async function fallbackGrading(questions, userAnswers, apiKey) {
+  console.log('Attempting fallback grading method');
+  
+  // Create a simpler prompt focused entirely on json output
+  const simplifiedPrompt = `Grade each question and output ONLY JSON:
+${questions.map((q, i) => {
+  const type = q.type;
+  const userAnswer = userAnswers[i] || 'No answer';
+  const maxPoints = type === 'open-ended' ? 5 : 1;
+  
+  return `Question ${i+1}: ${q.question} (Type: ${type}, Worth: ${maxPoints} points)
+Correct answer: ${type === 'multiple-choice' ? q.options[q.correctAnswer] : q.correctAnswer}
+User answer: ${userAnswer}`;
+}).join('\n\n')}
+
+Output format (ONLY JSON):
+{"risultati":[{"domanda":"Q1","risposta_utente":"A1","corretto":true/false,"punteggio":5,"spiegazione":"E1"}],"punteggio_totale":0.5,"feedback_generale":"F"}`;
+
+  const modelName = 'gemini-1.5-flash';
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey
+    },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: simplifiedPrompt }] }],
+      generationConfig: {
+        temperature: 0,
+        maxOutputTokens: 2048,
+        responseMimeType: "application/json"
+      }
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Fallback API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  
+  // Extract content
+  let content;
+  if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+    content = data.candidates[0].content.parts[0].text;
+  } else {
+    throw new Error('Unexpected response format in fallback method');
+  }
+  
+  // Clean and extract JSON
+  content = content.trim();
+  
+  // Remove markdown code blocks if present
+  content = content.replace(/```json\s*|\s*```/g, '');
+  
+  // Find JSON by looking for opening and closing braces
+  const jsonStartIndex = content.indexOf('{');
+  const jsonEndIndex = content.lastIndexOf('}');
+  
+  if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
+    content = content.substring(jsonStartIndex, jsonEndIndex + 1);
+  }
+  
+  try {
+    return JSON.parse(content);
+  } catch (parseError) {
+    console.error('Fallback JSON parsing failed:', parseError);
+    console.error('Content that failed to parse:', content.substring(0, 200));
+    throw new Error('Failed to parse JSON in fallback method');
+  }
+}
+
+// Create a manual grading response when all else fails
+function createManualGradingResponse(questions, userAnswers) {
+  console.log('Creating manual grading response');
+  
+  const results = questions.map((question, index) => {
+    const userAnswer = userAnswers[index] || '';
+    let isCorrect = false;
+    let score = 0;
+    
+    // Simple automated grading for multiple-choice and true-false
+    if (question.type !== 'open-ended') {
+      // For multiple-choice or true-false
+      if (typeof userAnswer === 'number' && userAnswer === question.correctAnswer) {
+        isCorrect = true;
+        score = 1;
+      }
+    }
+    
+    return {
+      domanda: question.question || `Question ${index + 1}`,
+      risposta_utente: String(userAnswer),
+      corretto: isCorrect,
+      punteggio: score,
+      spiegazione: isCorrect ? 
+        "Your answer is correct." : 
+        "The system couldn't evaluate this answer in detail, but it doesn't match the expected answer."
+    };
+  });
+  
+  // Calculate total score
+  const totalPoints = results.reduce((sum, r) => sum + r.punteggio, 0);
+  const maxPoints = questions.reduce((sum, q) => sum + (q.type === 'open-ended' ? 5 : 1), 0);
+  
+  return {
+    risultati: results,
+    punteggio_totale: maxPoints > 0 ? totalPoints / maxPoints : 0,
+    total_points: totalPoints,
+    max_points: maxPoints,
+    feedback_generale: "Your quiz was graded using a basic evaluation method due to AI service issues."
+  };
 }
 
 // Helper to format questions for grading
