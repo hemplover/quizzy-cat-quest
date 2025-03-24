@@ -1,10 +1,11 @@
 
 import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
-import pdfjsWorker from 'pdfjs-dist/legacy/build/pdf.worker.entry';
+// Import the worker directly without using 'default'
+import 'pdfjs-dist/legacy/build/pdf.worker.entry';
 
 // Set the worker path for PDF.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsLib.PDFWorker ? new pdfjsLib.PDFWorker().workerSrc : null;
 
 /**
  * Parses the content of various document types
