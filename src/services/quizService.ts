@@ -87,8 +87,8 @@ export const generateQuiz = async (
       console.log(`Checking for previous quizzes on document: ${documentId}`);
       
       // Get the current user's ID for the query
-      const { data: { session } } = await supabase.auth.getSession();
-      const userId = session?.user?.id;
+      const { data } = await supabase.auth.getSession();
+      const userId = data.session?.user?.id;
       
       if (!userId) {
         console.error('User ID is required but not found in session');
@@ -382,14 +382,14 @@ export const getSelectedModel = (): string => {
 };
 
 // Save the most recently uploaded text for the current subject
-export const saveRecentText = (subjectId: string, textData: {
+export const saveRecentText = async (subjectId: string, textData: {
   name: string;
   content: string;
-}): void => {
+}): Promise<void> => {
   try {
     // Store text data keyed by subject ID and user ID
-    const { session } = supabase.auth.getSession();
-    const userId = session?.user?.id || 'anonymous';
+    const { data } = await supabase.auth.getSession();
+    const userId = data.session?.user?.id || 'anonymous';
     const textKey = `recent_text_${subjectId}_${userId}`;
     localStorage.setItem(textKey, JSON.stringify(textData));
     console.log(`Saved recent text for subject ${subjectId} and user ${userId}`);
@@ -399,14 +399,14 @@ export const saveRecentText = (subjectId: string, textData: {
 };
 
 // Get the most recently uploaded text for the current subject
-export const getRecentText = (subjectId: string): {
+export const getRecentText = async (subjectId: string): Promise<{
   name: string;
   content: string;
-} | null => {
+} | null> => {
   try {
     // Get text data keyed by subject ID and user ID
-    const { session } = supabase.auth.getSession();
-    const userId = session?.user?.id || 'anonymous';
+    const { data } = await supabase.auth.getSession();
+    const userId = data.session?.user?.id || 'anonymous';
     const textKey = `recent_text_${subjectId}_${userId}`;
     const storedData = localStorage.getItem(textKey);
     
