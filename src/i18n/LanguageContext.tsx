@@ -36,6 +36,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     if (!translations[language] || !translations[language][key]) {
       // Fallback to English if translation is missing
       if (language !== 'en' && translations['en'] && translations['en'][key]) {
+        console.warn(`Using English fallback for key: ${key} in language: ${language}`);
         return translations['en'][key];
       }
       // Return the key itself if no translation found

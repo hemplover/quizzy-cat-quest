@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { FileUp, X, File, FileText, Image, Film, FileSpreadsheet } from 'lucide-react';
+import { FileUp, X, File, FileText, Image, Film, FileSpreadsheet, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supportsFileUpload, getSelectedProvider } from '@/services/aiProviderService';
@@ -23,6 +24,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const { t } = useLanguage();
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [supportsUpload, setSupportsUpload] = useState(supportsFileUpload());
   const [selectedProvider, setSelectedProvider] = useState(getSelectedProvider());
@@ -63,6 +65,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
   };
 
   const validateAndSetFile = (file: File) => {
+    setFileError(null);
     console.log(`Validating file: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
     
     // Extract file extension
@@ -73,14 +76,18 @@ const FileUpload: React.FC<FileUploadProps> = ({
       type.trim().replace('.', '').toLowerCase());
     
     if (!acceptedExtensions.includes(fileExtension || '') && !acceptedExtensions.includes('*')) {
-      toast.error(`Invalid file type. Please upload ${accept} files.`);
+      const errorMsg = `Invalid file type. Please upload ${accept} files.`;
+      setFileError(errorMsg);
+      toast.error(errorMsg);
       console.error(`Invalid file type: ${fileExtension}. Accepted types: ${acceptedExtensions.join(', ')}`);
       return;
     }
     
     // Check file size
     if (file.size > maxSize * 1024 * 1024) {
-      toast.error(`File too large. Maximum size is ${maxSize}MB.`);
+      const errorMsg = `File too large. Maximum size is ${maxSize}MB.`;
+      setFileError(errorMsg);
+      toast.error(errorMsg);
       console.error(`File too large: ${file.size} bytes. Maximum size: ${maxSize * 1024 * 1024} bytes`);
       return;
     }
@@ -94,12 +101,13 @@ const FileUpload: React.FC<FileUploadProps> = ({
     
     setSelectedFile(file);
     onFileUpload(file);
-    toast.success(`${file.name} ${t('selectedFileSuccess')}`);
+    toast.success(`${file.name} ${t('selectedFileSuccess') || 'selected successfully'}`);
     console.log(`File selected successfully: ${file.name}`);
   };
 
   const clearSelectedFile = () => {
     setSelectedFile(null);
+    setFileError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -137,6 +145,13 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
   return (
     <div className={cn("space-y-4", className)}>
+      {fileError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
+          <AlertCircle className="w-5 h-5" />
+          <p className="text-sm">{fileError}</p>
+        </div>
+      )}
+
       {!selectedFile ? (
         <div
           className={cn(
@@ -157,11 +172,11 @@ const FileUpload: React.FC<FileUploadProps> = ({
           </div>
           
           <h3 className="text-lg font-medium mb-2">
-            {showUploadButton ? t('dragDropFile') : t('dropFileHere')}
+            {showUploadButton ? t('dragDropFile') || 'Drag and drop your file' : t('dropFileHere') || 'Drop your file here'}
           </h3>
           <p className="text-sm text-muted-foreground mb-4">
-            {t('supportFor')} {accept.replace(/\./g, '')} {t('files')}.
-            <br />{t('maxSize')} {maxSize}MB
+            {t('supportFor') || 'Support for'} {accept.replace(/\./g, '')} {t('files') || 'files'}.
+            <br />{t('maxSize') || 'Maximum size'} {maxSize}MB
           </p>
           
           {showUploadButton && (
@@ -169,7 +184,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
               type="button" 
               className="cat-button-secondary text-sm py-2"
             >
-              {t('selectFromComputer')}
+              {t('selectFromComputer') || 'Select from computer'}
             </button>
           )}
           

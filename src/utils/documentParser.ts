@@ -1,3 +1,4 @@
+
 import { toast } from 'sonner';
 
 /**
@@ -82,34 +83,27 @@ async function readTextFile(file: File): Promise<string> {
   });
 }
 
-// Extract text from PDF using PDF.js with more detailed logging
+// Extract text from PDF using PDF.js with proper error handling
 async function extractTextFromPdf(file: File): Promise<string> {
   try {
     console.log('Starting PDF text extraction process...', file.name, file.size);
     
-    // Import PDF.js dynamically with explicit version to avoid potential conflicts
-    console.log('Loading PDF.js library...');
-    const pdfjsLib = await import('pdfjs-dist');
+    // Import pdf.js library directly instead of using dynamic imports which can fail
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.js');
     console.log('PDF.js library loaded successfully');
     
-    // Set worker source path
-    console.log('Configuring PDF.js worker...');
-    const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-    console.log('PDF.js worker configured successfully');
+    // Set worker path directly
+    const pdfjsWorker = await import('pdfjs-dist/legacy/build/pdf.worker.js');
+    pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
     
     // Read file as ArrayBuffer
     console.log('Loading file as ArrayBuffer...');
     const arrayBuffer = await file.arrayBuffer();
     console.log(`File loaded as ArrayBuffer, size: ${arrayBuffer.byteLength} bytes`);
     
-    // Load PDF document with proper error handling
+    // Load PDF document
     console.log('Creating PDF loading task...');
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-    
-    loadingTask.onProgress = (progressData) => {
-      console.log(`PDF loading progress: ${progressData.loaded} of ${progressData.total}`);
-    };
+    const loadingTask = pdfjs.getDocument({data: arrayBuffer});
     
     console.log('Waiting for PDF document to load...');
     const pdf = await loadingTask.promise;
