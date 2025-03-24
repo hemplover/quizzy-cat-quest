@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -28,19 +29,35 @@ serve(async (req) => {
     
     const { questions, userAnswers, provider } = requestBody;
     
-    // Validate input parameters
-    if (!questions || !Array.isArray(questions)) {
-      console.error('Missing or invalid questions parameter:', questions);
+    // Validate input parameters with better error handling
+    if (!questions) {
+      console.error('Missing questions parameter');
       return new Response(
-        JSON.stringify({ error: 'Missing or invalid questions parameter' }),
+        JSON.stringify({ error: 'Missing questions parameter' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
-    if (!userAnswers || !Array.isArray(userAnswers)) {
-      console.error('Missing or invalid userAnswers parameter:', userAnswers);
+    if (!Array.isArray(questions)) {
+      console.error('Invalid questions parameter, not an array:', typeof questions);
       return new Response(
-        JSON.stringify({ error: 'Missing or invalid userAnswers parameter' }),
+        JSON.stringify({ error: 'Invalid questions parameter, must be an array' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!userAnswers) {
+      console.error('Missing userAnswers parameter');
+      return new Response(
+        JSON.stringify({ error: 'Missing userAnswers parameter' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!Array.isArray(userAnswers)) {
+      console.error('Invalid userAnswers parameter, not an array:', typeof userAnswers);
+      return new Response(
+        JSON.stringify({ error: 'Invalid userAnswers parameter, must be an array' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -56,6 +73,8 @@ serve(async (req) => {
     console.log(`Grading quiz with provider: ${provider}`);
     console.log('Questions count:', questions.length);
     console.log('User answers count:', userAnswers.length);
+    console.log('First question sample:', JSON.stringify(questions[0]).substring(0, 200));
+    console.log('First answer sample:', JSON.stringify(userAnswers[0]).substring(0, 200));
     
     // Ensure userAnswers has the same length as questions
     let processedUserAnswers = [...userAnswers];
@@ -111,7 +130,7 @@ serve(async (req) => {
           risposta_utente: String(processedUserAnswers[i] || ''),
           corretto: false,
           punteggio: 0,
-          spiegazione: `Error grading this answer: ${gradingError.message}`
+          spiegazione: `Error grading this answer: ${gradingError.message || 'Unknown error'}`
         })),
         punteggio_totale: 0,
         total_points: 0,
@@ -181,7 +200,7 @@ serve(async (req) => {
     let maxPoints = 0;
     
     result.risultati.forEach((r, i) => {
-      const questionType = questions[i].type;
+      const questionType = questions[i]?.type || 'multiple-choice';
       const pointValue = questionType === 'open-ended' ? 5 : 1;
       
       maxPoints += pointValue;
@@ -254,7 +273,6 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: error.message || 'Unknown error',
-        stack: error.stack,
         info: 'There was an error processing your request. Please try again.'
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -389,7 +407,7 @@ ONLY RETURN THIS JSON STRUCTURE, NOTHING ELSE:
     {
       "domanda": "Question text",
       "risposta_utente": "User answer",
-      "corretto": true/false/\"Parzialmente\",
+      "corretto": true/false/"Parzialmente",
       "punteggio": number,
       "spiegazione": "Explanation"
     }
@@ -404,7 +422,7 @@ ${formattedQuestions}`;
 
   try {
     // Use the updated Gemini 2.0 Flash model
-    const modelName = 'gemini-2.0-flash';
+    const modelName = 'gemini-1.5-flash';
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
 
     console.log(`Making request to Gemini API with model: ${modelName}`);
@@ -511,12 +529,19 @@ async function fallbackGrading(questions, userAnswers, apiKey) {
   // Create a simpler prompt focused entirely on json output
   const simplifiedPrompt = `Grade each question and output ONLY JSON:
 ${questions.map((q, i) => {
-  const type = q.type;
+  const type = q.type || 'multiple-choice';
   const userAnswer = userAnswers[i] || 'No answer';
   const maxPoints = type === 'open-ended' ? 5 : 1;
+  let correctAnswer = '';
   
-  return `Question ${i+1}: ${q.question} (Type: ${type}, Worth: ${maxPoints} points)
-Correct answer: ${type === 'multiple-choice' ? q.options[q.correctAnswer] : q.correctAnswer}
+  if (type === 'multiple-choice' && q.options && Array.isArray(q.options) && q.correctAnswer !== undefined) {
+    correctAnswer = q.options[q.correctAnswer] || '';
+  } else {
+    correctAnswer = q.correctAnswer || '';
+  }
+  
+  return `Question ${i+1}: ${q.question || 'Unknown question'} (Type: ${type}, Worth: ${maxPoints} points)
+Correct answer: ${correctAnswer}
 User answer: ${userAnswer}`;
 }).join('\n\n')}
 
@@ -624,25 +649,36 @@ function createManualGradingResponse(questions, userAnswers) {
 // Helper to format questions for grading
 function formatQuestionsForGrading(questions, userAnswers) {
   return questions.map((q, i) => {
-    let questionText = `Question ${i + 1}: ${q.question}`;
+    let questionText = `Question ${i + 1}: ${q.question || 'Unknown question'}`;
     
     // Add question type 
-    questionText += `\nQuestion Type: ${q.type}`;
-    questionText += q.type === 'open-ended' ? ' (worth 5 points)' : ' (worth 1 point)';
+    questionText += `\nQuestion Type: ${q.type || 'multiple-choice'}`;
+    questionText += (q.type === 'open-ended') ? ' (worth 5 points)' : ' (worth 1 point)';
     
-    if (q.type === 'multiple-choice') {
+    if (q.type === 'multiple-choice' && q.options && Array.isArray(q.options)) {
       questionText += `\nOptions: ${q.options.join(', ')}`;
-      questionText += `\nCorrect answer: ${q.options[q.correctAnswer]}`;
-      const userAnswer = userAnswers[i] !== null && userAnswers[i] !== undefined && q.options[userAnswers[i]] 
-        ? q.options[userAnswers[i]] 
-        : 'No answer provided';
-      questionText += `\nUser's answer: ${userAnswer}`;
+      const correctAnswerText = (q.correctAnswer !== undefined && q.options[q.correctAnswer]) 
+        ? q.options[q.correctAnswer] 
+        : 'Unknown';
+      questionText += `\nCorrect answer: ${correctAnswerText}`;
+      
+      let userAnswerText = 'No answer provided';
+      if (userAnswers[i] !== null && userAnswers[i] !== undefined) {
+        if (typeof userAnswers[i] === 'number' && q.options[userAnswers[i]]) {
+          userAnswerText = q.options[userAnswers[i]];
+        } else {
+          userAnswerText = String(userAnswers[i]);
+        }
+      }
+      questionText += `\nUser's answer: ${userAnswerText}`;
     } else if (q.type === 'true-false') {
       questionText += `\nCorrect answer: ${q.correctAnswer === 0 ? 'True' : 'False'}`;
-      const userAnswer = userAnswers[i] === 0 ? 'True' : userAnswers[i] === 1 ? 'False' : 'No answer provided';
-      questionText += `\nUser's answer: ${userAnswer}`;
+      const userAnswerText = userAnswers[i] === 0 ? 'True' : 
+                            userAnswers[i] === 1 ? 'False' : 
+                            'No answer provided';
+      questionText += `\nUser's answer: ${userAnswerText}`;
     } else {
-      questionText += `\nExpected answer: ${q.correctAnswer}`;
+      questionText += `\nExpected answer: ${q.correctAnswer || 'Unknown'}`;
       questionText += `\nUser's answer: ${userAnswers[i] || 'No answer provided'}`;
     }
     

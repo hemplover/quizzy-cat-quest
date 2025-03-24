@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { QuizQuestion, GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
 import { supabase } from '@/integrations/supabase/client';
@@ -263,102 +262,117 @@ export const gradeQuiz = async (
     console.log('Validated questions:', validatedQuestions);
     console.log('Validated answers:', validatedAnswers);
     
-    // Call the edge function for quiz grading
-    const { data, error } = await supabase.functions.invoke('grade-quiz', {
-      body: {
-        questions: validatedQuestions,
-        userAnswers: validatedAnswers,
-        provider: 'gemini'
-      }
-    });
-    
-    if (error) {
-      console.error('Error calling grade-quiz function:', error);
-      toast.error(`Error grading quiz: ${error.message}`);
-      return null;
-    }
-    
-    // Validate the quiz results
-    if (!data || !data.risultati || !Array.isArray(data.risultati)) {
-      console.error('Invalid quiz results format:', data);
-      toast.error('Invalid quiz results returned by AI. Please try again.');
-      return null;
-    }
-    
-    console.log('Received quiz results:', data);
-    
-    // Make sure we have the same number of results as questions
-    if (data.risultati.length !== questions.length) {
-      console.warn(`Result count mismatch: ${data.risultati.length} results for ${questions.length} questions`);
-      
-      // Pad or truncate results to match question count
-      if (data.risultati.length < questions.length) {
-        // Pad with dummy results if we have too few
-        const padding = Array(questions.length - data.risultati.length).fill(0).map((_, i) => ({
-          domanda: questions[data.risultati.length + i].question,
-          risposta_utente: String(userAnswers[data.risultati.length + i] || ''),
-          corretto: false,
-          punteggio: 0,
-          spiegazione: 'Answer could not be evaluated'
-        }));
-        
-        data.risultati = [...data.risultati, ...padding];
-      } else {
-        // Truncate if we have too many
-        data.risultati = data.risultati.slice(0, questions.length);
-      }
-    }
-    
-    // Double-check that total_points and max_points are properly calculated
-    if (data.total_points === undefined || data.max_points === undefined) {
-      console.log('Calculating total_points and max_points...');
-      
-      let totalPoints = 0;
-      let maxPoints = 0;
-      
-      data.risultati.forEach((result, index) => {
-        const question = questions[index];
-        const pointValue = question.type === 'open-ended' ? 5 : 1;
-        
-        maxPoints += pointValue;
-        
-        // Ensure punteggio is a number
-        let score = 0;
-        if (typeof result.punteggio === 'number') {
-          score = result.punteggio;
-        } else if (typeof result.punteggio === 'string') {
-          score = parseFloat(result.punteggio);
-          if (isNaN(score)) score = 0;
+    try {
+      // Call the edge function for quiz grading
+      const { data, error } = await supabase.functions.invoke('grade-quiz', {
+        body: {
+          questions: validatedQuestions,
+          userAnswers: validatedAnswers,
+          provider: 'gemini'
         }
-        
-        // Make sure the score is within the valid range
-        if (question.type === 'open-ended') {
-          score = Math.min(5, Math.max(0, Math.round(score)));
-        } else {
-          score = score > 0 ? 1 : 0;
-        }
-        
-        result.punteggio = score;
-        totalPoints += score;
-        
-        console.log(`Question ${index+1} (${question.type}): ${result.punteggio}/${pointValue} points`);
       });
       
-      data.total_points = totalPoints;
-      data.max_points = maxPoints;
+      if (error) {
+        console.error('Error calling grade-quiz function:', error);
+        toast.error(`Error grading quiz: ${error.message}`);
+        console.log('AI grading error, falling back to manual grading:', error);
+        // Fall back to manual grading
+        return createManualGradingResponse(validatedQuestions, validatedAnswers);
+      }
       
-      // Recalculate total score as a ratio
-      data.punteggio_totale = maxPoints > 0 ? totalPoints / maxPoints : 0;
+      // Validate the quiz results
+      if (!data || !data.risultati || !Array.isArray(data.risultati)) {
+        console.error('Invalid quiz results format:', data);
+        toast.error('Invalid quiz results returned by AI. Please try again.');
+        return createManualGradingResponse(validatedQuestions, validatedAnswers);
+      }
       
-      console.log(`Total score: ${totalPoints}/${maxPoints} (${data.punteggio_totale.toFixed(2)})`);
+      console.log('Received quiz results:', data);
+      return data;
+    } catch (error) {
+      console.error('Error grading quiz:', error);
+      console.log('AI grading error, falling back to manual grading:', error);
+      toast.error(`Error grading quiz: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Fall back to manual grading
+      return createManualGradingResponse(validatedQuestions, validatedAnswers);
     }
-    
-    return data;
   } catch (error) {
-    console.error('Error grading quiz:', error);
+    console.error('Error in gradeQuiz function:', error);
     toast.error(`Error grading quiz: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return null;
   }
+};
+
+// Manual grading when AI grading fails
+function createManualGradingResponse(questions: any[], userAnswers: any[]): QuizResults {
+  console.log('Using manual grading as fallback');
+  
+  const results = questions.map((question, index) => {
+    const userAnswer = userAnswers[index] || '';
+    let isCorrect = false;
+    let score = 0;
+    
+    // Simple automated grading for multiple-choice and true-false
+    if (question.type !== 'open-ended') {
+      // For multiple-choice or true-false
+      if (typeof userAnswer === 'number' && userAnswer === question.correctAnswer) {
+        isCorrect = true;
+        score = 1;
+      }
+    }
+    
+    return {
+      domanda: question.question || `Question ${index + 1}`,
+      risposta_utente: String(userAnswer),
+      corretto: isCorrect,
+      punteggio: score,
+      spiegazione: isCorrect ? 
+        "Your answer is correct." : 
+        "The system couldn't evaluate this answer in detail, but it doesn't match the expected answer."
+    };
+  });
+  
+  // Calculate total score
+  const totalPoints = results.reduce((sum, r) => sum + r.punteggio, 0);
+  const maxPoints = questions.reduce((sum, q) => sum + (q.type === 'open-ended' ? 5 : 1), 0);
+  
+  return {
+    risultati: results,
+    punteggio_totale: maxPoints > 0 ? totalPoints / maxPoints : 0,
+    total_points: totalPoints,
+    max_points: maxPoints,
+    feedback_generale: "Your quiz was graded using a basic evaluation method due to AI service issues."
+  };
+}
+
+// XP levels data
+export const xpLevels = [
+  { name: 'Scholarly Kitten', minXP: 0, maxXP: 100 },
+  { name: 'Curious Cat', minXP: 100, maxXP: 500 },
+  { name: 'Clever Feline', minXP: 500, maxXP: 1000 },
+  { name: 'Academic Tabby', minXP: 1000, maxXP: 2500 },
+  { name: 'Wisdom Tiger', minXP: 2500, maxXP: 5000 }
+];
+
+// Get level based on XP
+export const getLevelInfo = (xp: number) => {
+  let currentLevel = xpLevels[0];
+  let nextLevel = xpLevels[1];
+  
+  for (let i = 0; i < xpLevels.length; i++) {
+    if (xp >= xpLevels[i].minXP) {
+      currentLevel = xpLevels[i];
+      nextLevel = xpLevels[i + 1] || xpLevels[i];
+    } else {
+      break;
+    }
+  }
+  
+  return {
+    current: currentLevel,
+    next: nextLevel
+  };
 };
 
 // Always returns true since we're using backend-only Gemini
