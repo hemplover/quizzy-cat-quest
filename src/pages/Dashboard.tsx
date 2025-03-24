@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSubjects, getQuizzesBySubjectId, getSubjectById } from '@/services/subjectService';
-import { getLevelInfo, getUserXP } from '@/services/experienceService';
+import { getLevelInfo, getUserXP, updateUserXP } from '@/services/experienceService';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import CreateSubjectModal from '@/components/CreateSubjectModal';
@@ -28,6 +28,7 @@ const Dashboard = () => {
     const fetchData = async () => {
       // Load user XP from localStorage
       const storedXP = await getUserXP();
+      console.log('User XP loaded:', storedXP);
       setUserXP(storedXP);
       
       // Load subjects and quizzes
@@ -78,6 +79,8 @@ const Dashboard = () => {
         
         quizzes.forEach(quiz => {
           if (quiz.results) {
+            console.log(`Quiz ${quiz.id} has results:`, quiz.results);
+            
             // Check for total_points and max_points first (new format)
             if (typeof quiz.results.total_points === 'number' && 
                 typeof quiz.results.max_points === 'number') {
@@ -88,14 +91,14 @@ const Dashboard = () => {
             } 
             // Then check for punteggio_totale (legacy format)
             else if (typeof quiz.results.punteggio_totale === 'number' && quiz.questions && quiz.questions.length > 0) {
-              // For legacy format, convert to points based on question count
+              // Convert percentage to points
               const pointsForThisQuiz = quiz.results.punteggio_totale * quiz.questions.length;
               totalPointsEarned += pointsForThisQuiz;
               totalMaxPoints += quiz.questions.length;
               quizzesWithResults++;
               console.log(`Quiz ${quiz.id} score (legacy): ${pointsForThisQuiz} of ${quiz.questions.length} points`);
             }
-            // Make a third attempt to get at least some data
+            // Check for risultati array
             else if (quiz.results.risultati && Array.isArray(quiz.results.risultati)) {
               let quizPoints = 0;
               let quizMaxPoints = 0;
@@ -111,7 +114,7 @@ const Dashboard = () => {
                 totalPointsEarned += quizPoints;
                 totalMaxPoints += quizMaxPoints;
                 quizzesWithResults++;
-                console.log(`Quiz ${quiz.id} score (fallback): ${quizPoints} of ${quizMaxPoints} points`);
+                console.log(`Quiz ${quiz.id} score (risultati): ${quizPoints} of ${quizMaxPoints} points`);
               }
             }
           }

@@ -18,7 +18,15 @@ const XPBar: React.FC<XPBarProps> = ({
   nextLevel
 }) => {
   const { t } = useLanguage();
-  const percentage = Math.min(Math.round((currentXP / nextLevelXP) * 100), 100) || 0;
+  
+  // Ensure XP values are numbers
+  const current = typeof currentXP === 'number' ? currentXP : 0;
+  const target = typeof nextLevelXP === 'number' ? nextLevelXP : 100;
+  
+  // Calculate percentage - ensure it's between 0-100
+  const percentage = Math.min(Math.round((current / Math.max(target, 1)) * 100), 100) || 0;
+  
+  console.log(`XP Bar - Current: ${current}, Target: ${target}, Percentage: ${percentage}%`);
   
   return (
     <div className="space-y-2">
@@ -27,7 +35,7 @@ const XPBar: React.FC<XPBarProps> = ({
           {t('currentLevel')}: <span className="text-cat">{level}</span>
         </div>
         <div className="text-muted-foreground">
-          {currentXP} / {nextLevelXP} XP
+          {current} / {target} XP
         </div>
       </div>
       
@@ -48,7 +56,7 @@ const XPBar: React.FC<XPBarProps> = ({
       </Progress>
       
       <div className="text-xs text-right text-muted-foreground">
-        {nextLevelXP - currentXP} XP {t('toNextLevel')}: <span className="font-medium">{nextLevel}</span>
+        {target - current} XP {t('toNextLevel')}: <span className="font-medium">{nextLevel}</span>
       </div>
     </div>
   );

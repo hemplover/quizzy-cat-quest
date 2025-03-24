@@ -33,7 +33,13 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
     console.log('Calculating overall average score with subjects:', subjects);
     
     // Get all subjects with completed quizzes
-    const subjectsWithScores = subjects.filter(s => s.completedQuizCount > 0);
+    const subjectsWithScores = subjects.filter(s => {
+      // Check if the subject has any completed quizzes
+      const hasCompletedQuizzes = s.completedQuizCount > 0;
+      console.log(`Subject ${s.name} has completed quizzes: ${hasCompletedQuizzes} (count: ${s.completedQuizCount})`);
+      return hasCompletedQuizzes;
+    });
+    
     console.log('Filtered subjects with scores:', subjectsWithScores);
     
     if (subjectsWithScores.length === 0) {
@@ -48,7 +54,7 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
     subjectsWithScores.forEach(subject => {
       console.log(`Subject ${subject.name}:`, subject);
       
-      if (subject.totalPoints !== undefined && subject.maxPoints !== undefined) {
+      if (subject.totalPoints !== undefined && subject.maxPoints !== undefined && subject.maxPoints > 0) {
         // If we have the weighted point system
         totalPointsEarned += subject.totalPoints;
         totalMaxPoints += subject.maxPoints;
@@ -77,8 +83,13 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
   };
 
   // Count completed quizzes across all subjects
-  const totalCompletedQuizzes = subjects.reduce((total, subject) => 
-    total + (subject.completedQuizCount || 0), 0);
+  const totalCompletedQuizzes = subjects.reduce((total, subject) => {
+    const count = subject.completedQuizCount || 0;
+    console.log(`Subject ${subject.name} has ${count} completed quizzes`);
+    return total + count;
+  }, 0);
+  
+  console.log(`Total completed quizzes across all subjects: ${totalCompletedQuizzes}`);
 
   return (
     <div className="glass-card p-6 rounded-xl w-full md:w-2/3">
