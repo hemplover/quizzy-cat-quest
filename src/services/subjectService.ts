@@ -42,7 +42,11 @@ export interface Quiz {
 // Helper function to get current user ID
 export const getCurrentUserId = async (): Promise<string | null> => {
   const { data: { session } } = await supabase.auth.getSession();
-  return session?.user?.id || null;
+  if (!session || !session.user) {
+    console.error('No user ID found, user might not be logged in');
+    return null;
+  }
+  return session.user.id;
 }
 
 // Get all subjects
@@ -53,6 +57,8 @@ export const getSubjects = async (): Promise<Subject[]> => {
       console.error('No user ID found, user might not be logged in');
       return [];
     }
+
+    console.log('Fetching subjects for user ID:', userId);
 
     const { data, error } = await supabase
       .from('subjects')
@@ -65,6 +71,8 @@ export const getSubjects = async (): Promise<Subject[]> => {
       toast.error('Failed to load subjects');
       return [];
     }
+    
+    console.log('Subjects fetched for user:', data.length);
     
     // Transform to match our interface
     return data.map(subject => ({
@@ -431,6 +439,8 @@ export const getQuizzes = async (): Promise<Quiz[]> => {
       return [];
     }
 
+    console.log('Fetching quizzes for user ID:', userId);
+
     const { data, error } = await supabase
       .from('quizzes')
       .select('*')
@@ -441,6 +451,8 @@ export const getQuizzes = async (): Promise<Quiz[]> => {
       console.error('Error getting quizzes:', error);
       return [];
     }
+    
+    console.log('Quizzes fetched for user:', data.length);
     
     return data.map(quiz => ({
       id: quiz.id,
@@ -468,6 +480,8 @@ export const getQuizzesBySubjectId = async (subjectId: string): Promise<Quiz[]> 
       return [];
     }
 
+    console.log(`Fetching quizzes for subject ID: ${subjectId} and user ID: ${userId}`);
+
     const { data, error } = await supabase
       .from('quizzes')
       .select('*')
@@ -479,6 +493,8 @@ export const getQuizzesBySubjectId = async (subjectId: string): Promise<Quiz[]> 
       console.error('Error getting quizzes by subject ID:', error);
       return [];
     }
+    
+    console.log(`Quizzes fetched for subject ${subjectId}:`, data.length);
     
     return data.map(quiz => ({
       id: quiz.id,
@@ -544,6 +560,8 @@ export const createQuiz = async (quiz: Omit<Quiz, 'id' | 'createdAt' | 'userId'>
       throw new Error('User not authenticated');
     }
 
+    console.log('Creating new quiz for user ID:', userId);
+
     const { data, error } = await supabase
       .from('quizzes')
       .insert({
@@ -561,6 +579,8 @@ export const createQuiz = async (quiz: Omit<Quiz, 'id' | 'createdAt' | 'userId'>
       console.error('Error creating quiz:', error);
       throw error;
     }
+    
+    console.log('Quiz created successfully with ID:', data.id);
     
     return {
       id: data.id,
@@ -650,4 +670,3 @@ export const initializeSubjectsIfNeeded = async (): Promise<void> => {
   console.log('No predefined subjects will be created');
   return;
 };
-

@@ -15,6 +15,7 @@ const AuthRequired = ({ children }: AuthRequiredProps) => {
   
   useEffect(() => {
     if (!loading && !user) {
+      console.log('User not authenticated, redirecting to auth page');
       // Save the attempted URL for redirection after login
       navigate(`/auth?redirect=${encodeURIComponent(location.pathname)}`, { replace: true });
     }

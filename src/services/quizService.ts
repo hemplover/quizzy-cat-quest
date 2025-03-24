@@ -86,12 +86,22 @@ export const generateQuiz = async (
     if (subjectId && documentId) {
       console.log(`Checking for previous quizzes on document: ${documentId}`);
       
-      // Query previous quizzes for this document
+      // Get the current user's ID for the query
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id;
+      
+      if (!userId) {
+        console.error('User ID is required but not found in session');
+        return null;
+      }
+      
+      // Query previous quizzes for this document and this user only
       const { data: previousQuizzes, error } = await supabase
         .from('quizzes')
         .select('questions')
         .eq('document_id', documentId)
-        .eq('subject_id', subjectId);
+        .eq('subject_id', subjectId)
+        .eq('user_id', userId);
       
       if (error) {
         console.error('Error fetching previous quizzes:', error);
@@ -377,10 +387,12 @@ export const saveRecentText = (subjectId: string, textData: {
   content: string;
 }): void => {
   try {
-    // Store text data keyed by subject ID
-    const textKey = `recent_text_${subjectId}`;
+    // Store text data keyed by subject ID and user ID
+    const { session } = supabase.auth.getSession();
+    const userId = session?.user?.id || 'anonymous';
+    const textKey = `recent_text_${subjectId}_${userId}`;
     localStorage.setItem(textKey, JSON.stringify(textData));
-    console.log(`Saved recent text for subject ${subjectId}`);
+    console.log(`Saved recent text for subject ${subjectId} and user ${userId}`);
   } catch (error) {
     console.error('Error saving recent text:', error);
   }
@@ -392,7 +404,10 @@ export const getRecentText = (subjectId: string): {
   content: string;
 } | null => {
   try {
-    const textKey = `recent_text_${subjectId}`;
+    // Get text data keyed by subject ID and user ID
+    const { session } = supabase.auth.getSession();
+    const userId = session?.user?.id || 'anonymous';
+    const textKey = `recent_text_${subjectId}_${userId}`;
     const storedData = localStorage.getItem(textKey);
     
     if (!storedData) {

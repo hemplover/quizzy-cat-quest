@@ -48,6 +48,8 @@ const UserMenu = () => {
     return user.email?.split('@')[0] || t('User');
   };
   
+  console.log("Rendering UserMenu for user:", user.email);
+  
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
