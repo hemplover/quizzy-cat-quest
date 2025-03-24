@@ -1,16 +1,129 @@
-
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 import { updateUserXP, calculateQuizXP } from './experienceService';
 import { updateQuizResults, createQuiz } from '@/services/subjectService';
+import { getDefaultModel } from '@/services/aiProviderService';
 
-// Save quiz results to Supabase
+let currentModel = localStorage.getItem('selectedModel') || getDefaultModel();
+
+export const getSelectedModel = (): string => {
+  return currentModel || getDefaultModel();
+};
+
+export const setModelToUse = (modelId: string): void => {
+  currentModel = modelId;
+  localStorage.setItem('selectedModel', modelId);
+  console.log(`Model set to: ${modelId}`);
+};
+
+export const generateQuiz = async (
+  content: string,
+  settings: any,
+  subjectId: string,
+  documentId: string | null
+): Promise<any> => {
+  try {
+    console.log('Generating quiz with settings:', settings);
+    
+    const previousQuestions = [];
+    
+    const { data, error } = await supabase.functions.invoke('generate-quiz', {
+      body: {
+        content,
+        settings,
+        previousQuestions
+      }
+    });
+    
+    if (error) {
+      console.error('Error generating quiz:', error);
+      toast.error(`Error generating quiz: ${error.message || 'Unknown error'}`);
+      return null;
+    }
+    
+    if (!data) {
+      console.error('No data returned from quiz generation');
+      toast.error('Quiz generation failed');
+      return null;
+    }
+    
+    console.log('Quiz generated successfully:', data);
+    return data;
+  } catch (error: any) {
+    console.error('Error generating quiz:', error);
+    toast.error(`Error generating quiz: ${error.message || 'Unknown error'}`);
+    return null;
+  }
+};
+
+export const transformQuizQuestions = (generatedQuiz: any): any[] => {
+  try {
+    if (!generatedQuiz || !generatedQuiz.quiz || !Array.isArray(generatedQuiz.quiz)) {
+      console.error('Invalid quiz format:', generatedQuiz);
+      return [];
+    }
+    
+    return generatedQuiz.quiz.map((q: any) => {
+      let questionType = '';
+      
+      if (q.type === 'multiple_choice') {
+        questionType = 'multiple-choice';
+      } else if (q.type === 'true_false') {
+        questionType = 'true-false';
+      } else if (q.type === 'open_ended') {
+        questionType = 'open-ended';
+      } else {
+        questionType = q.type;
+      }
+      
+      const question: any = {
+        type: questionType,
+        question: q.question,
+        explanation: q.explanation || ''
+      };
+      
+      if (questionType === 'multiple-choice') {
+        question.options = q.options || [];
+        if (typeof q.correct_answer === 'number') {
+          question.correctAnswer = q.correct_answer;
+        } else if (typeof q.correct_answer === 'string') {
+          const index = question.options.findIndex((opt: string) => 
+            opt === q.correct_answer || 
+            opt.charAt(0).toUpperCase() === q.correct_answer
+          );
+          question.correctAnswer = index >= 0 ? index : 0;
+        } else {
+          question.correctAnswer = 0;
+        }
+      } else if (questionType === 'true-false') {
+        question.options = ['False', 'True'];
+        if (typeof q.correct_answer === 'boolean') {
+          question.correctAnswer = q.correct_answer ? 1 : 0;
+        } else if (typeof q.correct_answer === 'string') {
+          const answer = q.correct_answer.toLowerCase();
+          question.correctAnswer = (answer === 'true' || answer === 't') ? 1 : 0;
+        } else if (typeof q.correct_answer === 'number') {
+          question.correctAnswer = q.correct_answer > 0 ? 1 : 0;
+        } else {
+          question.correctAnswer = 0;
+        }
+      } else if (questionType === 'open-ended') {
+        question.correctAnswer = q.correct_answer || '';
+      }
+      
+      return question;
+    });
+  } catch (error) {
+    console.error('Error transforming quiz questions:', error);
+    return [];
+  }
+};
+
 export const saveQuizResults = async (quizId: string, results: any): Promise<boolean> => {
   try {
     console.log('Saving quiz results to Supabase:', { quizId, results });
     
-    // First make sure we have a user ID
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user?.id) {
       console.error('Cannot save quiz results: User not logged in');
@@ -18,7 +131,6 @@ export const saveQuizResults = async (quizId: string, results: any): Promise<boo
       return false;
     }
 
-    // Save to Supabase
     const updatedQuiz = await updateQuizResults(quizId, results);
     
     if (!updatedQuiz) {
@@ -29,7 +141,6 @@ export const saveQuizResults = async (quizId: string, results: any): Promise<boo
     
     console.log('Quiz results saved successfully to Supabase');
     
-    // Calculate and award XP
     await awardQuizXP(results);
     
     return true;
@@ -40,24 +151,17 @@ export const saveQuizResults = async (quizId: string, results: any): Promise<boo
   }
 };
 
-// Award XP for completing a quiz
 const awardQuizXP = async (results: any): Promise<void> => {
   try {
-    // Ensure we have valid results with a score
     if (!results) return;
     
     let score = 0;
     
-    // First try with the new format (total_points / max_points)
     if (typeof results.total_points === 'number' && typeof results.max_points === 'number' && results.max_points > 0) {
       score = results.total_points / results.max_points;
-    }
-    // Then try with legacy format (punteggio_totale as a percentage 0-1)
-    else if (typeof results.punteggio_totale === 'number') {
+    } else if (typeof results.punteggio_totale === 'number') {
       score = results.punteggio_totale;
-    }
-    // Finally try to calculate from risultati if available
-    else if (results.risultati && Array.isArray(results.risultati)) {
+    } else if (results.risultati && Array.isArray(results.risultati)) {
       const totalPoints = results.risultati.reduce((sum: number, result: any) => {
         return sum + (typeof result.punteggio === 'number' ? result.punteggio : 0);
       }, 0);
@@ -69,15 +173,12 @@ const awardQuizXP = async (results: any): Promise<void> => {
       }
     }
     
-    // Normalize score to 0-1 range
     score = Math.max(0, Math.min(1, score));
     console.log(`Calculated normalized score for XP award: ${score}`);
     
-    // Calculate XP based on performance
     const xpEarned = calculateQuizXP(score);
     console.log(`XP to be awarded: ${xpEarned}`);
     
-    // Update user XP
     const result = await updateUserXP(xpEarned);
     
     if (result.leveledUp && result.newLevel) {
@@ -93,7 +194,6 @@ const awardQuizXP = async (results: any): Promise<void> => {
   }
 };
 
-// Generate a quiz using the grade-quiz Supabase edge function
 export const gradeQuiz = async (
   questions: any[],
   userAnswers: any[],
@@ -106,7 +206,6 @@ export const gradeQuiz = async (
       provider 
     });
     
-    // Call Supabase Edge Function
     const { data, error } = await supabase.functions.invoke('grade-quiz', {
       body: {
         questions,
@@ -136,10 +235,8 @@ export const gradeQuiz = async (
   }
 };
 
-// Save a quiz to localStorage for a logged in user
 export const saveQuizToHistory = async (quiz: any): Promise<void> => {
   try {
-    // First make sure we have a user ID
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
     
@@ -150,7 +247,6 @@ export const saveQuizToHistory = async (quiz: any): Promise<void> => {
     
     const historyKey = `quizHistory_${userId}`;
     
-    // Get existing history
     const existingHistoryStr = localStorage.getItem(historyKey);
     let history = [];
     
@@ -163,7 +259,6 @@ export const saveQuizToHistory = async (quiz: any): Promise<void> => {
       }
     }
     
-    // Add new quiz to history
     const quizWithTimestamp = {
       ...quiz,
       timestamp: new Date().toISOString()
@@ -171,12 +266,10 @@ export const saveQuizToHistory = async (quiz: any): Promise<void> => {
     
     history.unshift(quizWithTimestamp);
     
-    // Limit history size (optional)
     if (history.length > 50) {
       history = history.slice(0, 50);
     }
     
-    // Save back to localStorage
     localStorage.setItem(historyKey, JSON.stringify(history));
     console.log('Quiz saved to history');
   } catch (error) {
@@ -184,10 +277,8 @@ export const saveQuizToHistory = async (quiz: any): Promise<void> => {
   }
 };
 
-// Get recent quizzes history
 export const getQuizHistory = async (): Promise<any[]> => {
   try {
-    // First make sure we have a user ID
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
     
@@ -198,7 +289,6 @@ export const getQuizHistory = async (): Promise<any[]> => {
     
     const historyKey = `quizHistory_${userId}`;
     
-    // Get existing history
     const existingHistoryStr = localStorage.getItem(historyKey);
     
     if (!existingHistoryStr) {
@@ -218,10 +308,8 @@ export const getQuizHistory = async (): Promise<any[]> => {
   }
 };
 
-// Get most recent text used for generating quizzes
 export const getRecentText = async (): Promise<string> => {
   try {
-    // First make sure we have a user ID
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
     
@@ -238,10 +326,8 @@ export const getRecentText = async (): Promise<string> => {
   }
 };
 
-// Save most recent text used for generating quizzes
 export const saveRecentText = async (text: string): Promise<void> => {
   try {
-    // First make sure we have a user ID
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
     
@@ -257,7 +343,6 @@ export const saveRecentText = async (text: string): Promise<void> => {
   }
 };
 
-// Helper to create a new quiz directly from generated questions
 export const createNewQuizFromQuestions = async (
   title: string,
   subjectId: string,
@@ -273,7 +358,6 @@ export const createNewQuizFromQuestions = async (
       questionCount: questions.length
     });
     
-    // Create quiz in Supabase
     const newQuiz = await createQuiz({
       title,
       subjectId,
@@ -299,30 +383,25 @@ export const createNewQuizFromQuestions = async (
   }
 };
 
-// Function to deep validate a quiz object to ensure it has all required properties
 export const validateQuiz = (quiz: any): boolean => {
   if (!quiz) return false;
   
-  // Check required top-level properties
   if (!quiz.id || !quiz.title || !quiz.subjectId) {
     console.error('Quiz missing required properties:', quiz);
     return false;
   }
   
-  // Check that questions is an array
   if (!Array.isArray(quiz.questions) || quiz.questions.length === 0) {
     console.error('Quiz has no questions or questions is not an array:', quiz);
     return false;
   }
   
-  // Validate each question
   for (const question of quiz.questions) {
     if (!question.question) {
       console.error('Question missing text:', question);
       return false;
     }
     
-    // Validate by question type
     if (question.type === 'multiple-choice') {
       if (!Array.isArray(question.options) || question.options.length < 2) {
         console.error('Multiple-choice question has invalid options:', question);
