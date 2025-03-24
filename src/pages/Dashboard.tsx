@@ -4,15 +4,18 @@ import { useNavigate } from 'react-router-dom';
 import { getSubjects, getQuizzesBySubjectId, getSubjectById } from '@/services/subjectService';
 import { getLevelInfo } from '@/services/experienceService';
 import { useLanguage } from '@/i18n/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 import CreateSubjectModal from '@/components/CreateSubjectModal';
 import UserProgressCard from '@/components/dashboard/UserProgressCard';
 import QuickActionsCard from '@/components/dashboard/QuickActionsCard';
 import SubjectsSection from '@/components/dashboard/SubjectsSection';
 import RecentQuizzesSection from '@/components/dashboard/RecentQuizzesSection';
+import { toast } from 'sonner';
 
 const Dashboard = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [userXP, setUserXP] = useState(0);
   const [quizResults, setQuizResults] = useState<any[]>([]);
   const [createSubjectOpen, setCreateSubjectOpen] = useState(false);
@@ -21,14 +24,14 @@ const Dashboard = () => {
   
   useEffect(() => {
     // Load user XP from localStorage
-    const storedXP = parseInt(localStorage.getItem('userXP') || '0');
+    const storedXP = parseInt(localStorage.getItem(`userXP_${user?.id}`) || '0', 10);
     setUserXP(storedXP);
     
     // Load subjects and quizzes
     loadSubjects();
     
     // Load quiz history from localStorage
-    const storedQuizHistory = localStorage.getItem('quizHistory');
+    const storedQuizHistory = localStorage.getItem(`quizHistory_${user?.id}`);
     if (storedQuizHistory) {
       try {
         setQuizResults(JSON.parse(storedQuizHistory));
@@ -37,7 +40,7 @@ const Dashboard = () => {
         setQuizResults([]);
       }
     }
-  }, []);
+  }, [user]);
 
   // Calculate level information
   const levelInfo = getLevelInfo(userXP);
@@ -50,6 +53,12 @@ const Dashboard = () => {
       const loadedSubjects = await getSubjects();
       console.log('Loaded subjects:', loadedSubjects);
       
+      if (!loadedSubjects.length) {
+        setSubjects([]);
+        setIsLoading(false);
+        return;
+      }
+      
       // Calculate stats for each subject
       const subjectsWithStats = await Promise.all(loadedSubjects.map(async (subject) => {
         const quizzes = await getQuizzesBySubjectId(subject.id);
@@ -57,27 +66,34 @@ const Dashboard = () => {
         console.log(`Subject ${subject.name} has ${quizzes.length} quizzes`);
         
         // Calculate scores properly
-        let totalCorrectAnswers = 0;
-        let totalQuestions = 0;
+        let totalPointsEarned = 0;
+        let totalMaxPoints = 0;
         let quizzesWithResults = 0;
         
         quizzes.forEach(quiz => {
           if (quiz.results && quiz.questions && quiz.questions.length > 0) {
-            if (typeof quiz.results.punteggio_totale === 'number') {
-              console.log(`Quiz ${quiz.title || quiz.id} has results:`, quiz.results);
-              totalCorrectAnswers += quiz.results.punteggio_totale;
-              totalQuestions += quiz.questions.length;
+            if (typeof quiz.results.total_points === 'number' && typeof quiz.results.max_points === 'number') {
+              // If we have the new weighted point system with total_points and max_points
+              totalPointsEarned += quiz.results.total_points;
+              totalMaxPoints += quiz.results.max_points;
               quizzesWithResults++;
-              console.log(`Quiz ${quiz.id} score: ${quiz.results.punteggio_totale} correct out of ${quiz.questions.length} questions (${(quiz.results.punteggio_totale / quiz.questions.length) * 100}%)`);
+              console.log(`Quiz ${quiz.id} score: ${quiz.results.total_points} of ${quiz.results.max_points} points (${(quiz.results.total_points / quiz.results.max_points) * 100}%)`);
+            } else if (typeof quiz.results.punteggio_totale === 'number') {
+              // Fallback to punteggio_totale (legacy field)
+              const pointsForThisQuiz = quiz.results.punteggio_totale * quiz.questions.length;
+              totalPointsEarned += pointsForThisQuiz;
+              totalMaxPoints += quiz.questions.length;
+              quizzesWithResults++;
+              console.log(`Quiz ${quiz.id} score (legacy): ${pointsForThisQuiz} of ${quiz.questions.length} points (${quiz.results.punteggio_totale * 100}%)`);
             }
           }
         });
         
-        console.log(`Subject ${subject.name}: ${totalCorrectAnswers} correct answers out of ${totalQuestions} total questions`);
+        console.log(`Subject ${subject.name}: ${totalPointsEarned.toFixed(2)} points earned out of ${totalMaxPoints} total points`);
         
         // Calculate average score as a percentage
-        const averageScore = totalQuestions > 0 ? 
-          Math.round((totalCorrectAnswers / totalQuestions) * 100) : 0;
+        const averageScore = totalMaxPoints > 0 ? 
+          Math.round((totalPointsEarned / totalMaxPoints) * 100) : 0;
         
         console.log(`Subject ${subject.name} average score: ${averageScore}%`);
         
@@ -86,8 +102,8 @@ const Dashboard = () => {
           quizCount: quizzes.length,
           completedQuizCount: quizzesWithResults,
           averageScore: averageScore,
-          totalQuestions: totalQuestions, // Add this for the UserProgressCard calculation
-          totalCorrectAnswers: totalCorrectAnswers // Add this for the UserProgressCard calculation
+          totalPoints: totalPointsEarned,
+          maxPoints: totalMaxPoints
         };
       }));
       
@@ -95,6 +111,7 @@ const Dashboard = () => {
       setSubjects(subjectsWithStats);
     } catch (error) {
       console.error("Error loading subjects:", error);
+      toast.error("Failed to load subjects");
     } finally {
       setIsLoading(false);
     }

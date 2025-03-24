@@ -1,4 +1,6 @@
 
+import { supabase } from '@/integrations/supabase/client';
+
 // XP levels data
 export const xpLevels = [
   { name: 'Scholarly Kitten', minXP: 0, maxXP: 100 },
@@ -26,4 +28,63 @@ export const getLevelInfo = (xp: number) => {
     current: currentLevel,
     next: nextLevel
   };
+};
+
+// Add XP to a user's total and save it
+export const addUserXP = async (xpToAdd: number) => {
+  try {
+    // Get current user ID
+    const { data } = await supabase.auth.getSession();
+    const userId = data.session?.user?.id;
+    
+    if (!userId) {
+      console.error('Cannot add XP: User not authenticated');
+      return false;
+    }
+    
+    // Get current XP
+    const currentXP = parseInt(localStorage.getItem(`userXP_${userId}`) || '0', 10);
+    
+    // Add new XP
+    const newXP = currentXP + xpToAdd;
+    
+    // Save to localStorage
+    localStorage.setItem(`userXP_${userId}`, newXP.toString());
+    
+    console.log(`Added ${xpToAdd} XP. New total: ${newXP}`);
+    
+    // Check if user leveled up
+    const oldLevelInfo = getLevelInfo(currentXP);
+    const newLevelInfo = getLevelInfo(newXP);
+    
+    return {
+      newXP,
+      leveledUp: oldLevelInfo.current.name !== newLevelInfo.current.name,
+      oldLevel: oldLevelInfo.current,
+      newLevel: newLevelInfo.current
+    };
+  } catch (error) {
+    console.error('Error adding XP:', error);
+    return false;
+  }
+};
+
+// Get the user's current XP
+export const getUserXP = async () => {
+  try {
+    // Get current user ID
+    const { data } = await supabase.auth.getSession();
+    const userId = data.session?.user?.id;
+    
+    if (!userId) {
+      console.error('Cannot get XP: User not authenticated');
+      return 0;
+    }
+    
+    // Get current XP from localStorage
+    return parseInt(localStorage.getItem(`userXP_${userId}`) || '0', 10);
+  } catch (error) {
+    console.error('Error getting XP:', error);
+    return 0;
+  }
 };

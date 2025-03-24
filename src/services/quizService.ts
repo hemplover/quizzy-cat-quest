@@ -353,6 +353,26 @@ export const gradeQuiz = async (
       console.log(`Total score: ${totalPoints}/${maxPoints} (${data.punteggio_totale.toFixed(2)})`);
     }
     
+    // After grading, add XP to user based on score
+    try {
+      // Import dynamically to avoid circular dependency
+      const experienceService = await import('@/services/experienceService');
+      
+      // Calculate XP to award (10 XP per correct answer)
+      const xpToAward = Math.round(data.total_points * 10);
+      if (xpToAward > 0) {
+        const xpResult = await experienceService.addUserXP(xpToAward);
+        if (xpResult && xpResult.leveledUp) {
+          toast.success(`Level up! You're now a ${xpResult.newLevel.name}!`);
+        } else {
+          toast.success(`+${xpToAward} XP earned!`);
+        }
+      }
+    } catch (error) {
+      console.error('Error awarding XP:', error);
+      // Non-critical error, continue without failing
+    }
+    
     return data;
   } catch (error) {
     console.error('Error grading quiz:', error);

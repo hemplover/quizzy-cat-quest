@@ -49,17 +49,16 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
       console.log(`Subject ${subject.name}:`, subject);
       
       if (subject.totalPoints !== undefined && subject.maxPoints !== undefined) {
-        // If we have the new weighted point system
+        // If we have the weighted point system
         totalPointsEarned += subject.totalPoints;
         totalMaxPoints += subject.maxPoints;
         console.log(`Added ${subject.totalPoints} points earned out of ${subject.maxPoints} maximum points`);
-      } else if (subject.averageScore !== undefined && subject.totalQuestions !== undefined) {
-        // Legacy calculation (pre-weighted scoring)
-        // Convert percentage to points (assuming 1 point per question)
-        const subjectPointsEarned = (subject.averageScore / 100) * subject.totalQuestions;
+      } else if (subject.averageScore !== undefined && subject.completedQuizCount > 0) {
+        // Convert percentage to points
+        const subjectPointsEarned = (subject.averageScore / 100) * subject.completedQuizCount;
         totalPointsEarned += subjectPointsEarned;
-        totalMaxPoints += subject.totalQuestions;
-        console.log(`Legacy calculation: Added ${subjectPointsEarned.toFixed(2)} points earned out of ${subject.totalQuestions} maximum points`);
+        totalMaxPoints += subject.completedQuizCount;
+        console.log(`Legacy calculation: Added ${subjectPointsEarned.toFixed(2)} points earned out of ${subject.completedQuizCount} maximum points`);
       }
     });
     

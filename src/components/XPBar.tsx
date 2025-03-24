@@ -2,6 +2,7 @@
 import React from 'react';
 import { Progress } from '@/components/ui/progress';
 import { useLanguage } from '@/i18n/LanguageContext';
+import { cn } from '@/lib/utils';
 
 interface XPBarProps {
   currentXP: number;
@@ -30,8 +31,18 @@ const XPBar: React.FC<XPBarProps> = ({
         </div>
       </div>
       
-      <Progress value={percentage} className="h-2 bg-gray-100">
-        <div className="absolute inset-0 flex items-center justify-center">
+      <Progress 
+        value={percentage} 
+        className={cn(
+          "h-2 bg-gray-100",
+          "relative overflow-hidden"
+        )}
+      >
+        <div 
+          className={cn(
+            "absolute inset-0 flex items-center justify-center",
+            "transition-all duration-500"
+          )}>
           <span className="text-xs font-medium text-white z-10">{percentage}%</span>
         </div>
       </Progress>
