@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 interface CatTutorProps {
   message?: string;
   randomMessages?: boolean;
-  emotion?: 'happy' | 'thinking' | 'excited' | 'confused';
+  emotion?: 'happy' | 'thinking' | 'excited' | 'confused' | 'sad' | 'neutral';
   withSpeechBubble?: boolean;
   className?: string;
 }
@@ -70,6 +70,10 @@ const CatTutor: React.FC<CatTutorProps> = ({
         return 'bg-orange-500 text-white animate-bounce-subtle';
       case 'confused':
         return 'bg-yellow-500 text-white animate-pulse-subtle';
+      case 'sad':
+        return 'bg-gray-400 text-white animate-pulse-subtle';
+      case 'neutral':
+        return 'bg-gray-300 text-gray-700';
       default:
         return 'bg-cat text-cat-foreground animate-bounce-subtle';
     }
