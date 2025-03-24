@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
@@ -15,7 +16,6 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { gradeQuiz, saveQuizResults, getSelectedModel } from '@/services/quizService';
 import { useLanguage } from '@/i18n/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
 
 interface BaseQuestion {
   id: number;
@@ -98,7 +98,9 @@ const Quiz = () => {
       try {
         setIsLoading(true);
         
+        // First check if we have a quiz ID in the URL
         if (quizId) {
+          // Try to fetch from Supabase
           const { data, error } = await supabase.from('quizzes')
             .select('*')
             .eq('id', quizId)
@@ -114,6 +116,7 @@ const Quiz = () => {
             setQuizTitle(data.title);
             
             if (Array.isArray(data.questions)) {
+              // Ensure all questions have an ID
               const questionsWithIds = data.questions.map((q: any, index: number) => ({
                 ...q,
                 id: q.id || index + 1
@@ -127,6 +130,7 @@ const Quiz = () => {
           }
         }
         
+        // If no quiz ID or couldn't fetch from database, try session storage
         const quizDataStr = sessionStorage.getItem('quizData');
         
         if (!quizDataStr) {
@@ -143,6 +147,7 @@ const Quiz = () => {
         if (storedQuestionsStr) {
           const parsedQuestions = JSON.parse(storedQuestionsStr);
           
+          // Ensure all questions have an ID for tracking user answers
           const questionsWithIds = parsedQuestions.map((q: any, index: number) => ({
             ...q,
             id: q.id || index + 1
@@ -210,8 +215,11 @@ const Quiz = () => {
         return;
       }
       
+      // For open-ended questions, we don't determine correctness immediately
+      // We'll let the AI grade it later
       setIsCorrect(null);
       
+      // Store the answer with the question ID
       setUserAnswers(prev => [...prev, {
         questionId: currentQuestion.id,
         userAnswer: openEndedAnswer
@@ -227,6 +235,7 @@ const Quiz = () => {
       const isCorrectAnswer = selectedOption === currentQuestion.correctAnswer;
       setIsCorrect(isCorrectAnswer);
       
+      // Store the answer with the question ID
       setUserAnswers(prev => [...prev, {
         questionId: currentQuestion.id,
         userAnswer: selectedOption
@@ -237,11 +246,13 @@ const Quiz = () => {
     
     setIsAnswerSubmitted(true);
     
+    // Set cat message based on if we know correctness now
     if (currentQuestion.type !== 'open-ended') {
       const messageType = isCorrect ? 'correct' : 'incorrect';
       const randomIndex = Math.floor(Math.random() * catMessages[messageType].length);
       setCatMessage(catMessages[messageType][randomIndex]);
     } else {
+      // For open-ended, just show an encouraging message
       const randomIndex = Math.floor(Math.random() * catMessages.encouragement.length);
       setCatMessage(`${catMessages.encouragement[randomIndex]} I'll grade your answer at the end.`);
     }
@@ -267,11 +278,13 @@ const Quiz = () => {
     setCatMessage(`${catMessages.completion[randomIndex]} I'm grading your answers now...`);
     
     try {
+      // Make sure we have an answer for every question
       const answersForAllQuestions = questions.map(question => {
         const existingAnswer = userAnswers.find(answer => answer.questionId === question.id);
         if (existingAnswer) {
           return existingAnswer;
         }
+        // If no answer was provided, create a default one
         if (question.type === 'open-ended') {
           return { questionId: question.id, userAnswer: '' };
         }
@@ -281,18 +294,21 @@ const Quiz = () => {
       console.log("Sending questions and answers for grading:", questions, answersForAllQuestions);
       console.log("Prepared answers for grading:", answersForAllQuestions.map(a => a.userAnswer));
       
+      // Send to API for grading
       const results = await gradeQuiz(questions, answersForAllQuestions, getSelectedModel() as any);
       
       if (results) {
         console.log("Received grading results:", results);
         setAiGradingResults(results);
         
+        // Save results if we have a quiz ID
         if (quizId) {
           await saveQuizResults(quizId, results);
         } else if (quizData && quizData.quizId) {
           await saveQuizResults(quizData.quizId, results);
         }
         
+        // Calculate total score
         let totalPoints = 0;
         let maxPoints = 0;
         
@@ -354,10 +370,12 @@ const Quiz = () => {
     const savedResults = JSON.parse(sessionStorage.getItem('quizResults') || '[]');
     sessionStorage.setItem('quizResults', JSON.stringify([...savedResults, results]));
     
+    // Calculate and award XP
     const earnedXP = Math.round((results.totalPoints / results.maxPoints) * (questions.length * 10));
     
     toast.success(`${t('quizCompleted')}! ${t('youEarned')} ${earnedXP} XP!`);
     
+    // Navigate to the subject detail page if we have subject ID
     if (quizData && quizData.subjectId) {
       navigate(`/subjects/${quizData.subjectId}`);
     } else {

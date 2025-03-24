@@ -1,11 +1,5 @@
 
 import { toast } from 'sonner';
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
-// Import the worker directly without using 'default'
-import 'pdfjs-dist/legacy/build/pdf.worker.entry';
-
-// Set the worker path for PDF.js - using the static property correctly
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsLib.PDFWorker && pdfjsLib.PDFWorker.workerSrc ? pdfjsLib.PDFWorker.workerSrc : null;
 
 /**
  * Parses the content of various document types
@@ -94,6 +88,14 @@ async function extractTextFromPdf(file: File): Promise<string> {
   try {
     console.log('Starting PDF text extraction process...', file.name, file.size);
     
+    // Import pdf.js library directly instead of using dynamic imports which can fail
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.js');
+    console.log('PDF.js library loaded successfully');
+    
+    // Set worker path directly
+    const pdfjsWorker = await import('pdfjs-dist/legacy/build/pdf.worker.js');
+    pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+    
     // Read file as ArrayBuffer
     console.log('Loading file as ArrayBuffer...');
     const arrayBuffer = await file.arrayBuffer();
@@ -101,7 +103,7 @@ async function extractTextFromPdf(file: File): Promise<string> {
     
     // Load PDF document
     console.log('Creating PDF loading task...');
-    const loadingTask = pdfjsLib.getDocument({data: arrayBuffer});
+    const loadingTask = pdfjs.getDocument({data: arrayBuffer});
     
     console.log('Waiting for PDF document to load...');
     const pdf = await loadingTask.promise;
