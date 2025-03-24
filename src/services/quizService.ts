@@ -49,6 +49,31 @@ export const generateQuiz = async (
     }
     
     console.log('Quiz generated successfully:', data);
+    
+    if (data.quiz && Array.isArray(data.quiz)) {
+      if (settings.questionTypes && settings.questionTypes.length > 0) {
+        const allowedTypes = new Set(settings.questionTypes.map(type => {
+          if (type === 'multiple-choice') return 'multiple_choice';
+          if (type === 'true-false') return 'true_false';
+          if (type === 'open-ended') return 'open_ended';
+          return type;
+        }));
+        
+        const hasIncorrectTypes = data.quiz.some(q => !allowedTypes.has(q.type));
+        
+        if (hasIncorrectTypes) {
+          console.error('Quiz contains question types not requested by user:', 
+            data.quiz.map(q => q.type));
+          toast.error('The generated quiz contains incorrect question types. Please try again.');
+          return null;
+        }
+      }
+      
+      if (data.quiz.length !== settings.numQuestions) {
+        console.warn(`Quiz contains ${data.quiz.length} questions, but ${settings.numQuestions} were requested.`);
+      }
+    }
+    
     return data;
   } catch (error: any) {
     console.error('Error generating quiz:', error);
@@ -64,7 +89,7 @@ export const transformQuizQuestions = (generatedQuiz: any): any[] => {
       return [];
     }
     
-    return generatedQuiz.quiz.map((q: any) => {
+    return generatedQuiz.quiz.map((q: any, index: number) => {
       let questionType = '';
       
       if (q.type === 'multiple_choice') {
@@ -78,6 +103,7 @@ export const transformQuizQuestions = (generatedQuiz: any): any[] => {
       }
       
       const question: any = {
+        id: index + 1,
         type: questionType,
         question: q.question,
         explanation: q.explanation || ''
@@ -97,14 +123,14 @@ export const transformQuizQuestions = (generatedQuiz: any): any[] => {
           question.correctAnswer = 0;
         }
       } else if (questionType === 'true-false') {
-        question.options = ['False', 'True'];
+        question.options = ['True', 'False'];
         if (typeof q.correct_answer === 'boolean') {
-          question.correctAnswer = q.correct_answer ? 1 : 0;
+          question.correctAnswer = q.correct_answer ? 0 : 1;
         } else if (typeof q.correct_answer === 'string') {
           const answer = q.correct_answer.toLowerCase();
-          question.correctAnswer = (answer === 'true' || answer === 't') ? 1 : 0;
+          question.correctAnswer = (answer === 'true' || answer === 't') ? 0 : 1;
         } else if (typeof q.correct_answer === 'number') {
-          question.correctAnswer = q.correct_answer > 0 ? 1 : 0;
+          question.correctAnswer = q.correct_answer > 0 ? 0 : 1;
         } else {
           question.correctAnswer = 0;
         }
@@ -206,10 +232,29 @@ export const gradeQuiz = async (
       provider 
     });
     
+    const processedAnswers = [];
+    
+    for (let i = 0; i < questions.length; i++) {
+      const question = questions[i];
+      let answer = null;
+      
+      const userAnswerObj = userAnswers.find(a => a.questionId === question.id);
+      
+      if (userAnswerObj) {
+        answer = userAnswerObj.userAnswer;
+      } else if (i < userAnswers.length) {
+        answer = typeof userAnswers[i] === 'object' ? userAnswers[i].userAnswer : userAnswers[i];
+      }
+      
+      processedAnswers.push(answer);
+    }
+    
+    console.log('Grading quiz with processed answers:', processedAnswers);
+    
     const { data, error } = await supabase.functions.invoke('grade-quiz', {
       body: {
         questions,
-        userAnswers,
+        userAnswers: processedAnswers,
         provider
       }
     });
@@ -224,6 +269,38 @@ export const gradeQuiz = async (
       console.error('No data returned from quiz grading');
       toast.error('Quiz grading failed');
       return null;
+    }
+    
+    if (!data.risultati || !Array.isArray(data.risultati)) {
+      console.error('Invalid quiz results format:', data);
+      toast.error('Invalid quiz results format. Please try again.');
+      return null;
+    }
+    
+    let validationFailed = false;
+    data.risultati.forEach((result: any, index: number) => {
+      const question = questions[index];
+      if (!question) {
+        console.error(`No matching question for result at index ${index}`);
+        validationFailed = true;
+        return;
+      }
+      
+      if (question.type === 'open-ended') {
+        if (typeof result.punteggio !== 'number' || result.punteggio < 0 || result.punteggio > 5) {
+          console.error(`Invalid score for open-ended question: ${result.punteggio}`);
+          result.punteggio = Math.min(5, Math.max(0, Math.round(result.punteggio || 0)));
+        }
+      } else {
+        if (typeof result.punteggio !== 'number' || (result.punteggio !== 0 && result.punteggio !== 1)) {
+          console.error(`Invalid score for ${question.type} question: ${result.punteggio}`);
+          result.punteggio = result.corretto ? 1 : 0;
+        }
+      }
+    });
+    
+    if (validationFailed) {
+      toast.error('There was an issue with the quiz grading. Results may not be accurate.');
     }
     
     console.log('Quiz graded successfully:', data);
