@@ -179,27 +179,45 @@ export const gradeQuizWithGemini = async (
   if (isBackendOnlyProvider('gemini')) {
     console.log('Using backend Gemini API key from Supabase secrets for grading');
     
-    // Call the edge function for quiz grading
-    const { data, error } = await supabase.functions.invoke('grade-quiz', {
-      body: {
-        questions,
-        userAnswers,
-        provider: 'gemini'
+    try {
+      // Clean up answers before sending to the edge function
+      const processedAnswers = userAnswers.map(answer => {
+        if (answer === null || answer === undefined) {
+          return '';
+        }
+        return answer;
+      });
+      
+      // Call the edge function for quiz grading
+      const { data, error } = await supabase.functions.invoke('grade-quiz', {
+        body: {
+          questions,
+          userAnswers: processedAnswers,
+          provider: 'gemini'
+        }
+      });
+      
+      if (error) {
+        console.error('Error calling grade-quiz function:', error);
+        toast.error(`Error grading quiz: ${error.message}`);
+        throw new Error(`Error grading quiz: ${error.message}`);
       }
-    });
-    
-    if (error) {
-      console.error('Error calling grade-quiz function:', error);
-      toast.error(`Error grading quiz: ${error.message}`);
-      throw new Error(`Error grading quiz: ${error.message}`);
+      
+      if (!data) {
+        console.error('No data returned from grade-quiz function');
+        throw new Error('No data returned from grade-quiz function');
+      }
+      
+      if (!data.risultati || !Array.isArray(data.risultati)) {
+        console.error('Invalid quiz results format returned by API:', data);
+        throw new Error('Invalid quiz results format returned by API');
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error in gradeQuizWithGemini:', error);
+      throw error;
     }
-    
-    if (!data || !data.risultati || !Array.isArray(data.risultati)) {
-      console.error('Invalid quiz results format returned by API');
-      throw new Error('Invalid quiz results format returned by API');
-    }
-    
-    return data;
   }
   
   // Original frontend implementation is kept but won't be used

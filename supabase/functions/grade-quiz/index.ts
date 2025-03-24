@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -384,7 +383,7 @@ For open-ended questions, you MUST:
 3. Be fair but rigorous - a score of 5/5 should only be for truly excellent, comprehensive answers
 4. Always include what the correct answer should have included
 
-Return your grading as JSON with the following format:
+YOUR RESPONSE MUST ONLY CONTAIN VALID JSON in this exact format:
 {
   "risultati": [
     {"domanda": "Question text", "risposta_utente": "User's answer", "corretto": true/false or "Parzialmente", "punteggio": score (based on question type), "spiegazione": "Detailed explanation of the score, including what the correct answer should be"}, 
@@ -424,7 +423,9 @@ ${formattedQuestions}`;
         ],
         generationConfig: {
           temperature: 0,
-          maxOutputTokens: 1000
+          maxOutputTokens: 1000,
+          topP: 0.8,
+          topK: 40
         }
       })
     });
@@ -459,79 +460,48 @@ ${formattedQuestions}`;
       throw new Error('Unexpected response format from Gemini API');
     }
     
-    // Log the raw response for debugging
-    console.log('Raw Gemini response content:', generatedContent.substring(0, 1000));
+    // Log part of the raw response for debugging
+    console.log('Raw Gemini response content (first 200 chars):', generatedContent.substring(0, 200));
     
-    // Improved JSON parsing with better error handling
+    // Clean up the response text before parsing
+    const cleanedContent = generatedContent
+      .replace(/```json/g, '')   // Remove Markdown code indicators
+      .replace(/```/g, '')       // Remove Markdown code indicators
+      .trim();                   // Remove any leading/trailing whitespace
+    
+    console.log('Cleaned response (first 200 chars):', cleanedContent.substring(0, 200));
+    
+    // Force the model to return valid JSON by using a more explicit JSON-only prompt
     try {
       // First attempt: try to parse directly
-      return JSON.parse(generatedContent);
+      return JSON.parse(cleanedContent);
     } catch (directParseError) {
       console.error('Direct JSON parsing failed:', directParseError);
       
       try {
-        // Second attempt: look for JSON block pattern
-        const jsonMatch = generatedContent.match(/```json\n([\s\S]*)\n```/) || 
-                           generatedContent.match(/\{[\s\S]*\}/);
+        // Second attempt: extract JSON object - find the first '{' and last '}'
+        const firstBrace = cleanedContent.indexOf('{');
+        const lastBrace = cleanedContent.lastIndexOf('}');
         
-        if (jsonMatch) {
-          const extractedJson = jsonMatch[1] || jsonMatch[0];
-          console.log('Extracted JSON:', extractedJson.substring(0, 500));
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          const jsonString = cleanedContent.substring(firstBrace, lastBrace + 1);
+          console.log('Extracted JSON string (first 200 chars):', jsonString.substring(0, 200));
           
-          // Try to clean the JSON before parsing
-          const cleanedJson = extractedJson
-            .replace(/\\"/g, '"') // Fix escaped quotes
-            .replace(/\n/g, ' ')  // Remove newlines
-            .replace(/\t/g, ' ')  // Remove tabs
-            .replace(/\r/g, ' ')  // Remove carriage returns
-            .replace(/,\s*}/g, '}') // Remove trailing commas
-            .replace(/,\s*]/g, ']'); // Remove trailing commas in arrays
-            
-          // Create a simple validation to ensure it's properly formatted JSON
-          if (!cleanedJson.startsWith('{') || !cleanedJson.endsWith('}')) {
-            throw new Error('Extracted text is not a valid JSON object');
-          }
-                    
-          // Parse cleaned JSON
+          // Try to parse the extracted JSON
           try {
-            return JSON.parse(cleanedJson);
-          } catch (cleanedParseError) {
-            console.error('Error parsing cleaned JSON:', cleanedParseError);
-            
-            // Last attempt: try to manually construct a valid result object
-            // Extract fragments and build our own JSON
-            const risulatiMatch = cleanedJson.match(/"risultati"\s*:\s*\[([\s\S]*?)\]/);
-            if (risulatiMatch) {
-              console.log('Successfully extracted risultati array');
-              
-              try {
-                // Try to parse just the risultati array
-                const risultatiJson = `[${risulatiMatch[1]}]`;
-                const risultati = JSON.parse(risultatiJson);
-                
-                // Construct a valid result object
-                return {
-                  risultati: risultati,
-                  punteggio_totale: 0.5, // Default to 50% score
-                  feedback_generale: "Grading partially completed due to response formatting issues."
-                };
-              } catch (fragmentParseError) {
-                console.error('Error parsing risultati fragment:', fragmentParseError);
-                throw new Error('Failed to parse essential JSON components');
-              }
-            } else {
-              throw new Error('Could not extract key components from Gemini response');
-            }
+            return JSON.parse(jsonString);
+          } catch (extractedJsonError) {
+            console.error('Error parsing extracted JSON:', extractedJsonError);
+            throw new Error('Failed to parse extracted JSON from Gemini response');
           }
         } else {
-          throw new Error('Failed to extract JSON from Gemini response text');
+          console.error('Could not find valid JSON structure in response');
+          throw new Error('No valid JSON structure found in Gemini response');
         }
       } catch (extractError) {
         console.error('JSON extraction and parsing failed:', extractError);
         
-        // Last resort: construct a basic fallback result
-        console.log('Creating fallback grading result due to parsing failures');
-        
+        // Create a fallback response
         return {
           risultati: questions.map((q, i) => ({
             domanda: q.question || 'Unknown question',
