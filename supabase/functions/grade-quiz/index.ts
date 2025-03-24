@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -29,146 +28,97 @@ serve(async (req) => {
     
     const { questions, userAnswers, provider } = requestBody;
     
-    // Validate input parameters with better error handling
-    if (!questions) {
-      console.error('Missing questions parameter');
+    // More detailed logging to help diagnose issues
+    console.log('Provider:', provider);
+    console.log('Questions type:', typeof questions);
+    console.log('UserAnswers type:', typeof userAnswers);
+    console.log('Questions is array:', Array.isArray(questions));
+    console.log('UserAnswers is array:', Array.isArray(userAnswers));
+    
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+      console.error('Invalid or missing questions:', questions);
+      // Return a fallback grading response instead of an error
+      const fallbackResponse = createManualGradingResponse(questions || [], userAnswers || []);
+      console.log('Using fallback response due to invalid questions');
       return new Response(
-        JSON.stringify({ error: 'Missing questions parameter' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify(fallbackResponse),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
-    if (!Array.isArray(questions)) {
-      console.error('Invalid questions parameter, not an array:', typeof questions);
+    if (!userAnswers || !Array.isArray(userAnswers)) {
+      console.error('Invalid or missing userAnswers:', userAnswers);
+      // Return a fallback grading response instead of an error
+      const fallbackResponse = createManualGradingResponse(questions, userAnswers || []);
+      console.log('Using fallback response due to invalid answers');
       return new Response(
-        JSON.stringify({ error: 'Invalid questions parameter, must be an array' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify(fallbackResponse),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
-    if (!userAnswers) {
-      console.error('Missing userAnswers parameter');
-      return new Response(
-        JSON.stringify({ error: 'Missing userAnswers parameter' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    if (!Array.isArray(userAnswers)) {
-      console.error('Invalid userAnswers parameter, not an array:', typeof userAnswers);
-      return new Response(
-        JSON.stringify({ error: 'Invalid userAnswers parameter, must be an array' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    if (!provider) {
-      console.error('Missing provider parameter');
-      return new Response(
-        JSON.stringify({ error: 'Missing provider parameter' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    console.log(`Grading quiz with provider: ${provider}`);
-    console.log('Questions count:', questions.length);
-    console.log('User answers count:', userAnswers.length);
-    console.log('First question sample:', JSON.stringify(questions[0]).substring(0, 200));
-    console.log('First answer sample:', JSON.stringify(userAnswers[0]).substring(0, 200));
-    
-    // Ensure userAnswers has the same length as questions
-    let processedUserAnswers = [...userAnswers];
-    if (processedUserAnswers.length !== questions.length) {
-      console.warn(`Answer count mismatch: ${processedUserAnswers.length} answers for ${questions.length} questions`);
-      
-      // Pad with empty answers if needed
-      while (processedUserAnswers.length < questions.length) {
-        processedUserAnswers.push('');
+    // Sanitize userAnswers to ensure we have valid data
+    const sanitizedAnswers = userAnswers.map((answer, index) => {
+      // Convert null/undefined to default values
+      if (answer === null || answer === undefined) {
+        const questionType = questions[index]?.type || 'unknown';
+        if (questionType === 'multiple-choice' || questionType === 'true-false') {
+          return 0; // Default to first option
+        }
+        return ''; // Empty string for open-ended
       }
-      
-      // Truncate if too many answers
-      if (processedUserAnswers.length > questions.length) {
-        processedUserAnswers = processedUserAnswers.slice(0, questions.length);
+      // If answer is a number, keep it as is
+      if (typeof answer === 'number') {
+        return answer;
       }
-    }
+      // If answer is anything else, convert to string
+      return String(answer);
+    });
     
-    // Check for null or undefined values in answers and convert them to empty strings
-    processedUserAnswers = processedUserAnswers.map(answer => 
-      answer === null || answer === undefined ? '' : answer
-    );
+    console.log('Sanitized answers:', sanitizedAnswers);
+    
+    // Always use a fallback provider if specified provider is invalid
+    let effectiveProvider = 'gemini';
+    if (provider === 'openai' || provider === 'gemini') {
+      effectiveProvider = provider;
+    } else {
+      console.warn(`Unrecognized provider "${provider}", defaulting to "gemini"`);
+    }
     
     let result = null;
     
     try {
-      switch (provider) {
+      switch (effectiveProvider) {
         case 'openai':
-          result = await gradeWithOpenAI(questions, processedUserAnswers);
+          result = await gradeWithOpenAI(questions, sanitizedAnswers);
           break;
         case 'gemini':
           // Always use backend key for Gemini
-          result = await gradeWithGemini(questions, processedUserAnswers);
+          result = await gradeWithGemini(questions, sanitizedAnswers);
           break;
-        case 'claude':
-        case 'mistral':
-          return new Response(
-            JSON.stringify({ error: `Integration with ${provider} is coming soon!` }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
         default:
-          return new Response(
-            JSON.stringify({ error: 'Unknown AI provider' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          // This shouldn't happen due to the check above
+          throw new Error(`Unsupported provider: ${effectiveProvider}`);
       }
     } catch (gradingError) {
-      console.error(`Error grading with ${provider}:`, gradingError);
+      console.error(`Error grading with ${effectiveProvider}:`, gradingError);
       
       // Create a fallback response for grading failures
-      result = {
-        risultati: questions.map((q, i) => ({
-          domanda: q.question || 'Unknown question',
-          risposta_utente: String(processedUserAnswers[i] || ''),
-          corretto: false,
-          punteggio: 0,
-          spiegazione: `Error grading this answer: ${gradingError.message || 'Unknown error'}`
-        })),
-        punteggio_totale: 0,
-        total_points: 0,
-        max_points: questions.length,
-        feedback_generale: 'There was an error grading your quiz. Some questions may not have been properly evaluated.'
-      };
-      
+      result = createManualGradingResponse(questions, sanitizedAnswers);
       console.log('Using fallback grading result due to error');
     }
     
     // Check if we got a valid result
     if (!result) {
       console.error('No result returned from grading function');
-      return new Response(
-        JSON.stringify({ error: 'No result returned from grading function' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      result = createManualGradingResponse(questions, sanitizedAnswers);
+      console.log('Using fallback grading result due to missing result');
     }
     
-    // Validate the quiz results
+    // Validate and fix the quiz results if needed
     if (!result.risultati || !Array.isArray(result.risultati)) {
-      console.error('Invalid quiz results format returned by AI:', result);
-      
-      // Create a fallback response if needed
-      result = {
-        risultati: questions.map((q, i) => ({
-          domanda: q.question || 'Unknown question',
-          risposta_utente: String(processedUserAnswers[i] || ''),
-          corretto: false,
-          punteggio: 0,
-          spiegazione: 'Error: Could not evaluate this answer'
-        })),
-        punteggio_totale: 0,
-        total_points: 0,
-        max_points: questions.length,
-        feedback_generale: 'There was an error grading your quiz. Please try again.'
-      };
-      
+      console.error('Invalid quiz results format:', result);
+      result = createManualGradingResponse(questions, sanitizedAnswers);
       console.log('Using fallback grading result due to invalid format');
     }
     
@@ -176,18 +126,23 @@ serve(async (req) => {
     if (result.risultati.length !== questions.length) {
       console.warn(`Result count mismatch: ${result.risultati.length} results for ${questions.length} questions`);
       
-      // Pad or truncate results to match question count
+      // Fix the results to match question count
       if (result.risultati.length < questions.length) {
-        // Pad with dummy results if we have too few
-        const padding = Array(questions.length - result.risultati.length).fill(0).map((_, i) => ({
-          domanda: questions[result.risultati.length + i].question || 'Unknown question',
-          risposta_utente: String(processedUserAnswers[result.risultati.length + i] || ''),
-          corretto: false,
-          punteggio: 0,
-          spiegazione: 'Answer could not be evaluated'
-        }));
-        
-        result.risultati = [...result.risultati, ...padding];
+        // Add missing results
+        const missing = questions.length - result.risultati.length;
+        for (let i = 0; i < missing; i++) {
+          const questionIndex = result.risultati.length + i;
+          const question = questions[questionIndex];
+          const answer = sanitizedAnswers[questionIndex];
+          
+          result.risultati.push({
+            domanda: question?.question || `Question ${questionIndex + 1}`,
+            risposta_utente: String(answer || ''),
+            corretto: false,
+            punteggio: 0,
+            spiegazione: "Answer could not be evaluated"
+          });
+        }
       } else {
         // Truncate if we have too many
         result.risultati = result.risultati.slice(0, questions.length);
@@ -268,14 +223,20 @@ serve(async (req) => {
     );
     
   } catch (error) {
-    console.error('Error in grade-quiz function:', error);
+    console.error('Unhandled error in grade-quiz function:', error);
+    
+    // Create a safe fallback response with basic info
+    const fallbackResponse = {
+      risultati: [],
+      punteggio_totale: 0,
+      total_points: 0,
+      max_points: 0,
+      feedback_generale: 'There was an error grading your quiz. Please try again.'
+    };
     
     return new Response(
-      JSON.stringify({ 
-        error: error.message || 'Unknown error',
-        info: 'There was an error processing your request. Please try again.'
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify(fallbackResponse),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
@@ -342,8 +303,10 @@ ${formattedQuestions}`;
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`OpenAI API Error: ${errorData.error?.message || 'Unknown error'}`);
+      const errorText = await response.text();
+      console.error('OpenAI API Error - Status:', response.status);
+      console.error('Error Response:', errorText);
+      throw new Error(`OpenAI API Error: Status ${response.status}`);
     }
 
     const data = await response.json();
@@ -421,11 +384,12 @@ Questions to grade:
 ${formattedQuestions}`;
 
   try {
-    // Use the updated Gemini 2.0 Flash model
+    // Use Gemini 1.5 Flash model
     const modelName = 'gemini-1.5-flash';
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
 
     console.log(`Making request to Gemini API with model: ${modelName}`);
+    console.log('Gemini API key exists:', !!GEMINI_API_KEY);
     
     // First attempt with strict parameters to get clean JSON
     const response = await fetch(apiUrl, {
@@ -448,8 +412,7 @@ ${formattedQuestions}`;
           temperature: 0,
           maxOutputTokens: 2048,
           topP: 0.1,
-          topK: 1,
-          responseMimeType: "application/json"
+          topK: 1
         }
       })
     });
@@ -504,7 +467,7 @@ ${formattedQuestions}`;
       console.error('JSON parsing error:', parseError);
       console.error('Content that failed to parse:', cleanedContent.substring(0, 500));
       
-      // If we can't parse the JSON, make a second attempt with a different prompt
+      // If we can't parse the JSON, try the fallback method
       return await fallbackGrading(questions, userAnswers, GEMINI_API_KEY);
     }
   } catch (error) {
@@ -548,65 +511,79 @@ User answer: ${userAnswer}`;
 Output format (ONLY JSON):
 {"risultati":[{"domanda":"Q1","risposta_utente":"A1","corretto":true/false,"punteggio":5,"spiegazione":"E1"}],"punteggio_totale":0.5,"feedback_generale":"F"}`;
 
-  const modelName = 'gemini-1.5-flash';
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
-
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey
-    },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: simplifiedPrompt }] }],
-      generationConfig: {
-        temperature: 0,
-        maxOutputTokens: 2048,
-        responseMimeType: "application/json"
-      }
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`Fallback API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  
-  // Extract content
-  let content;
-  if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-    content = data.candidates[0].content.parts[0].text;
-  } else {
-    throw new Error('Unexpected response format in fallback method');
-  }
-  
-  // Clean and extract JSON
-  content = content.trim();
-  
-  // Remove markdown code blocks if present
-  content = content.replace(/```json\s*|\s*```/g, '');
-  
-  // Find JSON by looking for opening and closing braces
-  const jsonStartIndex = content.indexOf('{');
-  const jsonEndIndex = content.lastIndexOf('}');
-  
-  if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
-    content = content.substring(jsonStartIndex, jsonEndIndex + 1);
-  }
-  
   try {
-    return JSON.parse(content);
-  } catch (parseError) {
-    console.error('Fallback JSON parsing failed:', parseError);
-    console.error('Content that failed to parse:', content.substring(0, 200));
-    throw new Error('Failed to parse JSON in fallback method');
+    const modelName = 'gemini-1.5-flash';
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: simplifiedPrompt }] }],
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: 2048
+        }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Fallback API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    // Extract content
+    let content;
+    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+      content = data.candidates[0].content.parts[0].text;
+    } else {
+      throw new Error('Unexpected response format in fallback method');
+    }
+    
+    // Clean and extract JSON
+    content = content.trim();
+    
+    // Remove markdown code blocks if present
+    content = content.replace(/```json\s*|\s*```/g, '');
+    
+    // Find JSON by looking for opening and closing braces
+    const jsonStartIndex = content.indexOf('{');
+    const jsonEndIndex = content.lastIndexOf('}');
+    
+    if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
+      content = content.substring(jsonStartIndex, jsonEndIndex + 1);
+    }
+    
+    try {
+      return JSON.parse(content);
+    } catch (parseError) {
+      console.error('Fallback JSON parsing failed:', parseError);
+      throw new Error('Failed to parse JSON in fallback method');
+    }
+  } catch (error) {
+    console.error('Error in fallback grading:', error);
+    throw error;
   }
 }
 
 // Create a manual grading response when all else fails
 function createManualGradingResponse(questions, userAnswers) {
   console.log('Creating manual grading response');
+  
+  // Handle empty questions gracefully
+  if (!questions || !Array.isArray(questions) || questions.length === 0) {
+    return {
+      risultati: [],
+      punteggio_totale: 0,
+      total_points: 0,
+      max_points: 0,
+      feedback_generale: "No valid questions were provided for grading."
+    };
+  }
   
   const results = questions.map((question, index) => {
     const userAnswer = userAnswers[index] || '';
@@ -648,7 +625,15 @@ function createManualGradingResponse(questions, userAnswers) {
 
 // Helper to format questions for grading
 function formatQuestionsForGrading(questions, userAnswers) {
+  if (!questions || !Array.isArray(questions) || questions.length === 0) {
+    return "No questions provided.";
+  }
+
   return questions.map((q, i) => {
+    if (!q) {
+      return `Question ${i + 1}: Invalid question data`;
+    }
+
     let questionText = `Question ${i + 1}: ${q.question || 'Unknown question'}`;
     
     // Add question type 

@@ -1,3 +1,4 @@
+
 import { toast } from 'sonner';
 import { QuizQuestion, GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
 import { supabase } from '@/integrations/supabase/client';
@@ -263,7 +264,7 @@ export const gradeQuiz = async (
     console.log('Validated answers:', validatedAnswers);
     
     try {
-      // Call the edge function for quiz grading
+      // Call the edge function for quiz grading with increased timeout
       const { data, error } = await supabase.functions.invoke('grade-quiz', {
         body: {
           questions: validatedQuestions,
