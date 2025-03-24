@@ -430,7 +430,7 @@ const manualGrading = (questions: any[], userAnswers: any[]): any => {
     } else if (question.type === 'open-ended') {
       // For open-ended, we give partial credit of 2 out of 5 without AI grading
       points = 2;
-      isCorrect = 'Partially';
+      isCorrect = false; // Change from 'Partially' string to a boolean to match the type
       explanation = 'We were unable to fully assess your answer. Please review the correct answer.';
     }
     
