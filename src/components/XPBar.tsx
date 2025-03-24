@@ -18,7 +18,7 @@ const XPBar: React.FC<XPBarProps> = ({
   nextLevel
 }) => {
   const { t } = useLanguage();
-  const percentage = Math.min(Math.round((currentXP / nextLevelXP) * 100), 100);
+  const percentage = Math.min(Math.round((currentXP / nextLevelXP) * 100), 100) || 0;
   
   return (
     <div className="space-y-2">

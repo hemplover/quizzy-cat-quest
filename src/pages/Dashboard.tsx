@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSubjects, getQuizzesBySubjectId, getSubjectById } from '@/services/subjectService';
-import { getLevelInfo } from '@/services/experienceService';
+import { getLevelInfo, getUserXP } from '@/services/experienceService';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import CreateSubjectModal from '@/components/CreateSubjectModal';
@@ -23,23 +23,29 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
-    // Load user XP from localStorage
-    const storedXP = parseInt(localStorage.getItem(`userXP_${user?.id}`) || '0', 10);
-    setUserXP(storedXP);
+    if (!user) return;
     
-    // Load subjects and quizzes
-    loadSubjects();
-    
-    // Load quiz history from localStorage
-    const storedQuizHistory = localStorage.getItem(`quizHistory_${user?.id}`);
-    if (storedQuizHistory) {
-      try {
-        setQuizResults(JSON.parse(storedQuizHistory));
-      } catch (error) {
-        console.error('Error parsing quiz history:', error);
-        setQuizResults([]);
+    const fetchData = async () => {
+      // Load user XP from localStorage
+      const storedXP = await getUserXP();
+      setUserXP(storedXP);
+      
+      // Load subjects and quizzes
+      await loadSubjects();
+      
+      // Load quiz history from localStorage
+      const storedQuizHistory = localStorage.getItem(`quizHistory_${user?.id}`);
+      if (storedQuizHistory) {
+        try {
+          setQuizResults(JSON.parse(storedQuizHistory));
+        } catch (error) {
+          console.error('Error parsing quiz history:', error);
+          setQuizResults([]);
+        }
       }
-    }
+    };
+    
+    fetchData();
   }, [user]);
 
   // Calculate level information
@@ -71,20 +77,42 @@ const Dashboard = () => {
         let quizzesWithResults = 0;
         
         quizzes.forEach(quiz => {
-          if (quiz.results && quiz.questions && quiz.questions.length > 0) {
-            if (typeof quiz.results.total_points === 'number' && typeof quiz.results.max_points === 'number') {
-              // If we have the new weighted point system with total_points and max_points
+          if (quiz.results) {
+            // Check for total_points and max_points first (new format)
+            if (typeof quiz.results.total_points === 'number' && 
+                typeof quiz.results.max_points === 'number') {
               totalPointsEarned += quiz.results.total_points;
               totalMaxPoints += quiz.results.max_points;
               quizzesWithResults++;
-              console.log(`Quiz ${quiz.id} score: ${quiz.results.total_points} of ${quiz.results.max_points} points (${(quiz.results.total_points / quiz.results.max_points) * 100}%)`);
-            } else if (typeof quiz.results.punteggio_totale === 'number') {
-              // Fallback to punteggio_totale (legacy field)
+              console.log(`Quiz ${quiz.id} score: ${quiz.results.total_points} of ${quiz.results.max_points} points`);
+            } 
+            // Then check for punteggio_totale (legacy format)
+            else if (typeof quiz.results.punteggio_totale === 'number' && quiz.questions && quiz.questions.length > 0) {
+              // For legacy format, convert to points based on question count
               const pointsForThisQuiz = quiz.results.punteggio_totale * quiz.questions.length;
               totalPointsEarned += pointsForThisQuiz;
               totalMaxPoints += quiz.questions.length;
               quizzesWithResults++;
-              console.log(`Quiz ${quiz.id} score (legacy): ${pointsForThisQuiz} of ${quiz.questions.length} points (${quiz.results.punteggio_totale * 100}%)`);
+              console.log(`Quiz ${quiz.id} score (legacy): ${pointsForThisQuiz} of ${quiz.questions.length} points`);
+            }
+            // Make a third attempt to get at least some data
+            else if (quiz.results.risultati && Array.isArray(quiz.results.risultati)) {
+              let quizPoints = 0;
+              let quizMaxPoints = 0;
+              
+              quiz.results.risultati.forEach(result => {
+                if (typeof result.punteggio === 'number') {
+                  quizPoints += result.punteggio;
+                  quizMaxPoints += result.punteggio > 0 ? 1 : 1; // Count as 1 point per question
+                }
+              });
+              
+              if (quizMaxPoints > 0) {
+                totalPointsEarned += quizPoints;
+                totalMaxPoints += quizMaxPoints;
+                quizzesWithResults++;
+                console.log(`Quiz ${quiz.id} score (fallback): ${quizPoints} of ${quizMaxPoints} points`);
+              }
             }
           }
         });

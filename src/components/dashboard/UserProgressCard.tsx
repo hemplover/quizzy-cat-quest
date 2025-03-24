@@ -76,6 +76,10 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
     return overallPercentage;
   };
 
+  // Count completed quizzes across all subjects
+  const totalCompletedQuizzes = subjects.reduce((total, subject) => 
+    total + (subject.completedQuizCount || 0), 0);
+
   return (
     <div className="glass-card p-6 rounded-xl w-full md:w-2/3">
       <div className="flex justify-between items-start mb-6">
@@ -113,7 +117,7 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
             <span className="text-sm font-medium">{t('quizzes')}</span>
           </div>
           <p className="text-2xl font-bold">
-            {subjects.reduce((total, subject) => total + (subject.quizCount || 0), 0)}
+            {totalCompletedQuizzes > 0 ? totalCompletedQuizzes : subjects.reduce((total, subject) => total + (subject.quizCount || 0), 0)}
           </p>
         </div>
         
