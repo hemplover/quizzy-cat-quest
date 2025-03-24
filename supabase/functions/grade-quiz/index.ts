@@ -459,28 +459,91 @@ ${formattedQuestions}`;
       throw new Error('Unexpected response format from Gemini API');
     }
     
+    // Log the raw response for debugging
+    console.log('Raw Gemini response content:', generatedContent.substring(0, 1000));
+    
+    // Improved JSON parsing with better error handling
     try {
-      // Parse the response as JSON
+      // First attempt: try to parse directly
       return JSON.parse(generatedContent);
-    } catch (error) {
-      console.error('Error parsing grading JSON from Gemini:', error);
-      console.log('Raw content from Gemini:', generatedContent.substring(0, 500));
+    } catch (directParseError) {
+      console.error('Direct JSON parsing failed:', directParseError);
       
-      // Try to extract JSON from the text
-      const jsonMatch = generatedContent.match(/```json\n([\s\S]*)\n```/) || 
-                       generatedContent.match(/\{[\s\S]*\}/);
-      
-      if (jsonMatch) {
-        const extractedJson = jsonMatch[1] || jsonMatch[0];
-        try {
-          return JSON.parse(extractedJson);
-        } catch (parseError) {
-          console.error('Error parsing extracted JSON:', parseError);
-          throw new Error('Failed to parse extracted JSON from Gemini response');
+      try {
+        // Second attempt: look for JSON block pattern
+        const jsonMatch = generatedContent.match(/```json\n([\s\S]*)\n```/) || 
+                           generatedContent.match(/\{[\s\S]*\}/);
+        
+        if (jsonMatch) {
+          const extractedJson = jsonMatch[1] || jsonMatch[0];
+          console.log('Extracted JSON:', extractedJson.substring(0, 500));
+          
+          // Try to clean the JSON before parsing
+          const cleanedJson = extractedJson
+            .replace(/\\"/g, '"') // Fix escaped quotes
+            .replace(/\n/g, ' ')  // Remove newlines
+            .replace(/\t/g, ' ')  // Remove tabs
+            .replace(/\r/g, ' ')  // Remove carriage returns
+            .replace(/,\s*}/g, '}') // Remove trailing commas
+            .replace(/,\s*]/g, ']'); // Remove trailing commas in arrays
+            
+          // Create a simple validation to ensure it's properly formatted JSON
+          if (!cleanedJson.startsWith('{') || !cleanedJson.endsWith('}')) {
+            throw new Error('Extracted text is not a valid JSON object');
+          }
+                    
+          // Parse cleaned JSON
+          try {
+            return JSON.parse(cleanedJson);
+          } catch (cleanedParseError) {
+            console.error('Error parsing cleaned JSON:', cleanedParseError);
+            
+            // Last attempt: try to manually construct a valid result object
+            // Extract fragments and build our own JSON
+            const risulatiMatch = cleanedJson.match(/"risultati"\s*:\s*\[([\s\S]*?)\]/);
+            if (risulatiMatch) {
+              console.log('Successfully extracted risultati array');
+              
+              try {
+                // Try to parse just the risultati array
+                const risultatiJson = `[${risulatiMatch[1]}]`;
+                const risultati = JSON.parse(risultatiJson);
+                
+                // Construct a valid result object
+                return {
+                  risultati: risultati,
+                  punteggio_totale: 0.5, // Default to 50% score
+                  feedback_generale: "Grading partially completed due to response formatting issues."
+                };
+              } catch (fragmentParseError) {
+                console.error('Error parsing risultati fragment:', fragmentParseError);
+                throw new Error('Failed to parse essential JSON components');
+              }
+            } else {
+              throw new Error('Could not extract key components from Gemini response');
+            }
+          }
+        } else {
+          throw new Error('Failed to extract JSON from Gemini response text');
         }
+      } catch (extractError) {
+        console.error('JSON extraction and parsing failed:', extractError);
+        
+        // Last resort: construct a basic fallback result
+        console.log('Creating fallback grading result due to parsing failures');
+        
+        return {
+          risultati: questions.map((q, i) => ({
+            domanda: q.question || 'Unknown question',
+            risposta_utente: String(userAnswers[i] || ''),
+            corretto: false,
+            punteggio: 0,
+            spiegazione: 'Unable to grade this answer due to AI response parsing issues.'
+          })),
+          punteggio_totale: 0,
+          feedback_generale: 'There was an error processing the AI grading response. Your answers could not be properly evaluated.'
+        };
       }
-      
-      throw new Error('Failed to parse grading response from Gemini');
     }
   } catch (error) {
     console.error('Gemini grading error:', error);
