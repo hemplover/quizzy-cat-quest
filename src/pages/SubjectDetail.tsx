@@ -6,9 +6,7 @@ import {
   ChevronLeft,
   PlusCircle,
   BarChart,
-  File,
-  Calendar,
-  Clock
+  File
 } from 'lucide-react';
 import { 
   getSubjectById, 
@@ -24,8 +22,6 @@ import {
   ChartTooltipContent
 } from '@/components/ui/chart';
 import { BarChart as ReBarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
-import QuizHistoryModal from '@/components/QuizHistoryModal';
-import { format } from 'date-fns';
 
 const SubjectDetail = () => {
   const { subjectId } = useParams();
@@ -34,8 +30,6 @@ const SubjectDetail = () => {
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('documents');
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedQuiz, setSelectedQuiz] = useState<any>(null);
-  const [showQuizModal, setShowQuizModal] = useState(false);
   
   useEffect(() => {
     if (!subjectId) {
@@ -71,11 +65,6 @@ const SubjectDetail = () => {
     fetchSubjectData();
   }, [subjectId]);
   
-  const handleOpenQuizDetails = (quiz: any) => {
-    setSelectedQuiz(quiz);
-    setShowQuizModal(true);
-  };
-  
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -99,9 +88,12 @@ const SubjectDetail = () => {
       return 0;
     }
     
+    console.log('All quizzes for this subject:', quizzes);
+    
     // Filter quizzes with valid results
     const quizzesWithResults = quizzes.filter(quiz => 
       quiz.results && 
+      typeof quiz.results.punteggio_totale === 'number' && 
       quiz.questions && 
       quiz.questions.length > 0
     );
@@ -113,43 +105,25 @@ const SubjectDetail = () => {
       return 0;
     }
     
-    // Calculate total score percentage
-    let totalPercentage = 0;
+    // Calculate total correct answers and total questions
+    let totalCorrectAnswers = 0;
+    let totalQuestions = 0;
     
     quizzesWithResults.forEach(quiz => {
-      let quizPercentage;
+      const correctAnswers = quiz.results.punteggio_totale;
+      const questions = quiz.questions.length;
       
-      if (quiz.results.total_points !== undefined && quiz.results.max_points !== undefined) {
-        // Use pre-calculated total points if available
-        quizPercentage = (quiz.results.total_points / quiz.results.max_points) * 100;
-      } else if (quiz.results.punteggio_totale !== undefined && quiz.questions.length > 0) {
-        // Otherwise calculate from individual results
-        quizPercentage = (quiz.results.punteggio_totale / quiz.questions.length) * 100;
-      } else {
-        // Try to calculate from risultati array if available
-        let totalPoints = 0;
-        let maxPoints = 0;
-        
-        (quiz.results.risultati || []).forEach((result: any) => {
-          if (result.punteggio !== undefined) {
-            const questionType = result.tipo || quiz.questions.find((q: any) => q.question === result.domanda)?.type;
-            const pointValue = questionType === 'open-ended' ? 5 : 1;
-            
-            totalPoints += result.punteggio;
-            maxPoints += pointValue;
-          }
-        });
-        
-        quizPercentage = maxPoints > 0 ? (totalPoints / maxPoints) * 100 : 0;
-      }
+      console.log(`Quiz "${quiz.title}": ${correctAnswers} correct out of ${questions} questions`);
       
-      console.log(`Quiz "${quiz.title}": ${quizPercentage.toFixed(2)}%`);
-      totalPercentage += quizPercentage;
+      totalCorrectAnswers += correctAnswers;
+      totalQuestions += questions;
     });
     
-    // Calculate the average percentage across all quizzes
-    const averagePercentage = Math.round(totalPercentage / quizzesWithResults.length);
-    console.log(`Average score across all quizzes: ${averagePercentage}%`);
+    console.log(`Total for subject: ${totalCorrectAnswers} correct answers out of ${totalQuestions} questions`);
+    
+    // Calculate the average percentage
+    const averagePercentage = Math.round((totalCorrectAnswers / totalQuestions) * 100);
+    console.log(`Average score: ${averagePercentage}%`);
     return averagePercentage;
   };
   
@@ -160,19 +134,11 @@ const SubjectDetail = () => {
     return quizzes
       .filter(quiz => quiz.results && quiz.questions && quiz.questions.length > 0)
       .map(quiz => {
-        let score = 0;
-        
-        if (quiz.results.total_points !== undefined && quiz.results.max_points !== undefined) {
-          score = Math.round((quiz.results.total_points / quiz.results.max_points) * 100);
-        } else if (quiz.results.punteggio_totale !== undefined && quiz.questions.length > 0) {
-          score = Math.round((quiz.results.punteggio_totale / quiz.questions.length) * 100);
-        }
-        
+        const score = Math.round((quiz.results.punteggio_totale / quiz.questions.length) * 100);
         return {
-          name: quiz.title.length > 15 ? quiz.title.substring(0, 15) + '...' : quiz.title,
+          name: quiz.title.length > 20 ? quiz.title.substring(0, 20) + '...' : quiz.title,
           score: score,
-          fullTitle: quiz.title,
-          date: format(new Date(quiz.created_at), 'MM/dd')
+          fullTitle: quiz.title
         };
       });
   };
@@ -181,7 +147,8 @@ const SubjectDetail = () => {
   const completedQuizzes = quizzes.filter(q => 
     q.results && 
     q.questions && 
-    q.questions.length > 0
+    q.questions.length > 0 && 
+    typeof q.results.punteggio_totale === 'number'
   );
   
   // Get total questions answered across all quizzes
@@ -189,36 +156,10 @@ const SubjectDetail = () => {
   
   // Get best score from all quizzes
   const bestScore = completedQuizzes.length > 0 
-    ? Math.max(...completedQuizzes.map(q => {
-        if (q.results.total_points !== undefined && q.results.max_points !== undefined) {
-          return Math.round((q.results.total_points / q.results.max_points) * 100);
-        }
-        return Math.round((q.results.punteggio_totale / q.questions.length) * 100);
-      }))
+    ? Math.max(...completedQuizzes.map(q => 
+        Math.round((q.results.punteggio_totale / q.questions.length) * 100)
+      ))
     : 0;
-  
-  // Get last week's improvement (comparing latest quiz to the one before)
-  const calculateImprovement = () => {
-    if (completedQuizzes.length < 2) return null;
-    
-    // Sort quizzes by creation date (newest first)
-    const sortedQuizzes = [...completedQuizzes].sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-    
-    // Get scores for latest two quizzes
-    const latestScore = sortedQuizzes[0].results.total_points !== undefined 
-      ? (sortedQuizzes[0].results.total_points / sortedQuizzes[0].results.max_points) * 100
-      : (sortedQuizzes[0].results.punteggio_totale / sortedQuizzes[0].questions.length) * 100;
-      
-    const previousScore = sortedQuizzes[1].results.total_points !== undefined
-      ? (sortedQuizzes[1].results.total_points / sortedQuizzes[1].results.max_points) * 100
-      : (sortedQuizzes[1].results.punteggio_totale / sortedQuizzes[1].questions.length) * 100;
-    
-    return Math.round(latestScore - previousScore);
-  };
-  
-  const improvement = calculateImprovement();
   
   return (
     <div className="max-w-5xl mx-auto">
@@ -405,15 +346,9 @@ const SubjectDetail = () => {
               ) : (
                 <div className="space-y-4">
                   {quizzes.map((quiz) => {
-                    let scorePercentage = null;
-                    
-                    if (quiz.results && quiz.questions && quiz.questions.length > 0) {
-                      if (quiz.results.total_points !== undefined && quiz.results.max_points !== undefined) {
-                        scorePercentage = Math.round((quiz.results.total_points / quiz.results.max_points) * 100);
-                      } else {
-                        scorePercentage = Math.round((quiz.results.punteggio_totale / quiz.questions.length) * 100);
-                      }
-                    }
+                    const scorePercentage = quiz.results && quiz.questions && quiz.questions.length > 0 
+                      ? Math.round((quiz.results.punteggio_totale / quiz.questions.length) * 100) 
+                      : null;
                     
                     return (
                       <div key={quiz.id} className="glass-card p-4 rounded-lg">
@@ -425,14 +360,10 @@ const SubjectDetail = () => {
                             
                             <div>
                               <h3 className="font-medium">{quiz.title}</h3>
-                              <div className="flex text-xs text-muted-foreground">
-                                <span className="flex items-center">
-                                  <Calendar className="w-3 h-3 mr-1" />
-                                  {format(new Date(quiz.created_at), 'PP')}
-                                </span>
-                                <span className="mx-2">•</span>
-                                <span>{quiz.questions.length} questions</span>
-                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Created {new Date(quiz.createdAt).toLocaleDateString()} • 
+                                {quiz.questions.length} questions
+                              </p>
                               
                               <div className="flex mt-3 gap-2">
                                 <Link 
@@ -441,13 +372,6 @@ const SubjectDetail = () => {
                                 >
                                   Take Quiz
                                 </Link>
-                                
-                                <button 
-                                  onClick={() => handleOpenQuizDetails(quiz)}
-                                  className="text-xs px-2 py-1 bg-blue-500/10 text-blue-600 rounded hover:bg-blue-500/20"
-                                >
-                                  View Details
-                                </button>
                                 
                                 {scorePercentage !== null && (
                                   <div className="text-xs px-2 py-1 bg-gray-100 rounded">
@@ -514,13 +438,7 @@ const SubjectDetail = () => {
                         <span className="text-sm font-medium">Quiz History</span>
                         <div className="mt-2 space-y-2">
                           {completedQuizzes.map((quiz) => {
-                            let score;
-                            if (quiz.results.total_points !== undefined && quiz.results.max_points !== undefined) {
-                              score = Math.round((quiz.results.total_points / quiz.results.max_points) * 100);
-                            } else {
-                              score = Math.round((quiz.results.punteggio_totale / quiz.questions.length) * 100);
-                            }
-                            
+                            const score = Math.round((quiz.results.punteggio_totale / quiz.questions.length) * 100);
                             return (
                               <div key={quiz.id} className="flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-cat"></div>
@@ -538,12 +456,6 @@ const SubjectDetail = () => {
                                   ></div>
                                 </div>
                                 <div className="text-xs font-mono">{score}%</div>
-                                <button 
-                                  onClick={() => handleOpenQuizDetails(quiz)}
-                                  className="text-xs text-blue-600 hover:underline"
-                                >
-                                  View
-                                </button>
                               </div>
                             );
                           })}
@@ -564,7 +476,7 @@ const SubjectDetail = () => {
                           }}>
                             <ReBarChart data={prepareQuizScoreData()}>
                               <XAxis 
-                                dataKey="date" 
+                                dataKey="name" 
                                 fontSize={12}
                                 tickLine={false}
                                 axisLine={false}
@@ -613,37 +525,12 @@ const SubjectDetail = () => {
                       </p>
                     </div>
                   </div>
-                  
-                  {improvement !== null && (
-                    <div className="glass-card p-4 rounded-lg">
-                      <h3 className="text-sm font-medium mb-2">Recent Progress</h3>
-                      <div className="flex items-center">
-                        <div className={cn(
-                          "text-2xl font-bold",
-                          improvement > 0 ? "text-green-600" : 
-                          improvement < 0 ? "text-red-600" : 
-                          "text-gray-600"
-                        )}>
-                          {improvement > 0 ? '+' : ''}{improvement}%
-                        </div>
-                        <p className="ml-2 text-sm text-muted-foreground">
-                          compared to previous quiz
-                        </p>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
           )}
         </div>
       )}
-      
-      <QuizHistoryModal
-        open={showQuizModal}
-        onOpenChange={setShowQuizModal}
-        quiz={selectedQuiz}
-      />
     </div>
   );
 };

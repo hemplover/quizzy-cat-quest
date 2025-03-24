@@ -31,29 +31,19 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     return (savedLanguage as Language) || defaultLanguage;
   });
 
-  // Translation function with enhanced fallback
+  // Translation function
   const t = (key: string): string => {
-    // Check if translation exists for current language
-    if (translations[language] && translations[language][key]) {
-      return translations[language][key];
-    }
-    
-    // First fallback to English if translation is missing
-    if (language !== 'en' && translations['en'] && translations['en'][key]) {
-      console.warn(`Using English fallback for key: ${key} in language: ${language}`);
-      return translations['en'][key];
-    }
-    
-    // If English translation is also missing but we're specifically using English,
-    // we want to avoid endless warnings, so just return the key
-    if (language === 'en') {
-      console.warn(`Translation missing for key: ${key} in English`);
+    if (!translations[language] || !translations[language][key]) {
+      // Fallback to English if translation is missing
+      if (language !== 'en' && translations['en'] && translations['en'][key]) {
+        console.warn(`Using English fallback for key: ${key} in language: ${language}`);
+        return translations['en'][key];
+      }
+      // Return the key itself if no translation found
+      console.warn(`Translation missing for key: ${key} in language: ${language}`);
       return key;
     }
-    
-    // Last resort fallback - return the key itself 
-    console.warn(`Translation missing for key: ${key} in language: ${language}`);
-    return key;
+    return translations[language][key];
   };
 
   const setLanguage = (lang: Language) => {
