@@ -33,13 +33,7 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
     console.log('Calculating overall average score with subjects:', subjects);
     
     // Get all subjects with completed quizzes
-    const subjectsWithScores = subjects.filter(s => {
-      // Check if the subject has any completed quizzes
-      const hasCompletedQuizzes = s.completedQuizCount > 0;
-      console.log(`Subject ${s.name} has completed quizzes: ${hasCompletedQuizzes} (count: ${s.completedQuizCount})`);
-      return hasCompletedQuizzes;
-    });
-    
+    const subjectsWithScores = subjects.filter(s => s.completedQuizCount > 0);
     console.log('Filtered subjects with scores:', subjectsWithScores);
     
     if (subjectsWithScores.length === 0) {
@@ -54,17 +48,18 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
     subjectsWithScores.forEach(subject => {
       console.log(`Subject ${subject.name}:`, subject);
       
-      if (subject.totalPoints !== undefined && subject.maxPoints !== undefined && subject.maxPoints > 0) {
-        // If we have the weighted point system
+      if (subject.totalPoints !== undefined && subject.maxPoints !== undefined) {
+        // If we have the new weighted point system
         totalPointsEarned += subject.totalPoints;
         totalMaxPoints += subject.maxPoints;
         console.log(`Added ${subject.totalPoints} points earned out of ${subject.maxPoints} maximum points`);
-      } else if (subject.averageScore !== undefined && subject.completedQuizCount > 0) {
-        // Convert percentage to points
-        const subjectPointsEarned = (subject.averageScore / 100) * subject.completedQuizCount;
+      } else if (subject.averageScore !== undefined && subject.totalQuestions !== undefined) {
+        // Legacy calculation (pre-weighted scoring)
+        // Convert percentage to points (assuming 1 point per question)
+        const subjectPointsEarned = (subject.averageScore / 100) * subject.totalQuestions;
         totalPointsEarned += subjectPointsEarned;
-        totalMaxPoints += subject.completedQuizCount;
-        console.log(`Legacy calculation: Added ${subjectPointsEarned.toFixed(2)} points earned out of ${subject.completedQuizCount} maximum points`);
+        totalMaxPoints += subject.totalQuestions;
+        console.log(`Legacy calculation: Added ${subjectPointsEarned.toFixed(2)} points earned out of ${subject.totalQuestions} maximum points`);
       }
     });
     
@@ -81,15 +76,6 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
     console.log(`Overall percentage: ${overallPercentage}%`);
     return overallPercentage;
   };
-
-  // Count completed quizzes across all subjects
-  const totalCompletedQuizzes = subjects.reduce((total, subject) => {
-    const count = subject.completedQuizCount || 0;
-    console.log(`Subject ${subject.name} has ${count} completed quizzes`);
-    return total + count;
-  }, 0);
-  
-  console.log(`Total completed quizzes across all subjects: ${totalCompletedQuizzes}`);
 
   return (
     <div className="glass-card p-6 rounded-xl w-full md:w-2/3">
@@ -128,7 +114,7 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
             <span className="text-sm font-medium">{t('quizzes')}</span>
           </div>
           <p className="text-2xl font-bold">
-            {totalCompletedQuizzes > 0 ? totalCompletedQuizzes : subjects.reduce((total, subject) => total + (subject.quizCount || 0), 0)}
+            {subjects.reduce((total, subject) => total + (subject.quizCount || 0), 0)}
           </p>
         </div>
         

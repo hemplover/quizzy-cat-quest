@@ -3,7 +3,6 @@ import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
 
 interface AuthRequiredProps {
   children: React.ReactNode;
@@ -17,7 +16,6 @@ const AuthRequired = ({ children }: AuthRequiredProps) => {
   useEffect(() => {
     if (!loading && !user) {
       console.log('User not authenticated, redirecting to auth page');
-      toast.error('Authentication required');
       // Save the attempted URL for redirection after login
       navigate(`/auth?redirect=${encodeURIComponent(location.pathname)}`, { replace: true });
     }

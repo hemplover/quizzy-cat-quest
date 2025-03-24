@@ -1,144 +1,60 @@
+
 import { toast } from 'sonner';
+import { QuizQuestion, GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
 import { supabase } from '@/integrations/supabase/client';
-import { v4 as uuidv4 } from 'uuid';
-import { updateUserXP, calculateQuizXP } from './experienceService';
-import { updateQuizResults, createQuiz } from '@/services/subjectService';
-import { getDefaultModel } from '@/services/aiProviderService';
 
-let currentModel = localStorage.getItem('selectedModel') || getDefaultModel();
-
-export const getSelectedModel = (): string => {
-  return currentModel || getDefaultModel();
-};
-
-export const setModelToUse = (modelId: string): void => {
-  currentModel = modelId;
-  localStorage.setItem('selectedModel', modelId);
-  console.log(`Model set to: ${modelId}`);
-};
-
-export const generateQuiz = async (
-  content: string,
-  settings: any,
-  subjectId: string,
-  documentId: string | null
-): Promise<any> => {
-  try {
-    console.log('Generating quiz with settings:', settings);
-    
-    const previousQuestions = [];
-    
-    const { data, error } = await supabase.functions.invoke('generate-quiz', {
-      body: {
-        content,
-        settings,
-        previousQuestions
-      }
-    });
-    
-    if (error) {
-      console.error('Error generating quiz:', error);
-      toast.error(`Error generating quiz: ${error.message || 'Unknown error'}`);
-      return null;
-    }
-    
-    if (!data) {
-      console.error('No data returned from quiz generation');
-      toast.error('Quiz generation failed');
-      return null;
-    }
-    
-    console.log('Quiz generated successfully:', data);
-    
-    if (data.quiz && Array.isArray(data.quiz)) {
-      if (settings.questionTypes && settings.questionTypes.length > 0) {
-        const allowedTypes = new Set(settings.questionTypes.map(type => {
-          if (type === 'multiple-choice') return 'multiple_choice';
-          if (type === 'true-false') return 'true_false';
-          if (type === 'open-ended') return 'open_ended';
-          return type;
-        }));
-        
-        const hasIncorrectTypes = data.quiz.some(q => !allowedTypes.has(q.type));
-        
-        if (hasIncorrectTypes) {
-          console.error('Quiz contains question types not requested by user:', 
-            data.quiz.map(q => q.type));
-          toast.error('The generated quiz contains incorrect question types. Please try again.');
-          return null;
-        }
-      }
-      
-      if (data.quiz.length !== settings.numQuestions) {
-        console.warn(`Quiz contains ${data.quiz.length} questions, but ${settings.numQuestions} were requested.`);
-      }
-    }
-    
-    return data;
-  } catch (error: any) {
-    console.error('Error generating quiz:', error);
-    toast.error(`Error generating quiz: ${error.message || 'Unknown error'}`);
-    return null;
-  }
-};
-
-export const transformQuizQuestions = (generatedQuiz: any): any[] => {
+// Transform generated questions to our app format with improved reliability
+export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
   try {
     if (!generatedQuiz || !generatedQuiz.quiz || !Array.isArray(generatedQuiz.quiz)) {
       console.error('Invalid quiz format:', generatedQuiz);
       return [];
     }
     
-    return generatedQuiz.quiz.map((q: any, index: number) => {
-      let questionType = '';
-      
-      if (q.type === 'multiple_choice') {
-        questionType = 'multiple-choice';
-      } else if (q.type === 'true_false') {
-        questionType = 'true-false';
-      } else if (q.type === 'open_ended') {
-        questionType = 'open-ended';
+    return generatedQuiz.quiz.map((q, index) => {
+      // First check for English format fields
+      if ((q.type === 'multiple_choice' || q.type === 'multiple-choice' || q.tipo === 'scelta_multipla')) {
+        // Handle multiple choice questions
+        const options = q.options || q.opzioni || [];
+        let correctAnswer = q.correct_answer || q.risposta_corretta || '';
+        // Convert boolean to string if needed
+        if (typeof correctAnswer === 'boolean') {
+          correctAnswer = correctAnswer.toString();
+        }
+        const correctIndex = Array.isArray(options) ? options.indexOf(correctAnswer) : 0;
+        
+        return {
+          id: index,
+          type: 'multiple-choice',
+          question: q.question || q.domanda || '',
+          options: options,
+          correctAnswer: correctIndex >= 0 ? correctIndex : 0,
+          explanation: q.explanation || q.spiegazione || ''
+        };
+      } else if ((q.type === 'true_false' || q.type === 'true-false' || q.tipo === 'vero_falso')) {
+        // Handle true/false questions
+        const correctAnswer = q.correct_answer || q.risposta_corretta || '';
+        const isTrue = correctAnswer === 'True' || correctAnswer === 'Vero' || 
+                       (typeof correctAnswer === 'boolean' && correctAnswer === true);
+        
+        return {
+          id: index,
+          type: 'true-false',
+          question: q.question || q.domanda || '',
+          options: ['True', 'False'],
+          correctAnswer: isTrue ? 0 : 1,
+          explanation: q.explanation || q.spiegazione || ''
+        };
       } else {
-        questionType = q.type;
+        // Default to open-ended questions
+        return {
+          id: index,
+          type: 'open-ended',
+          question: q.question || q.domanda || '',
+          correctAnswer: q.correct_answer || q.risposta_corretta || '',
+          explanation: q.explanation || q.spiegazione || ''
+        };
       }
-      
-      const question: any = {
-        id: index + 1,
-        type: questionType,
-        question: q.question,
-        explanation: q.explanation || ''
-      };
-      
-      if (questionType === 'multiple-choice') {
-        question.options = q.options || [];
-        if (typeof q.correct_answer === 'number') {
-          question.correctAnswer = q.correct_answer;
-        } else if (typeof q.correct_answer === 'string') {
-          const index = question.options.findIndex((opt: string) => 
-            opt === q.correct_answer || 
-            opt.charAt(0).toUpperCase() === q.correct_answer
-          );
-          question.correctAnswer = index >= 0 ? index : 0;
-        } else {
-          question.correctAnswer = 0;
-        }
-      } else if (questionType === 'true-false') {
-        question.options = ['True', 'False'];
-        if (typeof q.correct_answer === 'boolean') {
-          question.correctAnswer = q.correct_answer ? 0 : 1;
-        } else if (typeof q.correct_answer === 'string') {
-          const answer = q.correct_answer.toLowerCase();
-          question.correctAnswer = (answer === 'true' || answer === 't') ? 0 : 1;
-        } else if (typeof q.correct_answer === 'number') {
-          question.correctAnswer = q.correct_answer > 0 ? 0 : 1;
-        } else {
-          question.correctAnswer = 0;
-        }
-      } else if (questionType === 'open-ended') {
-        question.correctAnswer = q.correct_answer || '';
-      }
-      
-      return question;
     });
   } catch (error) {
     console.error('Error transforming quiz questions:', error);
@@ -146,363 +62,361 @@ export const transformQuizQuestions = (generatedQuiz: any): any[] => {
   }
 };
 
-export const saveQuizResults = async (quizId: string, results: any): Promise<boolean> => {
-  try {
-    console.log('Saving quiz results to Supabase:', { quizId, results });
-    
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user?.id) {
-      console.error('Cannot save quiz results: User not logged in');
-      toast.error('You must be logged in to save quiz results');
-      return false;
-    }
-
-    const updatedQuiz = await updateQuizResults(quizId, results);
-    
-    if (!updatedQuiz) {
-      console.error('Failed to save quiz results to Supabase');
-      toast.error('Failed to save your quiz results');
-      return false;
-    }
-    
-    console.log('Quiz results saved successfully to Supabase');
-    
-    await awardQuizXP(results);
-    
-    return true;
-  } catch (error) {
-    console.error('Error saving quiz results:', error);
-    toast.error('Error saving quiz results');
-    return false;
+// Generate quiz using Supabase Edge Function
+export const generateQuiz = async (
+  content: string,
+  settings: QuizSettings,
+  subjectId?: string,
+  documentId?: string
+): Promise<GeneratedQuiz | null> => {
+  console.log(`Generating quiz with Gemini`);
+  console.log(`Content type: ${typeof content}`);
+  console.log(`Content length: ${content.length} characters`);
+  console.log(`Selected question types:`, settings.questionTypes);
+  
+  if (!content || content.trim().length < 100) {
+    toast.error('Please provide more detailed study material.');
+    return null;
   }
-};
-
-const awardQuizXP = async (results: any): Promise<void> => {
+  
   try {
-    if (!results) return;
+    // If we have a document ID, check for previous quizzes to avoid duplicates
+    let previousQuestions: string[] = [];
     
-    let score = 0;
-    
-    if (typeof results.total_points === 'number' && typeof results.max_points === 'number' && results.max_points > 0) {
-      score = results.total_points / results.max_points;
-    } else if (typeof results.punteggio_totale === 'number') {
-      score = results.punteggio_totale;
-    } else if (results.risultati && Array.isArray(results.risultati)) {
-      const totalPoints = results.risultati.reduce((sum: number, result: any) => {
-        return sum + (typeof result.punteggio === 'number' ? result.punteggio : 0);
-      }, 0);
+    if (subjectId && documentId) {
+      console.log(`Checking for previous quizzes on document: ${documentId}`);
       
-      const maxPoints = results.risultati.length;
+      // Get the current user's ID for the query
+      const { data } = await supabase.auth.getSession();
+      const userId = data.session?.user?.id;
       
-      if (maxPoints > 0) {
-        score = totalPoints / maxPoints;
+      if (!userId) {
+        console.error('User ID is required but not found in session');
+        return null;
+      }
+      
+      // Query previous quizzes for this document and this user only
+      const { data: previousQuizzes, error } = await supabase
+        .from('quizzes')
+        .select('questions')
+        .eq('document_id', documentId)
+        .eq('subject_id', subjectId)
+        .eq('user_id', userId);
+      
+      if (error) {
+        console.error('Error fetching previous quizzes:', error);
+      } else if (previousQuizzes && previousQuizzes.length > 0) {
+        console.log(`Found ${previousQuizzes.length} previous quizzes for this document`);
+        
+        // Extract questions from previous quizzes
+        previousQuizzes.forEach(quiz => {
+          const questions = quiz.questions as QuizQuestion[];
+          if (questions && Array.isArray(questions)) {
+            questions.forEach(q => {
+              if (q.question) {
+                previousQuestions.push(q.question);
+              }
+            });
+          }
+        });
+        
+        console.log(`Extracted ${previousQuestions.length} previous questions`);
+        
+        // Update settings to indicate this is a repeat quiz
+        settings.previousQuizzes = previousQuizzes.length;
       }
     }
     
-    score = Math.max(0, Math.min(1, score));
-    console.log(`Calculated normalized score for XP award: ${score}`);
-    
-    const xpEarned = calculateQuizXP(score);
-    console.log(`XP to be awarded: ${xpEarned}`);
-    
-    const result = await updateUserXP(xpEarned);
-    
-    if (result.leveledUp && result.newLevel) {
-      toast.success(`Level Up! You are now ${result.newLevel}!`, {
-        duration: 5000,
-        icon: '🏆'
-      });
-    } else {
-      toast.success(`You earned ${xpEarned} XP!`);
-    }
-  } catch (error) {
-    console.error('Error awarding quiz XP:', error);
-  }
-};
-
-export const gradeQuiz = async (
-  questions: any[],
-  userAnswers: any[],
-  provider: 'openai' | 'gemini' | 'claude' | 'mistral' = 'gemini'
-): Promise<any> => {
-  try {
-    console.log('Grading quiz:', { 
-      questions: questions.length, 
-      userAnswers: userAnswers.length, 
-      provider 
-    });
-    
-    const processedAnswers = [];
-    
-    for (let i = 0; i < questions.length; i++) {
-      const question = questions[i];
-      let answer = null;
-      
-      const userAnswerObj = userAnswers.find(a => a.questionId === question.id);
-      
-      if (userAnswerObj) {
-        answer = userAnswerObj.userAnswer;
-      } else if (i < userAnswers.length) {
-        answer = typeof userAnswers[i] === 'object' ? userAnswers[i].userAnswer : userAnswers[i];
-      }
-      
-      processedAnswers.push(answer);
-    }
-    
-    console.log('Grading quiz with processed answers:', processedAnswers);
-    
-    const { data, error } = await supabase.functions.invoke('grade-quiz', {
+    // Call the edge function for quiz generation
+    const { data, error } = await supabase.functions.invoke('generate-quiz', {
       body: {
-        questions,
-        userAnswers: processedAnswers,
-        provider
+        content,
+        settings,
+        previousQuestions: previousQuestions.length > 0 ? previousQuestions : undefined
       }
     });
     
     if (error) {
-      console.error('Error grading quiz:', error);
-      toast.error(`Error grading quiz: ${error.message || 'Unknown error'}`);
+      console.error('Error calling generate-quiz function:', error);
+      toast.error(`Error generating quiz: ${error.message}`);
       return null;
     }
     
     if (!data) {
-      console.error('No data returned from quiz grading');
-      toast.error('Quiz grading failed');
+      console.error('No data returned from generate-quiz function');
+      toast.error('Failed to generate quiz. Please try again with more detailed content.');
       return null;
     }
     
-    if (!data.risultati || !Array.isArray(data.risultati)) {
-      console.error('Invalid quiz results format:', data);
-      toast.error('Invalid quiz results format. Please try again.');
+    if (data.error) {
+      console.error('Error returned from generate-quiz function:', data.error);
+      toast.error(`Error generating quiz: ${data.error}`);
       return null;
     }
     
-    let validationFailed = false;
-    data.risultati.forEach((result: any, index: number) => {
-      const question = questions[index];
-      if (!question) {
-        console.error(`No matching question for result at index ${index}`);
-        validationFailed = true;
-        return;
+    if (!data.quiz || data.quiz.length === 0) {
+      console.error('Failed to generate quiz: Empty or invalid response from API', data);
+      toast.error('Could not create a quiz from this content. Please provide more detailed study material.');
+      return null;
+    }
+    
+    // Filter questions to match the selected question types
+    if (settings.questionTypes && settings.questionTypes.length > 0) {
+      const typeMapping = {
+        'multiple-choice': ['multiple_choice', 'multiple-choice', 'scelta_multipla'],
+        'true-false': ['true_false', 'true-false', 'vero_falso'],
+        'open-ended': ['open_ended', 'open-ended', 'risposta_aperta']
+      };
+      
+      // Only keep questions of the selected types
+      const filteredQuiz = {
+        ...data,
+        quiz: data.quiz.filter(q => {
+          // Get the question type, checking both .type and .tipo fields
+          const questionType = q.type || q.tipo || '';
+          
+          // Check if this question type is in any of the selected categories
+          return settings.questionTypes.some(selectedType => 
+            typeMapping[selectedType].includes(questionType)
+          );
+        })
+      };
+      
+      // If we filtered out all questions, use the original result
+      if (filteredQuiz.quiz.length === 0) {
+        console.warn('Filtering removed all questions, using original result');
+        return data;
       }
       
-      if (question.type === 'open-ended') {
-        if (typeof result.punteggio !== 'number' || result.punteggio < 0 || result.punteggio > 5) {
-          console.error(`Invalid score for open-ended question: ${result.punteggio}`);
-          result.punteggio = Math.min(5, Math.max(0, Math.round(result.punteggio || 0)));
-        }
-      } else {
-        if (typeof result.punteggio !== 'number' || (result.punteggio !== 0 && result.punteggio !== 1)) {
-          console.error(`Invalid score for ${question.type} question: ${result.punteggio}`);
-          result.punteggio = result.corretto ? 1 : 0;
-        }
-      }
-    });
-    
-    if (validationFailed) {
-      toast.error('There was an issue with the quiz grading. Results may not be accurate.');
+      return filteredQuiz;
     }
     
-    console.log('Quiz graded successfully:', data);
     return data;
-  } catch (error: any) {
-    console.error('Error grading quiz:', error);
-    toast.error(`Error grading quiz: ${error.message || 'Unknown error'}`);
+  } catch (error) {
+    console.error('Error generating quiz:', error);
+    toast.error(`Error generating quiz: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return null;
   }
 };
 
-export const saveQuizToHistory = async (quiz: any): Promise<void> => {
+// Grade quiz using Supabase Edge Function
+export const gradeQuiz = async (
+  questions: any[], 
+  userAnswers: any[]
+): Promise<QuizResults | null> => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const userId = session?.user?.id;
+    console.log('Starting quiz grading process...');
+    console.log('Questions to grade:', questions);
+    console.log('User answers to grade:', userAnswers);
     
-    if (!userId) {
-      console.error('Cannot save quiz history: User not logged in');
-      return;
+    // Make sure we have valid data to send
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+      console.error('Invalid questions data:', questions);
+      toast.error('Invalid questions data. Please try again.');
+      return null;
     }
     
-    const historyKey = `quizHistory_${userId}`;
+    if (!userAnswers || !Array.isArray(userAnswers)) {
+      console.error('Invalid user answers:', userAnswers);
+      toast.error('Invalid user answers. Please try again.');
+      return null;
+    }
     
-    const existingHistoryStr = localStorage.getItem(historyKey);
-    let history = [];
+    // Ensure all questions have the required properties
+    const validatedQuestions = questions.map(q => {
+      // Make sure each question has the necessary properties
+      return {
+        id: q.id || 0,
+        type: q.type || 'multiple-choice',
+        question: q.question || 'Unknown question',
+        options: q.options || [],
+        correctAnswer: q.correctAnswer !== undefined ? q.correctAnswer : '',
+        explanation: q.explanation || ''
+      };
+    });
     
-    if (existingHistoryStr) {
-      try {
-        history = JSON.parse(existingHistoryStr);
-      } catch (e) {
-        console.error('Invalid quiz history format in localStorage');
-        history = [];
+    // Ensure all user answers are in the correct format
+    // Replace null/undefined with empty strings for open-ended questions
+    // or 0 for multiple-choice questions
+    const validatedAnswers = userAnswers.map((answer, index) => {
+      const questionType = validatedQuestions[index]?.type;
+      
+      if (answer === null || answer === undefined) {
+        // Provide default values for null/undefined answers
+        if (questionType === 'multiple-choice' || questionType === 'true-false') {
+          return 0; // Default to first option for choice questions
+        } else {
+          return ''; // Empty string for open-ended
+        }
+      }
+      
+      // Convert to appropriate format based on question type
+      if (questionType === 'multiple-choice' || questionType === 'true-false') {
+        // For multiple choice, ensure we have a number
+        return typeof answer === 'number' ? answer : 0;
+      } else {
+        // For open-ended, ensure we have a string
+        return String(answer || '');
+      }
+    });
+    
+    console.log('Validated questions:', validatedQuestions);
+    console.log('Validated answers:', validatedAnswers);
+    
+    // Call the edge function for quiz grading
+    const { data, error } = await supabase.functions.invoke('grade-quiz', {
+      body: {
+        questions: validatedQuestions,
+        userAnswers: validatedAnswers,
+        provider: 'gemini'
+      }
+    });
+    
+    if (error) {
+      console.error('Error calling grade-quiz function:', error);
+      toast.error(`Error grading quiz: ${error.message}`);
+      return null;
+    }
+    
+    // Validate the quiz results
+    if (!data || !data.risultati || !Array.isArray(data.risultati)) {
+      console.error('Invalid quiz results format:', data);
+      toast.error('Invalid quiz results returned by AI. Please try again.');
+      return null;
+    }
+    
+    console.log('Received quiz results:', data);
+    
+    // Make sure we have the same number of results as questions
+    if (data.risultati.length !== questions.length) {
+      console.warn(`Result count mismatch: ${data.risultati.length} results for ${questions.length} questions`);
+      
+      // Pad or truncate results to match question count
+      if (data.risultati.length < questions.length) {
+        // Pad with dummy results if we have too few
+        const padding = Array(questions.length - data.risultati.length).fill(0).map((_, i) => ({
+          domanda: questions[data.risultati.length + i].question,
+          risposta_utente: String(userAnswers[data.risultati.length + i] || ''),
+          corretto: false,
+          punteggio: 0,
+          spiegazione: 'Answer could not be evaluated'
+        }));
+        
+        data.risultati = [...data.risultati, ...padding];
+      } else {
+        // Truncate if we have too many
+        data.risultati = data.risultati.slice(0, questions.length);
       }
     }
     
-    const quizWithTimestamp = {
-      ...quiz,
-      timestamp: new Date().toISOString()
-    };
-    
-    history.unshift(quizWithTimestamp);
-    
-    if (history.length > 50) {
-      history = history.slice(0, 50);
+    // Double-check that total_points and max_points are properly calculated
+    if (data.total_points === undefined || data.max_points === undefined) {
+      console.log('Calculating total_points and max_points...');
+      
+      let totalPoints = 0;
+      let maxPoints = 0;
+      
+      data.risultati.forEach((result, index) => {
+        const question = questions[index];
+        const pointValue = question.type === 'open-ended' ? 5 : 1;
+        
+        maxPoints += pointValue;
+        
+        // Ensure punteggio is a number
+        let score = 0;
+        if (typeof result.punteggio === 'number') {
+          score = result.punteggio;
+        } else if (typeof result.punteggio === 'string') {
+          score = parseFloat(result.punteggio);
+          if (isNaN(score)) score = 0;
+        }
+        
+        // Make sure the score is within the valid range
+        if (question.type === 'open-ended') {
+          score = Math.min(5, Math.max(0, Math.round(score)));
+        } else {
+          score = score > 0 ? 1 : 0;
+        }
+        
+        result.punteggio = score;
+        totalPoints += score;
+        
+        console.log(`Question ${index+1} (${question.type}): ${result.punteggio}/${pointValue} points`);
+      });
+      
+      data.total_points = totalPoints;
+      data.max_points = maxPoints;
+      
+      // Recalculate total score as a ratio
+      data.punteggio_totale = maxPoints > 0 ? totalPoints / maxPoints : 0;
+      
+      console.log(`Total score: ${totalPoints}/${maxPoints} (${data.punteggio_totale.toFixed(2)})`);
     }
     
-    localStorage.setItem(historyKey, JSON.stringify(history));
-    console.log('Quiz saved to history');
+    return data;
   } catch (error) {
-    console.error('Error saving quiz to history:', error);
+    console.error('Error grading quiz:', error);
+    toast.error(`Error grading quiz: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return null;
   }
 };
 
-export const getQuizHistory = async (): Promise<any[]> => {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const userId = session?.user?.id;
-    
-    if (!userId) {
-      console.error('Cannot get quiz history: User not logged in');
-      return [];
-    }
-    
-    const historyKey = `quizHistory_${userId}`;
-    
-    const existingHistoryStr = localStorage.getItem(historyKey);
-    
-    if (!existingHistoryStr) {
-      return [];
-    }
-    
-    try {
-      const history = JSON.parse(existingHistoryStr);
-      return Array.isArray(history) ? history : [];
-    } catch (e) {
-      console.error('Invalid quiz history format in localStorage');
-      return [];
-    }
-  } catch (error) {
-    console.error('Error getting quiz history:', error);
-    return [];
-  }
+// Always returns true since we're using backend-only Gemini
+export const hasValidApiKey = (): boolean => {
+  return true;
 };
 
-export const getRecentText = async (): Promise<string> => {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const userId = session?.user?.id;
-    
-    if (!userId) {
-      console.log('No user ID available for getting recent text');
-      return '';
-    }
-    
-    const key = `recentText_${userId}`;
-    return localStorage.getItem(key) || '';
-  } catch (error) {
-    console.error('Error getting recent text:', error);
-    return '';
-  }
+// Get the appropriate model to use based on provider
+export const getDefaultModel = (): string => {
+  return 'gemini-2-flash';
 };
 
-export const saveRecentText = async (text: string): Promise<void> => {
+// Set the specific model to use
+export const setModelToUse = (model: string): void => {
+  localStorage.setItem('selected_model', model);
+};
+
+// Get the selected model 
+export const getSelectedModel = (): string => {
+  return 'gemini-2-flash';
+};
+
+// Save the most recently uploaded text for the current subject
+export const saveRecentText = async (subjectId: string, textData: {
+  name: string;
+  content: string;
+}): Promise<void> => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const userId = session?.user?.id;
-    
-    if (!userId) {
-      console.log('No user ID available for saving recent text');
-      return;
-    }
-    
-    const key = `recentText_${userId}`;
-    localStorage.setItem(key, text);
+    // Store text data keyed by subject ID and user ID
+    const { data } = await supabase.auth.getSession();
+    const userId = data.session?.user?.id || 'anonymous';
+    const textKey = `recent_text_${subjectId}_${userId}`;
+    localStorage.setItem(textKey, JSON.stringify(textData));
+    console.log(`Saved recent text for subject ${subjectId} and user ${userId}`);
   } catch (error) {
     console.error('Error saving recent text:', error);
   }
 };
 
-export const createNewQuizFromQuestions = async (
-  title: string,
-  subjectId: string,
-  documentId: string | null,
-  questions: any[],
-  settings: any = {}
-): Promise<string | null> => {
+// Get the most recently uploaded text for the current subject
+export const getRecentText = async (subjectId: string): Promise<{
+  name: string;
+  content: string;
+} | null> => {
   try {
-    console.log('Creating new quiz from questions:', {
-      title,
-      subjectId,
-      documentId,
-      questionCount: questions.length
-    });
+    // Get text data keyed by subject ID and user ID
+    const { data } = await supabase.auth.getSession();
+    const userId = data.session?.user?.id || 'anonymous';
+    const textKey = `recent_text_${subjectId}_${userId}`;
+    const storedData = localStorage.getItem(textKey);
     
-    const newQuiz = await createQuiz({
-      title,
-      subjectId,
-      documentId,
-      questions,
-      settings
-    });
-    
-    if (!newQuiz || !newQuiz.id) {
-      console.error('Failed to create quiz');
-      toast.error('Failed to create quiz');
+    if (!storedData) {
       return null;
     }
     
-    console.log('Quiz created successfully with ID:', newQuiz.id);
-    toast.success('Quiz created successfully!');
-    
-    return newQuiz.id;
-  } catch (error: any) {
-    console.error('Error creating quiz:', error);
-    toast.error(`Error creating quiz: ${error.message || 'Unknown error'}`);
+    return JSON.parse(storedData);
+  } catch (error) {
+    console.error('Error retrieving recent text:', error);
     return null;
   }
-};
-
-export const validateQuiz = (quiz: any): boolean => {
-  if (!quiz) return false;
-  
-  if (!quiz.id || !quiz.title || !quiz.subjectId) {
-    console.error('Quiz missing required properties:', quiz);
-    return false;
-  }
-  
-  if (!Array.isArray(quiz.questions) || quiz.questions.length === 0) {
-    console.error('Quiz has no questions or questions is not an array:', quiz);
-    return false;
-  }
-  
-  for (const question of quiz.questions) {
-    if (!question.question) {
-      console.error('Question missing text:', question);
-      return false;
-    }
-    
-    if (question.type === 'multiple-choice') {
-      if (!Array.isArray(question.options) || question.options.length < 2) {
-        console.error('Multiple-choice question has invalid options:', question);
-        return false;
-      }
-      if (typeof question.correctAnswer !== 'number') {
-        console.error('Multiple-choice question has invalid correctAnswer:', question);
-        return false;
-      }
-    } else if (question.type === 'true-false') {
-      if (typeof question.correctAnswer !== 'number' || (question.correctAnswer !== 0 && question.correctAnswer !== 1)) {
-        console.error('True-false question has invalid correctAnswer:', question);
-        return false;
-      }
-    } else if (question.type === 'open-ended') {
-      if (!question.correctAnswer) {
-        console.error('Open-ended question has no correctAnswer:', question);
-        return false;
-      }
-    } else {
-      console.error('Question has invalid type:', question);
-      return false;
-    }
-  }
-  
-  return true;
 };

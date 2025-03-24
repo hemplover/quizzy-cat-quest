@@ -14,7 +14,7 @@ import {
 import CatTutor from '@/components/CatTutor';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { gradeQuiz, saveQuizResults } from '@/services/quizService';
+import { gradeQuiz } from '@/services/quizService';
 
 interface BaseQuestion {
   id: number;
@@ -158,17 +158,7 @@ const Quiz = () => {
         const storedQuestionsStr = sessionStorage.getItem('quizQuestions');
         if (storedQuestionsStr) {
           const parsedQuestions = JSON.parse(storedQuestionsStr);
-          
-          // Ensure all questions have an ID for tracking user answers
-          const questionsWithIds = parsedQuestions.map((q: any, index: number) => {
-            if (!q.id) {
-              return { ...q, id: index + 1 };
-            }
-            return q;
-          });
-          
-          setQuestions(questionsWithIds);
-          console.log("Loaded questions:", questionsWithIds);
+          setQuestions(parsedQuestions);
         } else {
           setQuestions(mockQuestions);
         }
@@ -233,13 +223,10 @@ const Quiz = () => {
       // We'll let the AI grade it later
       setIsCorrect(null);
       
-      // Store the answer with the question ID
-      setUserAnswers(prev => [...prev, {
+      setUserAnswers([...userAnswers, {
         questionId: currentQuestion.id,
         userAnswer: openEndedAnswer
       }]);
-      
-      console.log(`Submitted open-ended answer for question ${currentQuestion.id}:`, openEndedAnswer);
     } else {
       if (selectedOption === null) {
         toast.error("Please select an answer");
@@ -249,13 +236,10 @@ const Quiz = () => {
       const isCorrectAnswer = selectedOption === currentQuestion.correctAnswer;
       setIsCorrect(isCorrectAnswer);
       
-      // Store the answer with the question ID
-      setUserAnswers(prev => [...prev, {
+      setUserAnswers([...userAnswers, {
         questionId: currentQuestion.id,
         userAnswer: selectedOption
       }]);
-      
-      console.log(`Submitted choice ${selectedOption} for question ${currentQuestion.id}:`, isCorrectAnswer ? "Correct" : "Incorrect");
     }
     
     setIsAnswerSubmitted(true);
@@ -292,40 +276,22 @@ const Quiz = () => {
     setCatMessage(`${catMessages.completion[randomIndex]} I'm grading your answers now...`);
     
     try {
-      // Log all user answers to ensure they're in the correct format
       console.log("Sending questions and answers for grading:", questions, userAnswers);
       
-      // Make sure we have an answer for every question
-      const answersForAllQuestions = questions.map(question => {
-        const existingAnswer = userAnswers.find(answer => answer.questionId === question.id);
-        if (existingAnswer) {
-          return existingAnswer;
-        }
-        // If no answer was provided, create a default one
-        if (question.type === 'open-ended') {
-          return { questionId: question.id, userAnswer: '' };
-        }
-        return { questionId: question.id, userAnswer: -1 };
+      // Map user answers to match the order of questions for grading
+      const answersForGrading = questions.map((question, index) => {
+        const userAnswer = userAnswers.find(answer => answer.questionId === question.id);
+        return userAnswer ? userAnswer.userAnswer : '';
       });
       
-      console.log("Prepared answers for grading:", answersForAllQuestions.map(a => a.userAnswer));
+      console.log("Prepared answers for grading:", answersForGrading);
       
       // Send to API for grading
-      const results = await gradeQuiz(questions, answersForAllQuestions);
+      const results = await gradeQuiz(questions, answersForGrading);
       
       if (results) {
         console.log("Received grading results:", results);
         setAiGradingResults(results);
-        
-        // Get the quiz ID from session storage if available
-        const quizDataStr = sessionStorage.getItem('quizData');
-        if (quizDataStr) {
-          const quizData = JSON.parse(quizDataStr);
-          if (quizData.quizId) {
-            // Save the results to the database
-            await saveQuizResults(quizData.quizId, results);
-          }
-        }
         
         let totalPoints = 0;
         let maxPoints = 0;
@@ -335,7 +301,7 @@ const Quiz = () => {
           maxPoints = results.max_points;
           console.log(`Using pre-calculated scores: ${totalPoints}/${maxPoints}`);
         } else {
-          results.risultati.forEach((result: any, index: number) => {
+          results.risultati.forEach((result, index) => {
             const question = questions[index];
             const pointValue = question.type === 'open-ended' ? 5 : 1;
             
@@ -388,8 +354,9 @@ const Quiz = () => {
     const savedResults = JSON.parse(sessionStorage.getItem('quizResults') || '[]');
     sessionStorage.setItem('quizResults', JSON.stringify([...savedResults, results]));
     
-    // Calculate and award XP
+    const currentXP = parseInt(localStorage.getItem('userXP') || '0');
     const earnedXP = Math.round((results.totalPoints / results.maxPoints) * (questions.length * 10));
+    localStorage.setItem('userXP', (currentXP + earnedXP).toString());
     
     toast.success(`Quiz completed! You earned ${earnedXP} XP!`);
     navigate('/dashboard');
@@ -496,174 +463,188 @@ const Quiz = () => {
                     <span className="font-medium">Your answer:</span> {result.risposta_utente}
                   </p>
                   <div className="flex items-start gap-2 text-sm">
-                    {result.corretto === true || result.corretto === "Completamente" ? (
-                      <Check className="w-4 h-4 text-green-500 mt-0.5" />
-                    ) : result.corretto === "Parzialmente" ? (
-                      <div className="w-4 h-4 text-yellow-500 mt-0.5 flex items-center justify-center">
-                        <span className="text-xs font-bold">!</span>
-                      </div>
-                    ) : (
-                      <X className="w-4 h-4 text-red-500 mt-0.5" />
-                    )}
+                    <span className={cn(
+                      "mt-1",
+                      result.corretto === true || result.corretto === "Completamente" 
+                        ? "text-green-500" 
+                        : result.corretto === "Parzialmente" 
+                          ? "text-yellow-500"
+                          : "text-red-500"
+                    )}>
+                      {result.corretto === true || result.corretto === "Completamente" 
+                        ? <CheckCircle2 className="w-4 h-4" /> 
+                        : result.corretto === "Parzialmente" 
+                          ? "⚠️"
+                          : <XCircle className="w-4 h-4" />}
+                    </span>
                     <div>
-                      <p className="font-medium">
-                        {result.corretto === true || result.corretto === "Completamente"
-                          ? "Correct"
-                          : result.corretto === "Parzialmente"
-                          ? "Partially Correct"
-                          : "Incorrect"}
-                        {result.punteggio !== undefined && (
-                          <span className="ml-1">
-                            ({result.punteggio} {result.punteggio === 1 ? "point" : "points"})
-                          </span>
-                        )}
+                      <p className="font-medium mb-1">
+                        {result.corretto === true || result.corretto === "Completamente" 
+                          ? "Correct" 
+                          : result.corretto === "Parzialmente" 
+                            ? "Partially Correct"
+                            : "Incorrect"}
+                        {" "}({result.punteggio} points)
                       </p>
-                      <p>{result.spiegazione}</p>
+                      <p className="text-muted-foreground">{result.spiegazione}</p>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-            
-            {aiGradingResults.feedback_generale && (
-              <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-lg">
-                <h3 className="font-medium mb-2">Overall Feedback</h3>
-                <p className="text-sm">{aiGradingResults.feedback_generale}</p>
-              </div>
-            )}
           </div>
         )}
       </div>
     );
   }
 
+  if (!currentQuestion) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-12">
+        <h2 className="text-2xl font-bold mb-4">No questions available</h2>
+        <p className="text-muted-foreground mb-8">Please create a new quiz</p>
+        <button className="cat-button" onClick={() => navigate('/upload')}>
+          Create New Quiz
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
+    <div className="max-w-3xl mx-auto">
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold mb-1">Quiz</h1>
-          <div className="flex items-center text-muted-foreground">
-            <span>Question {currentQuestionIndex + 1} of {questions.length}</span>
-            <div className="mx-2 h-1 w-1 rounded-full bg-muted-foreground"></div>
-            <Timer className="w-4 h-4 mr-1" />
-            <span>{formatTime(timeSpent)}</span>
-          </div>
+          <h1 className="text-2xl font-bold">Quiz in Progress</h1>
+          <p className="text-muted-foreground">
+            Question {currentQuestionIndex + 1} of {questions.length}
+          </p>
         </div>
-        <div className="flex flex-col items-end">
-          <CatTutor 
-            message={catMessage} 
-            emotion={isCorrect === true ? "happy" : isCorrect === false ? "sad" : isAnswerSubmitted ? "thinking" : "neutral"} 
-          />
+        
+        <div className="flex items-center gap-2 mt-4 sm:mt-0">
+          <Timer className="w-5 h-5 text-cat" />
+          <span className="font-mono text-lg">{formatTime(timeSpent)}</span>
         </div>
       </div>
       
-      {currentQuestion && (
-        <div className="glass-card p-6 rounded-xl mb-6">
-          <div className="flex items-start gap-2 mb-4">
-            <div className="bg-cat text-white w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 mt-1">
-              <span className="font-medium">{currentQuestionIndex + 1}</span>
-            </div>
-            <div>
-              <div className="text-lg font-medium">{currentQuestion.question}</div>
-              <div className="text-sm text-muted-foreground mt-1">
-                {currentQuestion.type === 'multiple-choice' && 'Select the best option'}
-                {currentQuestion.type === 'true-false' && 'Select True or False'}
-                {currentQuestion.type === 'open-ended' && 'Write your answer in the text box'}
-              </div>
-            </div>
+      <div className="w-full h-2 bg-gray-200 rounded-full mb-8">
+        <div 
+          className="h-full bg-cat rounded-full transition-all duration-300"
+          style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
+        ></div>
+      </div>
+      
+      <div className="mb-6">
+        <CatTutor message={catMessage} emotion={isCorrect === true ? 'happy' : isCorrect === false ? 'confused' : 'thinking'} />
+      </div>
+      
+      <div className="glass-card p-6 rounded-xl mb-8 animate-fade-in">
+        <h2 className="text-xl font-medium mb-6 flex items-start gap-2">
+          <span className="mt-1 flex-shrink-0">
+            <HelpCircle className="w-5 h-5 text-cat" />
+          </span>
+          {currentQuestion.question}
+        </h2>
+        
+        {currentQuestion.type === 'open-ended' ? (
+          <div className="space-y-4">
+            <textarea
+              className="w-full h-40 p-4 border rounded-lg focus:ring-cat focus:border-cat focus:outline-none transition-colors"
+              placeholder="Type your answer here..."
+              value={openEndedAnswer}
+              onChange={handleOpenEndedChange}
+              disabled={isAnswerSubmitted}
+            ></textarea>
           </div>
-          
-          <div className="mt-6">
-            {(currentQuestion.type === 'multiple-choice' || currentQuestion.type === 'true-false') && (
-              <div className="space-y-3">
-                {currentQuestion.options.map((option, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleOptionSelect(index)}
-                    disabled={isAnswerSubmitted}
-                    className={cn(
-                      "w-full p-4 rounded-lg border text-left transition-colors",
-                      isAnswerSubmitted && index === currentQuestion.correctAnswer && "bg-green-50 border-green-200",
-                      isAnswerSubmitted && selectedOption === index && index !== currentQuestion.correctAnswer && "bg-red-50 border-red-200",
-                      !isAnswerSubmitted && selectedOption === index && "bg-cat/10 border-cat",
-                      !isAnswerSubmitted && selectedOption !== index && "hover:bg-gray-50",
-                      !isAnswerSubmitted && "focus:outline-none focus:ring-2 focus:ring-cat focus:ring-offset-2"
-                    )}
-                  >
-                    <div className="flex items-center">
-                      <div className={cn(
-                        "w-6 h-6 rounded-full flex items-center justify-center mr-3 border",
-                        selectedOption === index ? "border-cat bg-cat text-white" : "border-gray-300",
-                        isAnswerSubmitted && index === currentQuestion.correctAnswer && "border-green-500 bg-green-500 text-white",
-                        isAnswerSubmitted && selectedOption === index && index !== currentQuestion.correctAnswer && "border-red-500 bg-red-500 text-white"
-                      )}>
-                        {isAnswerSubmitted && index === currentQuestion.correctAnswer && (
-                          <CheckCircle2 className="w-4 h-4" />
-                        )}
-                        {isAnswerSubmitted && selectedOption === index && index !== currentQuestion.correctAnswer && (
-                          <X className="w-4 h-4" />
-                        )}
-                        {!isAnswerSubmitted && selectedOption === index && (
-                          <div className="w-2 h-2 bg-white rounded-full" />
-                        )}
-                      </div>
-                      <span>{option}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-            
-            {currentQuestion.type === 'open-ended' && (
-              <div>
-                <textarea
-                  className="w-full h-32 p-4 border rounded-lg focus:ring-cat focus:border-cat focus:outline-none transition-colors"
-                  placeholder="Enter your answer here..."
-                  value={openEndedAnswer}
-                  onChange={handleOpenEndedChange}
-                  disabled={isAnswerSubmitted}
-                />
-                <p className="text-xs text-muted-foreground mt-2">
-                  Minimum 10 characters required. The more detailed your answer, the better your score.
-                </p>
-              </div>
-            )}
-          </div>
-          
-          {isAnswerSubmitted && currentQuestion.explanation && (
-            <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-lg">
-              <div className="flex items-start gap-2">
-                <HelpCircle className="w-5 h-5 text-blue-500 mt-0.5" />
-                <div>
-                  <p className="font-medium">Explanation</p>
-                  <p className="text-sm mt-1">{currentQuestion.explanation}</p>
+        ) : (
+          <div className="space-y-3">
+            {(currentQuestion as MultipleChoiceQuestion).options.map((option, index) => (
+              <button
+                key={index}
+                className={cn(
+                  "w-full text-left p-4 rounded-lg border transition-all duration-200",
+                  selectedOption === index 
+                    ? "border-cat bg-cat/5" 
+                    : "border-gray-200 hover:border-cat/50",
+                  isAnswerSubmitted && index === (currentQuestion as MultipleChoiceQuestion).correctAnswer
+                    ? "bg-green-50 border-green-500" 
+                    : "",
+                  isAnswerSubmitted && selectedOption === index && index !== (currentQuestion as MultipleChoiceQuestion).correctAnswer
+                    ? "bg-red-50 border-red-500" 
+                    : ""
+                )}
+                onClick={() => handleOptionSelect(index)}
+                disabled={isAnswerSubmitted}
+              >
+                <div className="flex justify-between items-center">
+                  <span>{option}</span>
+                  {isAnswerSubmitted && (
+                    <>
+                      {index === (currentQuestion as MultipleChoiceQuestion).correctAnswer ? (
+                        <Check className="w-5 h-5 text-green-500" />
+                      ) : (
+                        selectedOption === index && <X className="w-5 h-5 text-red-500" />
+                      )}
+                    </>
+                  )}
                 </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+              </button>
+            ))}
+          </div>
+        )}
+        
+        {isAnswerSubmitted && currentQuestion.type !== 'open-ended' && currentQuestion.explanation && (
+          <div className={cn(
+            "mt-6 p-4 rounded-lg animate-fade-in",
+            isCorrect ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"
+          )}>
+            <h3 className="font-medium mb-2 flex items-center gap-2">
+              {isCorrect ? (
+                <>
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  <span className="text-green-700">Correct!</span>
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-5 h-5 text-red-500" />
+                  <span className="text-red-700">Incorrect</span>
+                </>
+              )}
+            </h3>
+            <p className="text-gray-700">{currentQuestion.explanation}</p>
+          </div>
+        )}
+        
+        {isAnswerSubmitted && currentQuestion.type === 'open-ended' && (
+          <div className="mt-6 p-4 rounded-lg bg-blue-50 border border-blue-200 animate-fade-in">
+            <h3 className="font-medium mb-2 flex items-center gap-2">
+              <HelpCircle className="w-5 h-5 text-blue-500" />
+              <span className="text-blue-700">Open-ended Response</span>
+            </h3>
+            <p className="text-gray-700">
+              Your answer has been recorded and will be evaluated at the end of the quiz.
+            </p>
+          </div>
+        )}
+      </div>
       
       <div className="flex justify-between">
         <button
           onClick={handlePrevQuestion}
-          disabled={currentQuestionIndex === 0 || isGrading}
+          disabled={currentQuestionIndex === 0}
           className={cn(
-            "cat-button-secondary",
-            (currentQuestionIndex === 0) && "opacity-50 cursor-not-allowed"
+            "px-4 py-2 rounded-lg flex items-center gap-1 transition-colors",
+            currentQuestionIndex === 0
+              ? "text-gray-400 cursor-not-allowed"
+              : "text-gray-700 hover:bg-gray-100"
           )}
         >
-          <ChevronLeft className="w-5 h-5 mr-2" />
+          <ChevronLeft className="w-5 h-5" />
           Previous
         </button>
         
         {!isAnswerSubmitted ? (
           <button
             onClick={handleSubmitAnswer}
-            disabled={isGrading || 
-              (currentQuestion?.type === 'open-ended' && openEndedAnswer.trim().length < 10) ||
-              ((currentQuestion?.type === 'multiple-choice' || currentQuestion?.type === 'true-false') && selectedOption === null)
-            }
             className="cat-button"
           >
             Submit Answer
@@ -671,11 +652,10 @@ const Quiz = () => {
         ) : (
           <button
             onClick={handleNextQuestion}
-            disabled={isGrading}
             className="cat-button"
           >
             {isLastQuestion ? 'Finish Quiz' : 'Next Question'}
-            <ChevronRight className="w-5 h-5 ml-2" />
+            <ChevronRight className="w-5 h-5" />
           </button>
         )}
       </div>
