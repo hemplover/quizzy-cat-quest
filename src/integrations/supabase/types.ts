@@ -18,6 +18,7 @@ export type Database = {
           name: string
           subject_id: string
           uploaded_at: string
+          user_id: string | null
         }
         Insert: {
           content: string
@@ -27,6 +28,7 @@ export type Database = {
           name: string
           subject_id: string
           uploaded_at?: string
+          user_id?: string | null
         }
         Update: {
           content?: string
@@ -36,6 +38,7 @@ export type Database = {
           name?: string
           subject_id?: string
           uploaded_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -57,6 +60,7 @@ export type Database = {
           settings: Json
           subject_id: string
           title: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -67,6 +71,7 @@ export type Database = {
           settings: Json
           subject_id: string
           title: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -77,6 +82,7 @@ export type Database = {
           settings?: Json
           subject_id?: string
           title?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -104,6 +110,7 @@ export type Database = {
           id: string
           name: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           color?: string | null
@@ -113,6 +120,7 @@ export type Database = {
           id?: string
           name: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           color?: string | null
@@ -122,6 +130,7 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
