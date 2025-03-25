@@ -22,12 +22,53 @@ serve(async (req) => {
   }
 
   try {
-    const { content, settings, previousQuestions } = await req.json();
-    
-    if (!content || !settings) {
-      throw new Error('Missing required parameters: content or settings');
+    // Validate request body and structure
+    let body;
+    try {
+      body = await req.json();
+      console.log('Request body:', JSON.stringify(body).substring(0, 200) + '...');
+    } catch (error) {
+      console.error('Error parsing request body:', error);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid JSON in request body',
+          details: error.message 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
     
+    const { content, settings, previousQuestions } = body;
+    
+    // Validate required parameters with detailed error responses
+    if (!content) {
+      console.error('Missing required parameter: content');
+      return new Response(
+        JSON.stringify({ error: 'Missing required parameter: content' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!settings) {
+      console.error('Missing required parameter: settings');
+      return new Response(
+        JSON.stringify({ error: 'Missing required parameter: settings' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (typeof content !== 'string') {
+      console.error('Invalid content type, expected string but got:', typeof content);
+      return new Response(
+        JSON.stringify({ error: 'Invalid content type, expected string' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Log important information for debugging
     console.log('Generating quiz with Gemini');
     console.log(`Selected question types:`, settings.questionTypes);
     console.log(`Content length: ${content.length} characters`);
@@ -42,10 +83,18 @@ serve(async (req) => {
     );
     
   } catch (error) {
+    // Provide detailed error information
     console.error('Error in generate-quiz function:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : '';
+    
+    console.error('Error details:', { message: errorMessage, stack: errorStack });
     
     return new Response(
-      JSON.stringify({ error: error.message || 'Unknown error' }),
+      JSON.stringify({ 
+        error: errorMessage, 
+        details: errorStack 
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
@@ -65,6 +114,10 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings, previ
   const languagePrompt = "Please detect the language of the content and create the quiz in that same language. Preserve all terminology and concepts in their original language.";
   
   // Ensure sufficient content for quiz generation
+  if (!content || typeof content !== 'string') {
+    throw new Error('Invalid content format. Expected a non-empty string.');
+  }
+  
   if (content.trim().length < 100) {
     throw new Error('The provided content is too short. Please provide more detailed study material.');
   }
@@ -117,10 +170,13 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings, previ
       })
     });
 
+    // Check HTTP status and handle errors
     if (!response.ok) {
-      const errorData = await response.json();
-      const errorMessage = errorData.error?.message || 'Unknown error';
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.error?.message || `HTTP error ${response.status}: ${response.statusText}`;
       console.error('Gemini API Error:', errorData);
+      console.error('Response status:', response.status);
+      console.error('Response text:', await response.text().catch(() => 'Unable to get response text'));
       throw new Error(`Gemini API Error: ${errorMessage}`);
     }
 
@@ -138,7 +194,7 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings, previ
       // Simplified response format in some versions
       generatedContent = data.text;
     } else {
-      console.error('Unexpected Gemini response format:', data);
+      console.error('Unexpected Gemini response format:', JSON.stringify(data).substring(0, 500));
       throw new Error('Unexpected response format from Gemini API');
     }
     

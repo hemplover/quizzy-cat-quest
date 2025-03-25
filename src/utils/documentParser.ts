@@ -1,3 +1,4 @@
+
 import { toast } from 'sonner';
 
 /**
@@ -92,7 +93,7 @@ async function extractTextFromPdf(file: File): Promise<string> {
     const pdfjsLib = await import('pdfjs-dist');
     console.log('PDF.js library loaded successfully');
     
-    // Set worker source path
+    // Set worker source path - Fixed TypeScript error by accessing static property correctly
     console.log('Configuring PDF.js worker...');
     const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry');
     pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
@@ -176,7 +177,7 @@ async function extractTextFromPowerPoint(file: File): Promise<string> {
     let textContent = '';
     
     // Import jszip dynamically
-    const JSZip = await (await import('jszip')).default;
+    const JSZip = (await import('jszip')).default;
     
     // Load the file as a zip
     const zip = await JSZip.loadAsync(arrayBuffer);

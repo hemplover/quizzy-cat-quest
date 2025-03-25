@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { FileUp, X, File, FileText, Image, Film, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -26,6 +27,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [supportsUpload, setSupportsUpload] = useState(supportsFileUpload());
   const [selectedProvider, setSelectedProvider] = useState(getSelectedProvider());
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Update supported file types when the provider changes
   useEffect(() => {
@@ -65,37 +67,48 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const validateAndSetFile = (file: File) => {
     console.log(`Validating file: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
     
-    // Extract file extension
-    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    setIsProcessing(true);
     
-    // Check if the extension is in the accepted list
-    const acceptedExtensions = accept.split(',').map(type => 
-      type.trim().replace('.', '').toLowerCase());
-    
-    if (!acceptedExtensions.includes(fileExtension || '') && !acceptedExtensions.includes('*')) {
-      toast.error(`Invalid file type. Please upload ${accept} files.`);
-      console.error(`Invalid file type: ${fileExtension}. Accepted types: ${acceptedExtensions.join(', ')}`);
-      return;
+    try {
+      // Extract file extension
+      const fileExtension = file.name.split('.').pop()?.toLowerCase();
+      
+      // Check if the extension is in the accepted list
+      const acceptedExtensions = accept.split(',').map(type => 
+        type.trim().replace('.', '').toLowerCase());
+      
+      if (!acceptedExtensions.includes(fileExtension || '') && !acceptedExtensions.includes('*')) {
+        toast.error(`Invalid file type. Please upload ${accept} files.`);
+        console.error(`Invalid file type: ${fileExtension}. Accepted types: ${acceptedExtensions.join(', ')}`);
+        setIsProcessing(false);
+        return;
+      }
+      
+      // Check file size
+      if (file.size > maxSize * 1024 * 1024) {
+        toast.error(`File too large. Maximum size is ${maxSize}MB.`);
+        console.error(`File too large: ${file.size} bytes. Maximum size: ${maxSize * 1024 * 1024} bytes`);
+        setIsProcessing(false);
+        return;
+      }
+      
+      // Check if the current provider supports file uploads
+      if (!supportsUpload) {
+        toast.warning(t('fileUploadNotSupported'));
+        console.warn(`Provider ${selectedProvider} does not support direct file uploads`);
+        // Still set the file but with a warning
+      }
+      
+      setSelectedFile(file);
+      onFileUpload(file);
+      toast.success(`${file.name} ${t('selectedFileSuccess')}`);
+      console.log(`File selected successfully: ${file.name}`);
+    } catch (error) {
+      console.error('Error validating file:', error);
+      toast.error(`Error validating file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsProcessing(false);
     }
-    
-    // Check file size
-    if (file.size > maxSize * 1024 * 1024) {
-      toast.error(`File too large. Maximum size is ${maxSize}MB.`);
-      console.error(`File too large: ${file.size} bytes. Maximum size: ${maxSize * 1024 * 1024} bytes`);
-      return;
-    }
-    
-    // Check if the current provider supports file uploads
-    if (!supportsUpload) {
-      toast.warning(t('fileUploadNotSupported'));
-      console.warn(`Provider ${selectedProvider} does not support direct file uploads`);
-      // Still set the file but with a warning
-    }
-    
-    setSelectedFile(file);
-    onFileUpload(file);
-    toast.success(`${file.name} ${t('selectedFileSuccess')}`);
-    console.log(`File selected successfully: ${file.name}`);
   };
 
   const clearSelectedFile = () => {
@@ -168,8 +181,9 @@ const FileUpload: React.FC<FileUploadProps> = ({
             <button 
               type="button" 
               className="cat-button-secondary text-sm py-2"
+              disabled={isProcessing}
             >
-              {t('selectFromComputer')}
+              {isProcessing ? `${t('processing')}...` : t('selectFromComputer')}
             </button>
           )}
           
@@ -179,6 +193,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
             onChange={handleFileInputChange}
             accept={accept}
             className="hidden"
+            disabled={isProcessing}
           />
         </div>
       ) : (
@@ -203,6 +218,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 clearSelectedFile();
               }}
               className="p-1 rounded-full hover:bg-gray-100"
+              disabled={isProcessing}
             >
               <X className="w-4 h-4 text-gray-500" />
             </button>
@@ -211,6 +227,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
       )}
     </div>
   );
-};
+}
 
 export default FileUpload;
