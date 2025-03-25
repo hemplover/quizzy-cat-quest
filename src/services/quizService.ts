@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { QuizQuestion, GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
 import { supabase } from '@/integrations/supabase/client';
@@ -132,9 +131,22 @@ export const generateQuiz = async (
       ? content.replace(/\u0000/g, '') // Remove null bytes
       : String(content);
     
-    // Call the edge function for quiz generation
+    // Double check that content is proper
+    if (!sanitizedContent || sanitizedContent.trim().length < 100) {
+      toast.error('Please provide more detailed study material.');
+      return null;
+    }
+    
+    // Call the edge function for quiz generation with timeout handling
     console.log('Calling generate-quiz edge function with sanitized content');
-    const { data, error } = await supabase.functions.invoke('generate-quiz', {
+    
+    // Create a timeout promise
+    const timeoutPromise = new Promise<null>((_, reject) => {
+      setTimeout(() => reject(new Error('Request timed out after 30 seconds')), 30000);
+    });
+    
+    // Create the actual request promise
+    const requestPromise = supabase.functions.invoke('generate-quiz', {
       body: {
         content: sanitizedContent,
         settings,
@@ -142,9 +154,27 @@ export const generateQuiz = async (
       }
     });
     
+    // Race the promises to implement a timeout
+    const result = await Promise.race([requestPromise, timeoutPromise]) as any;
+    
+    // Check for errors
+    if (!result) {
+      console.error('Request timed out or returned null');
+      toast.error('Request timed out. Please try again.');
+      return null;
+    }
+    
+    if (result.error) {
+      console.error('Error calling generate-quiz function:', result.error);
+      toast.error(`Error generating quiz: ${result.error.message || 'Unknown error'}`);
+      return null;
+    }
+    
+    const { data, error } = result;
+    
     if (error) {
-      console.error('Error calling generate-quiz function:', error);
-      toast.error(`Error generating quiz: ${error.message}`);
+      console.error('Error from generate-quiz function:', error);
+      toast.error(`Error generating quiz: ${error.message || 'Unknown error'}`);
       return null;
     }
     
@@ -201,7 +231,19 @@ export const generateQuiz = async (
   } catch (error) {
     console.error('Error generating quiz:', error);
     toast.error(`Error generating quiz: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    return null;
+    
+    // Return a minimal valid quiz structure to avoid complete failure
+    return {
+      quiz: [
+        {
+          type: "multiple_choice",
+          question: "Could not generate a complete quiz. Please try again with different content.",
+          options: ["Try again", "Use different content", "Contact support"],
+          correct_answer: "Try again",
+          explanation: "There was an error generating this quiz."
+        }
+      ]
+    };
   }
 };
 

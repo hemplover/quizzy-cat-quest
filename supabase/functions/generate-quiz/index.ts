@@ -68,14 +68,25 @@ serve(async (req) => {
       );
     }
     
+    // Sanitize the content - remove any problematic characters
+    const sanitizedContent = content.replace(/\u0000/g, '').trim();
+    
+    if (sanitizedContent.length < 50) {
+      console.error('Content too short:', sanitizedContent.length, 'characters');
+      return new Response(
+        JSON.stringify({ error: 'Content too short to generate a quiz' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     // Log important information for debugging
     console.log('Generating quiz with Gemini');
     console.log(`Selected question types:`, settings.questionTypes);
-    console.log(`Content length: ${content.length} characters`);
+    console.log(`Content length: ${sanitizedContent.length} characters`);
     console.log(`Previous quiz count: ${previousQuestions?.length || 0}`);
     
     // Always use backend Gemini API
-    const result = await generateGeminiQuiz(content, settings, previousQuestions);
+    const result = await generateGeminiQuiz(sanitizedContent, settings, previousQuestions);
     
     return new Response(
       JSON.stringify(result),
@@ -83,24 +94,33 @@ serve(async (req) => {
     );
     
   } catch (error) {
-    // Provide detailed error information
+    // Provide detailed error information and fallback response
     console.error('Error in generate-quiz function:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorStack = error instanceof Error ? error.stack : '';
     
     console.error('Error details:', { message: errorMessage, stack: errorStack });
     
+    // Return a fallback response with simple quiz structure instead of failing completely
     return new Response(
       JSON.stringify({ 
-        error: errorMessage, 
-        details: errorStack 
+        error: errorMessage,
+        quiz: [
+          {
+            type: "multiple_choice",
+            question: "Could not generate quiz due to an error. Please try again.",
+            options: ["Try again", "Use different content", "Contact support"],
+            correct_answer: "Try again",
+            explanation: "There was an error with the quiz generation. Please try again with clearer content."
+          }
+        ]
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
 
-// Gemini quiz generation function
+// Gemini quiz generation function with improved error handling and fallbacks
 async function generateGeminiQuiz(content: string, settings: QuizSettings, previousQuestions?: any[]) {
   const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
   
@@ -191,7 +211,19 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings, previ
         console.error('Unable to get response text');
       }
       
-      throw new Error(`Gemini API Error: ${errorMessage}`);
+      // Return a fallback quiz structure instead of failing completely
+      return {
+        quiz: [
+          {
+            type: "multiple_choice",
+            question: "Could not connect to AI service. Please try again later.",
+            options: ["Try again", "Use different content", "Contact support"],
+            correct_answer: "Try again",
+            explanation: "There was an error connecting to the AI service. Please try again later."
+          }
+        ],
+        error: errorMessage
+      };
     }
 
     const data = await response.json();
@@ -209,13 +241,37 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings, previ
       generatedContent = data.text;
     } else {
       console.error('Unexpected Gemini response format:', JSON.stringify(data).substring(0, 500));
-      throw new Error('Unexpected response format from Gemini API');
+      
+      // Return a fallback quiz structure instead of failing
+      return {
+        quiz: [
+          {
+            type: "multiple_choice",
+            question: "Unexpected response format from AI service.",
+            options: ["Try again", "Use different content", "Contact support"],
+            correct_answer: "Try again",
+            explanation: "There was an issue with the AI service response. Please try again later."
+          }
+        ]
+      };
     }
     
     console.log('Generated content length:', generatedContent.length);
     if (generatedContent.length < 50) {
       console.error('Generated content too short:', generatedContent);
-      throw new Error('The AI generated content is too short. Please try with more detailed study material.');
+      
+      // Return a fallback quiz structure instead of failing
+      return {
+        quiz: [
+          {
+            type: "multiple_choice",
+            question: "AI generated content was too short.",
+            options: ["Try again", "Use different content", "Contact support"],
+            correct_answer: "Use different content",
+            explanation: "The AI couldn't generate enough content based on your input. Try providing more detailed study material."
+          }
+        ]
+      };
     }
     
     try {
@@ -240,10 +296,10 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings, previ
             quiz: [
               {
                 type: "multiple_choice",
-                question: "Could not generate quiz. The AI response was not in a valid format.",
+                question: "Could not parse AI response.",
                 options: ["Try again", "Use different content", "Contact support"],
                 correct_answer: "Try again",
-                explanation: "There was an error generating this quiz. Please try again with clearer content."
+                explanation: "There was an error parsing the AI response. Please try again with clearer content."
               }
             ]
           };
@@ -255,10 +311,10 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings, previ
         quiz: [
           {
             type: "multiple_choice",
-            question: "Could not generate quiz from the provided content.",
+            question: "Could not parse AI response to generate quiz.",
             options: ["Try again", "Use different content", "Contact support"],
             correct_answer: "Try again",
-            explanation: "There was an error generating this quiz. Please try again with clearer content."
+            explanation: "There was an error parsing the AI response. Please try again with clearer content."
           }
         ]
       };
@@ -266,7 +322,7 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings, previ
   } catch (error) {
     console.error('Error in Gemini API call:', error);
     
-    // Try to return a fallback response instead of failing completely
+    // Return a fallback response instead of failing completely
     return {
       quiz: [
         {
