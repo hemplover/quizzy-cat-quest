@@ -19,7 +19,19 @@ export async function parseDocument(file: File): Promise<string | null> {
     // PDF files
     else if (fileType.includes('application/pdf') || fileName.endsWith('.pdf')) {
       console.log('Detected PDF file, beginning extraction...');
-      return await extractTextFromPdf(file);
+      try {
+        return await extractTextFromPdf(file);
+      } catch (pdfError) {
+        console.error('PDF extraction failed, falling back to text extraction:', pdfError);
+        toast.error('PDF extraction failed. Some content may be missing.');
+        // Try to extract as plain text as fallback
+        try {
+          return await readTextFile(file);
+        } catch (textError) {
+          console.error('Text fallback also failed:', textError);
+          throw new Error('Could not extract text from this PDF file.');
+        }
+      }
     }
     
     // Word documents
@@ -29,7 +41,19 @@ export async function parseDocument(file: File): Promise<string | null> {
       fileName.endsWith('.docx') || 
       fileName.endsWith('.doc')
     ) {
-      return await extractTextFromWord(file);
+      try {
+        return await extractTextFromWord(file);
+      } catch (wordError) {
+        console.error('Word extraction failed, falling back to text extraction:', wordError);
+        toast.error('Word document extraction failed. Some content may be missing.');
+        // Try to extract as plain text as fallback
+        try {
+          return await readTextFile(file);
+        } catch (textError) {
+          console.error('Text fallback also failed:', textError);
+          throw new Error('Could not extract text from this Word document.');
+        }
+      }
     }
     
     // PowerPoint presentations
@@ -39,7 +63,19 @@ export async function parseDocument(file: File): Promise<string | null> {
       fileName.endsWith('.pptx') || 
       fileName.endsWith('.ppt')
     ) {
-      return await extractTextFromPowerPoint(file);
+      try {
+        return await extractTextFromPowerPoint(file);
+      } catch (pptError) {
+        console.error('PowerPoint extraction failed, falling back to text extraction:', pptError);
+        toast.error('PowerPoint extraction failed. Some content may be missing.');
+        // Try to extract as plain text as fallback
+        try {
+          return await readTextFile(file);
+        } catch (textError) {
+          console.error('Text fallback also failed:', textError);
+          throw new Error('Could not extract text from this PowerPoint file.');
+        }
+      }
     }
     
     // HTML files
@@ -83,7 +119,7 @@ async function readTextFile(file: File): Promise<string> {
   });
 }
 
-// Extract text from PDF using PDF.js with more detailed logging
+// Extract text from PDF using PDF.js with more detailed logging and better error handling
 async function extractTextFromPdf(file: File): Promise<string> {
   try {
     console.log('Starting PDF text extraction process...', file.name, file.size);
@@ -93,11 +129,10 @@ async function extractTextFromPdf(file: File): Promise<string> {
     const pdfjsLib = await import('pdfjs-dist');
     console.log('PDF.js library loaded successfully');
     
-    // Set worker source path - Fixed TypeScript error by accessing static property correctly
+    // Set worker source path - Using URL for the worker to avoid issues
     console.log('Configuring PDF.js worker...');
-    const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-    console.log('PDF.js worker configured successfully');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+    console.log('PDF.js worker configured successfully with CDN worker');
     
     // Read file as ArrayBuffer
     console.log('Loading file as ArrayBuffer...');
@@ -121,21 +156,31 @@ async function extractTextFromPdf(file: File): Promise<string> {
     // Extract text from each page
     for (let i = 1; i <= pdf.numPages; i++) {
       console.log(`Processing page ${i} of ${pdf.numPages}...`);
-      const page = await pdf.getPage(i);
-      console.log(`Extracting text content from page ${i}...`);
-      const content = await page.getTextContent();
-      
-      // Concatenate text items with spaces
-      const pageText = content.items
-        .map((item: any) => item.str)
-        .join(' ');
-      
-      textContent += pageText + '\n\n';
-      console.log(`Extracted ${pageText.length} characters from page ${i}`);
+      try {
+        const page = await pdf.getPage(i);
+        console.log(`Extracting text content from page ${i}...`);
+        const content = await page.getTextContent();
+        
+        // Concatenate text items with spaces
+        const pageText = content.items
+          .map((item: any) => item.str)
+          .join(' ');
+        
+        textContent += pageText + '\n\n';
+        console.log(`Extracted ${pageText.length} characters from page ${i}`);
+      } catch (pageError) {
+        console.error(`Error extracting text from page ${i}:`, pageError);
+        // Continue with next page instead of failing the entire process
+      }
     }
     
     const result = textContent.trim();
     console.log(`Total extracted text: ${result.length} characters`);
+    
+    if (result.length === 0) {
+      throw new Error('No text could be extracted from this PDF');
+    }
+    
     return result;
   } catch (error) {
     console.error('Error extracting text from PDF:', error);
@@ -148,63 +193,92 @@ async function extractTextFromPdf(file: File): Promise<string> {
   }
 }
 
-// Extract text from Word documents using mammoth.js
+// Extract text from Word documents using mammoth.js with improved error handling
 async function extractTextFromWord(file: File): Promise<string> {
   try {
+    console.log('Loading mammoth.js for Word document extraction');
     const mammoth = await import('mammoth');
     
     // Read file as ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
+    console.log(`Word document loaded as ArrayBuffer, size: ${arrayBuffer.byteLength} bytes`);
     
     // Extract text using mammoth
+    console.log('Extracting text from Word document...');
     const result = await mammoth.extractRawText({ arrayBuffer });
     
-    return result.value;
+    const extractedText = result.value.trim();
+    console.log(`Word document text extracted: ${extractedText.length} characters`);
+    
+    if (extractedText.length === 0) {
+      throw new Error('No text could be extracted from this Word document');
+    }
+    
+    if (result.messages && result.messages.length > 0) {
+      console.warn('Mammoth extraction warnings:', result.messages);
+    }
+    
+    return extractedText;
   } catch (error) {
     console.error('Error extracting text from Word document:', error);
-    throw new Error('Failed to extract text from Word document');
+    throw new Error(`Failed to extract text from Word document: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-// Extract text from PowerPoint presentations
+// Extract text from PowerPoint presentations with improved error handling
 async function extractTextFromPowerPoint(file: File): Promise<string> {
   try {
+    console.log('Starting PowerPoint extraction process');
     // For PowerPoint, we use browser's FileReader to first get the file as ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
+    console.log(`PowerPoint loaded as ArrayBuffer, size: ${arrayBuffer.byteLength} bytes`);
     
     // Use a simpler approach for PPTX extraction since pptxgenjs lacks direct text extraction
     // Instead, we'll use a basic approach to extract text from XML parts
     let textContent = '';
     
     // Import jszip dynamically
+    console.log('Loading JSZip for PowerPoint extraction');
     const JSZip = (await import('jszip')).default;
     
     // Load the file as a zip
+    console.log('Opening PowerPoint as zip file');
     const zip = await JSZip.loadAsync(arrayBuffer);
     
     // Try to extract text from slides
     const slideRegex = /ppt\/slides\/slide[0-9]+\.xml/;
     const slideKeys = Object.keys(zip.files).filter(key => slideRegex.test(key));
     
+    console.log(`Found ${slideKeys.length} slides in PowerPoint`);
+    
     for (const slideKey of slideKeys) {
-      const slideContent = await zip.files[slideKey].async('text');
-      // Simple regex to extract text between <a:t> tags (text elements in PPTX XML)
-      const textMatches = slideContent.match(/<a:t>([^<]*)<\/a:t>/g) || [];
-      for (const match of textMatches) {
-        const text = match.replace(/<a:t>/, '').replace(/<\/a:t>/, '');
-        if (text.trim()) {
-          textContent += text.trim() + '\n';
+      console.log(`Extracting text from slide: ${slideKey}`);
+      try {
+        const slideContent = await zip.files[slideKey].async('text');
+        // Simple regex to extract text between <a:t> tags (text elements in PPTX XML)
+        const textMatches = slideContent.match(/<a:t>([^<]*)<\/a:t>/g) || [];
+        for (const match of textMatches) {
+          const text = match.replace(/<a:t>/, '').replace(/<\/a:t>/, '');
+          if (text.trim()) {
+            textContent += text.trim() + '\n';
+          }
         }
+      } catch (slideError) {
+        console.error(`Error extracting text from slide ${slideKey}:`, slideError);
+        // Continue with next slide instead of failing the entire process
       }
     }
     
-    if (!textContent) {
+    const result = textContent.trim();
+    console.log(`Total extracted text from PowerPoint: ${result.length} characters`);
+    
+    if (!result) {
       throw new Error('Could not extract text from PowerPoint file');
     }
     
-    return textContent.trim();
+    return result;
   } catch (error) {
     console.error('Error extracting text from PowerPoint:', error);
-    throw new Error('Failed to extract text from PowerPoint presentation');
+    throw new Error(`Failed to extract text from PowerPoint presentation: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }

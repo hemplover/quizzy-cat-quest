@@ -127,10 +127,16 @@ export const generateQuiz = async (
       }
     }
     
+    // Sanitize input content - ensure it's a string and doesn't have problematic characters
+    const sanitizedContent = typeof content === 'string' 
+      ? content.replace(/\u0000/g, '') // Remove null bytes
+      : String(content);
+    
     // Call the edge function for quiz generation
+    console.log('Calling generate-quiz edge function with sanitized content');
     const { data, error } = await supabase.functions.invoke('generate-quiz', {
       body: {
-        content,
+        content: sanitizedContent,
         settings,
         previousQuestions: previousQuestions.length > 0 ? previousQuestions : undefined
       }

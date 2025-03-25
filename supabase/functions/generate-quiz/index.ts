@@ -12,7 +12,7 @@ interface QuizSettings {
   questionTypes: string[];
   numQuestions: number;
   model?: string;
-  previousQuizzes?: number; // New parameter to track previous quizzes
+  previousQuizzes?: number;
 }
 
 serve(async (req) => {
@@ -26,7 +26,7 @@ serve(async (req) => {
     let body;
     try {
       body = await req.json();
-      console.log('Request body:', JSON.stringify(body).substring(0, 200) + '...');
+      console.log('Request body received:', JSON.stringify(body).substring(0, 200) + '...');
     } catch (error) {
       console.error('Error parsing request body:', error);
       return new Response(
@@ -172,11 +172,25 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings, previ
 
     // Check HTTP status and handle errors
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = { error: { message: `HTTP error ${response.status}` } };
+      }
+      
       const errorMessage = errorData.error?.message || `HTTP error ${response.status}: ${response.statusText}`;
       console.error('Gemini API Error:', errorData);
       console.error('Response status:', response.status);
-      console.error('Response text:', await response.text().catch(() => 'Unable to get response text'));
+      
+      let responseText;
+      try {
+        responseText = await response.text();
+        console.error('Response text:', responseText);
+      } catch (e) {
+        console.error('Unable to get response text');
+      }
+      
       throw new Error(`Gemini API Error: ${errorMessage}`);
     }
 
@@ -221,15 +235,50 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings, previ
           return JSON.parse(extractedJson);
         } catch (jsonError) {
           console.error('Failed to parse extracted JSON:', jsonError);
-          throw new Error('Failed to parse quiz from Gemini response. The AI response was not in valid JSON format.');
+          // Return a fallback quiz structure instead of failing
+          return {
+            quiz: [
+              {
+                type: "multiple_choice",
+                question: "Could not generate quiz. The AI response was not in a valid format.",
+                options: ["Try again", "Use different content", "Contact support"],
+                correct_answer: "Try again",
+                explanation: "There was an error generating this quiz. Please try again with clearer content."
+              }
+            ]
+          };
         }
       }
       
-      throw new Error('Failed to parse quiz from Gemini response. Please try again with more detailed content.');
+      // Return a fallback quiz structure instead of failing
+      return {
+        quiz: [
+          {
+            type: "multiple_choice",
+            question: "Could not generate quiz from the provided content.",
+            options: ["Try again", "Use different content", "Contact support"],
+            correct_answer: "Try again",
+            explanation: "There was an error generating this quiz. Please try again with clearer content."
+          }
+        ]
+      };
     }
   } catch (error) {
     console.error('Error in Gemini API call:', error);
-    throw error;
+    
+    // Try to return a fallback response instead of failing completely
+    return {
+      quiz: [
+        {
+          type: "multiple_choice",
+          question: "Could not generate quiz due to an API error. Please try again.",
+          options: ["Try again", "Use different content", "Check your connection"],
+          correct_answer: "Try again",
+          explanation: "There was an error with the AI service. Please try again later."
+        }
+      ],
+      error: error instanceof Error ? error.message : "Unknown error"
+    };
   }
 }
 
