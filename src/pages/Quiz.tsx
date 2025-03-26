@@ -276,7 +276,8 @@ const Quiz = () => {
     setCatMessage(`${catMessages.completion[randomIndex]} I'm grading your answers now...`);
     
     try {
-      console.log("Sending questions and answers for grading:", questions, userAnswers);
+      console.log("Sending questions and answers for grading:", questions);
+      console.log("User answers to grade:", userAnswers);
       
       // Map user answers to match the order of questions for grading
       const answersForGrading = questions.map((question, index) => {
@@ -313,12 +314,47 @@ const Quiz = () => {
           console.log(`Calculated scores: ${totalPoints}/${maxPoints}`);
         }
         
+        // Ensure the results object always has these properties
         results.total_points = totalPoints;
         results.max_points = maxPoints;
         
         const percentageScore = Math.round((totalPoints / maxPoints) * 100);
         setScore(percentageScore);
         console.log(`Final percentage score: ${percentageScore}%`);
+        
+        // Check if we're in an environment where we can save to Supabase
+        const quizId = sessionStorage.getItem('currentQuizId');
+        if (quizId) {
+          console.log('Saving intermediate results to quiz ID:', quizId);
+          try {
+            // This is a separate save attempt just to ensure results are saved
+            // even if the user doesn't click "Finish Quiz"
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+              const { error } = await supabase
+                .from('quizzes')
+                .update({ 
+                  results: {
+                    ...results,
+                    score: percentageScore,
+                    punteggio_totale: percentageScore / 100,
+                    total_points: totalPoints,
+                    max_points: maxPoints
+                  }
+                })
+                .eq('id', quizId)
+                .eq('user_id', session.user.id);
+                
+              if (error) {
+                console.error('Error saving intermediate results:', error);
+              } else {
+                console.log('Intermediate results saved successfully');
+              }
+            }
+          } catch (err) {
+            console.error('Error in intermediate results save:', err);
+          }
+        }
       }
     } catch (error) {
       console.error("Error grading quiz:", error);
@@ -377,6 +413,16 @@ const Quiz = () => {
           // Get quiz ID if it exists
           const quizId = sessionStorage.getItem('currentQuizId');
           
+          console.log('Saving quiz results to Supabase with ID:', quizId);
+          console.log('Results data:', {
+            ...aiGradingResults,
+            score,
+            punteggio_totale: score / 100,
+            total_points: results.totalPoints,
+            max_points: results.maxPoints,
+            timeSpent
+          });
+          
           if (quizId) {
             // Update existing quiz
             const { error } = await supabase
@@ -395,12 +441,52 @@ const Quiz = () => {
               
             if (error) {
               console.error('Error updating quiz results:', error);
+              throw new Error(`Failed to save quiz results: ${error.message}`);
             } else {
-              console.log('Quiz results saved to Supabase');
+              console.log('Quiz results saved to Supabase successfully');
             }
           } else {
-            // Might be a temporary quiz without ID, but let's log it
-            console.log('No quiz ID found in session storage, results not saved to database');
+            // This might happen if the quiz was created but ID wasn't saved in session
+            // Let's try to find the most recent quiz for this subject and user
+            const { data: recentQuizzes, error: findError } = await supabase
+              .from('quizzes')
+              .select('id')
+              .eq('subject_id', quizData.subjectId)
+              .eq('user_id', session.user.id)
+              .order('created_at', { ascending: false })
+              .limit(1);
+              
+            if (findError) {
+              console.error('Error finding recent quiz:', findError);
+            } else if (recentQuizzes && recentQuizzes.length > 0) {
+              // Found a recent quiz, update it
+              const recentQuizId = recentQuizzes[0].id;
+              console.log('Found recent quiz ID:', recentQuizId);
+              
+              const { error: updateError } = await supabase
+                .from('quizzes')
+                .update({ 
+                  results: {
+                    ...aiGradingResults,
+                    score,
+                    punteggio_totale: score / 100,
+                    total_points: results.totalPoints,
+                    max_points: results.maxPoints,
+                    timeSpent
+                  }
+                })
+                .eq('id', recentQuizId);
+                
+              if (updateError) {
+                console.error('Error updating recent quiz results:', updateError);
+              } else {
+                console.log('Quiz results saved to recent quiz in Supabase');
+                // Store the ID for future reference
+                sessionStorage.setItem('currentQuizId', recentQuizId);
+              }
+            } else {
+              console.log('No quiz ID found and no recent quizzes, results not saved to database');
+            }
           }
         }
       }
@@ -716,3 +802,4 @@ const Quiz = () => {
 };
 
 export default Quiz;
+
