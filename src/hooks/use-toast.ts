@@ -1,16 +1,16 @@
+
 import React from "react";
-import { toast as sonnerToast, type ToastT } from "sonner";
+import { toast as sonnerToast, Toast, ToastOptions } from "sonner";
 
 const TOAST_LIMIT = 5;
 const TOAST_REMOVE_DELAY = 1000000;
 
-type ToasterToastProps = {
+type ToasterToast = Toast & {
   id: string;
   title?: React.ReactNode;
   description?: React.ReactNode;
   action?: React.ReactNode;
   dismiss?: React.ReactNode;
-  open?: boolean;
 };
 
 const actionTypes = {
@@ -32,11 +32,11 @@ type ActionType = typeof actionTypes;
 type Action =
   | {
       type: ActionType["ADD_TOAST"];
-      toast: ToasterToastProps;
+      toast: ToasterToast;
     }
   | {
       type: ActionType["UPDATE_TOAST"];
-      toast: Partial<ToasterToastProps>;
+      toast: Partial<ToasterToast>;
     }
   | {
       type: ActionType["DISMISS_TOAST"];
@@ -48,7 +48,7 @@ type Action =
     };
 
 interface State {
-  toasts: ToasterToastProps[];
+  toasts: ToasterToast[];
 }
 
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
@@ -133,48 +133,19 @@ function dispatch(action: Action) {
   });
 }
 
-type ToastProps = Omit<ToasterToastProps, "id">;
+type Toast = Omit<ToasterToast, "id">;
 
-type ToastFunction = (props: ToastProps) => string;
-
-interface ToastInterface {
-  (props: ToastProps): string;
-  success: (message: string, options?: any) => void;
-  error: (message: string, options?: any) => void;
-  warning: (message: string, options?: any) => void;
-  info: (message: string, options?: any) => void;
-}
-
-const toast = ((props: ToastProps) => {
+function toast(props: Toast) {
   const id = genId();
-  
+
+  // Just use sonner directly
   sonnerToast(props.title as string, {
     description: props.description,
     ...props,
   });
-  
+
   return id;
-}) as ToastInterface;
-
-toast.success = (message, options = {}) => {
-  sonnerToast.success(message, options);
-  return "";
-};
-
-toast.error = (message, options = {}) => {
-  sonnerToast.error(message, options);
-  return "";
-};
-
-toast.warning = (message, options = {}) => {
-  sonnerToast.warning(message, options);
-  return "";
-};
-
-toast.info = (message, options = {}) => {
-  sonnerToast.info(message, options);
-  return "";
-};
+}
 
 function useToast() {
   const [state, setState] = React.useState<State>(memoryState);

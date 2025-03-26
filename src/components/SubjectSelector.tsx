@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Select, 
@@ -52,12 +53,7 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
 
   // Create subject mutation
   const createSubjectMutation = useMutation({
-    mutationFn: (subjectData: {
-      name: string;
-      description: string;
-      icon: string;
-      color: string;
-    }) => createSubject(subjectData),
+    mutationFn: createSubject,
     onSuccess: () => {
       // Reset form
       setNewSubjectName('');

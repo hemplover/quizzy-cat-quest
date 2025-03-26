@@ -1,167 +1,221 @@
 
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { Database } from '@/integrations/supabase/types';
+import { Json } from '@/integrations/supabase/types';
+import { useAuth } from '@/contexts/AuthContext';
 
-// Define types for better type safety
 export interface Subject {
   id: string;
   name: string;
-  description: string | null;
-  color: string | null;
-  icon: string | null;
-  user_id: string;
-  created_at: string;
-  updated_at: string;
-  quizzes?: any[];
-  quizCount?: number;
-  completedQuizCount?: number;
-  averageScore?: number;
+  description: string;
+  icon: string;
+  color: string;
+  createdAt: string;
+  updatedAt: string;
+  userId: string;
 }
 
 export interface Document {
   id: string;
+  subjectId: string;
   name: string;
   content: string;
   fileType: string;
   fileSize: number;
   uploadedAt: string;
-  subject_id: string;
-  user_id: string;
+  userId: string;
 }
 
 export interface Quiz {
   id: string;
+  subjectId: string;
+  documentId: string | null;
   title: string;
   questions: any[];
-  settings: any;
-  results: any;
   createdAt: string;
-  subject_id: string;
-  document_id?: string;
-  user_id: string;
+  settings?: any;
+  results?: any;
+  userId: string;
 }
 
-// Fetch all subjects for a user
-export const fetchSubjects = async (): Promise<Subject[]> => {
-  try {
-    const { data } = await supabase.auth.getSession();
-    const userId = data.session?.user?.id;
+// Helper function to get current user ID
+export const getCurrentUserId = async (): Promise<string | null> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session || !session.user) {
+    console.error('No user ID found, user might not be logged in');
+    return null;
+  }
+  return session.user.id;
+}
 
+// Get all subjects
+export const getSubjects = async (): Promise<Subject[]> => {
+  try {
+    const userId = await getCurrentUserId();
     if (!userId) {
-      console.error('User ID is required but not found in session');
+      console.error('No user ID found, user might not be logged in');
       return [];
     }
 
-    const { data: subjects, error } = await supabase
+    console.log('Fetching subjects for user ID:', userId);
+
+    const { data, error } = await supabase
       .from('subjects')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
-
+    
     if (error) {
-      console.error('Error fetching subjects:', error);
+      console.error('Error getting subjects:', error);
+      toast.error('Failed to load subjects');
       return [];
     }
-
-    return subjects || [];
+    
+    console.log('Subjects fetched for user:', data.length);
+    
+    // Transform to match our interface
+    return data.map(subject => ({
+      id: subject.id,
+      name: subject.name,
+      description: subject.description || '',
+      icon: subject.icon || '📚',
+      color: subject.color || '#4f46e5',
+      createdAt: subject.created_at,
+      updatedAt: subject.updated_at,
+      userId: subject.user_id
+    }));
   } catch (error) {
-    console.error('Error in fetchSubjects:', error);
+    console.error('Error getting subjects:', error);
+    toast.error('Failed to load subjects');
     return [];
   }
 };
 
-// Alias for fetchSubjects to maintain backward compatibility
-export const getSubjects = fetchSubjects;
-
-// Create a new subject - support both object and individual parameters
-export const createSubject = async (
-  nameOrOptions: string | {
-    name: string;
-    description?: string | null;
-    color?: string | null;
-    icon?: string | null;
-  },
-  description: string | null = null,
-  color: string | null = null,
-  icon: string | null = null
-): Promise<Subject | null> => {
+// Get a subject by ID
+export const getSubjectById = async (id: string): Promise<Subject | null> => {
   try {
-    const { data } = await supabase.auth.getSession();
-    const userId = data.session?.user?.id;
-
+    const userId = await getCurrentUserId();
     if (!userId) {
-      console.error('User ID is required but not found in session');
+      console.error('No user ID found, user might not be logged in');
       return null;
     }
 
-    // Handle both formats: object or individual parameters
-    let name: string;
-    let descValue: string | null = description;
-    let colorValue: string | null = color;
-    let iconValue: string | null = icon;
-
-    if (typeof nameOrOptions === 'object') {
-      name = nameOrOptions.name;
-      descValue = nameOrOptions.description ?? null;
-      colorValue = nameOrOptions.color ?? null;
-      iconValue = nameOrOptions.icon ?? null;
-    } else {
-      name = nameOrOptions;
-    }
-
-    const { data: newSubject, error } = await supabase
+    const { data, error } = await supabase
       .from('subjects')
-      .insert([{ 
-        name, 
-        description: descValue, 
-        color: colorValue, 
-        icon: iconValue, 
-        user_id: userId 
-      }])
       .select('*')
+      .eq('id', id)
+      .eq('user_id', userId)
       .single();
-
+    
     if (error) {
-      console.error('Error creating subject:', error);
+      console.error('Error getting subject:', error);
       return null;
     }
-
-    return newSubject;
+    
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || '',
+      icon: data.icon || '📚',
+      color: data.color || '#4f46e5',
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      userId: data.user_id
+    };
   } catch (error) {
-    console.error('Error in createSubject:', error);
+    console.error('Error getting subject:', error);
     return null;
   }
 };
 
-// Update an existing subject
-export const updateSubject = async (
-  id: string,
-  { name, description, color, icon }: Partial<Subject>
-): Promise<Subject | null> => {
+// Create a new subject
+export const createSubject = async (subject: Omit<Subject, 'id' | 'createdAt' | 'updatedAt' | 'userId'>): Promise<Subject> => {
   try {
-    const { data } = await supabase.auth.getSession();
-    const userId = data.session?.user?.id;
-
+    const userId = await getCurrentUserId();
     if (!userId) {
-      console.error('User ID is required but not found in session');
-      return null;
+      console.error('No user ID found, user might not be logged in');
+      throw new Error('User not authenticated');
     }
 
-    const { data: updatedSubject, error } = await supabase
+    const { data, error } = await supabase
       .from('subjects')
-      .update({ name, description, color, icon })
+      .insert({
+        name: subject.name,
+        description: subject.description,
+        icon: subject.icon,
+        color: subject.color,
+        user_id: userId
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating subject:', error);
+      toast.error('Failed to create subject');
+      throw error;
+    }
+    
+    toast.success(`Subject ${subject.name} created successfully`);
+    
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || '',
+      icon: data.icon || '📚',
+      color: data.color || '#4f46e5',
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      userId: data.user_id
+    };
+  } catch (error) {
+    console.error('Error creating subject:', error);
+    toast.error('Failed to create subject');
+    throw error;
+  }
+};
+
+// Update a subject
+export const updateSubject = async (id: string, updates: Partial<Omit<Subject, 'id' | 'createdAt' | 'updatedAt' | 'userId'>>): Promise<Subject | null> => {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      console.error('No user ID found, user might not be logged in');
+      throw new Error('User not authenticated');
+    }
+
+    const { data, error } = await supabase
+      .from('subjects')
+      .update({ 
+        ...updates, 
+        updated_at: new Date().toISOString() 
+      })
       .eq('id', id)
       .eq('user_id', userId)
-      .select('*')
+      .select()
       .single();
-
+    
     if (error) {
       console.error('Error updating subject:', error);
+      toast.error('Failed to update subject');
       return null;
     }
-
-    return updatedSubject;
+    
+    toast.success(`Subject ${data.name} updated successfully`);
+    
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || '',
+      icon: data.icon || '📚',
+      color: data.color || '#4f46e5',
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      userId: data.user_id
+    };
   } catch (error) {
-    console.error('Error in updateSubject:', error);
+    console.error('Error updating subject:', error);
+    toast.error('Failed to update subject');
     return null;
   }
 };
@@ -169,12 +223,10 @@ export const updateSubject = async (
 // Delete a subject
 export const deleteSubject = async (id: string): Promise<boolean> => {
   try {
-    const { data } = await supabase.auth.getSession();
-    const userId = data.session?.user?.id;
-
+    const userId = await getCurrentUserId();
     if (!userId) {
-      console.error('User ID is required but not found in session');
-      return false;
+      console.error('No user ID found, user might not be logged in');
+      throw new Error('User not authenticated');
     }
 
     const { error } = await supabase
@@ -182,426 +234,439 @@ export const deleteSubject = async (id: string): Promise<boolean> => {
       .delete()
       .eq('id', id)
       .eq('user_id', userId);
-
+    
     if (error) {
       console.error('Error deleting subject:', error);
+      toast.error('Failed to delete subject');
       return false;
     }
-
+    
+    toast.success('Subject deleted successfully');
     return true;
   } catch (error) {
-    console.error('Error in deleteSubject:', error);
+    console.error('Error deleting subject:', error);
+    toast.error('Failed to delete subject');
     return false;
   }
 };
 
-// Fetch a single subject by ID
-export const fetchSubjectById = async (id: string): Promise<Subject | null> => {
+// Get all documents
+export const getDocuments = async (): Promise<Document[]> => {
   try {
-    const { data } = await supabase.auth.getSession();
-    const userId = data.session?.user?.id;
-
+    const userId = await getCurrentUserId();
     if (!userId) {
-      console.error('User ID is required but not found in session');
-      return null;
+      console.error('No user ID found, user might not be logged in');
+      return [];
     }
 
-    const { data: subject, error } = await supabase
-      .from('subjects')
+    const { data, error } = await supabase
+      .from('documents')
       .select('*')
-      .eq('id', id)
       .eq('user_id', userId)
-      .single();
-
+      .order('uploaded_at', { ascending: false });
+    
     if (error) {
-      console.error('Error fetching subject by ID:', error);
-      return null;
-    }
-
-    return subject;
-  } catch (error) {
-    console.error('Error in fetchSubjectById:', error);
-    return null;
-  }
-};
-
-// Alias for fetchSubjectById to maintain backward compatibility
-export const getSubjectById = fetchSubjectById;
-
-// Fetch subjects with quiz counts
-export const fetchSubjectsWithQuizCounts = async (): Promise<Subject[]> => {
-  try {
-    const { data } = await supabase.auth.getSession();
-    const userId = data.session?.user?.id;
-
-    if (!userId) {
-      console.error('User ID is required but not found in session');
+      console.error('Error getting documents:', error);
       return [];
     }
-
-    const { data: subjects, error } = await supabase
-      .from('subjects')
-      .select(`
-        *,
-        quizzes (count)
-      `)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching subjects with quiz counts:', error);
-      return [];
-    }
-
-    return subjects.map(subject => ({
-      ...subject,
-      quizCount: subject.quizzes ? subject.quizzes.length : 0,
-    })) || [];
+    
+    return data.map(doc => ({
+      id: doc.id,
+      subjectId: doc.subject_id,
+      name: doc.name,
+      content: doc.content,
+      fileType: doc.file_type,
+      fileSize: doc.file_size,
+      uploadedAt: doc.uploaded_at,
+      userId: doc.user_id
+    }));
   } catch (error) {
-    console.error('Error in fetchSubjectsWithQuizCounts:', error);
+    console.error('Error getting documents:', error);
     return [];
   }
 };
 
-// Create a new quiz for a subject
-export const createQuiz = async (
-  options: {
-    subjectId: string,
-    documentId?: string,
-    title: string,
-    questions: any[]
-  }
-): Promise<string | null> => {
-  try {
-    console.log(`Creating new quiz for subject ${options.subjectId} with ${options.questions.length} questions`);
-    
-    // Get the current user's ID
-    const { data } = await supabase.auth.getSession();
-    const userId = data.session?.user?.id;
-    
-    if (!userId) {
-      console.error('User ID is required but not found in session');
-      throw new Error('User not authenticated');
-    }
-    
-    // Prepare the quiz data
-    const quizData = {
-      title: options.title,
-      subject_id: options.subjectId,
-      document_id: options.documentId,
-      user_id: userId,
-      questions: options.questions,
-      settings: { documentId: options.documentId },
-      results: null, // Initialize with null, will be updated after grading
-      created_at: new Date().toISOString()
-    };
-    
-    console.log('Inserting quiz with data:', quizData);
-    
-    // Insert the quiz into the database
-    const { data: insertedQuiz, error } = await supabase
-      .from('quizzes')
-      .insert(quizData)
-      .select('id')
-      .single();
-    
-    if (error) {
-      console.error('Error creating quiz:', error);
-      return null;
-    }
-    
-    console.log('Quiz created successfully with ID:', insertedQuiz.id);
-    
-    // Store the quiz ID in session storage for reference during grading
-    sessionStorage.setItem('currentQuizId', insertedQuiz.id);
-    
-    return insertedQuiz.id;
-  } catch (error) {
-    console.error('Error in createQuiz:', error);
-    return null;
-  }
-};
-
-// Fetch documents by subject ID
+// Get documents by subject ID
 export const getDocumentsBySubjectId = async (subjectId: string): Promise<Document[]> => {
   try {
-    const { data } = await supabase.auth.getSession();
-    const userId = data.session?.user?.id;
-
+    const userId = await getCurrentUserId();
     if (!userId) {
-      console.error('User ID is required but not found in session');
+      console.error('No user ID found, user might not be logged in');
       return [];
     }
 
-    const { data: documents, error } = await supabase
+    const { data, error } = await supabase
       .from('documents')
       .select('*')
       .eq('subject_id', subjectId)
       .eq('user_id', userId)
       .order('uploaded_at', { ascending: false });
-
+    
     if (error) {
-      console.error('Error fetching documents:', error);
+      console.error('Error getting documents by subject ID:', error);
       return [];
     }
-
-    return documents.map(doc => ({
-      ...doc,
+    
+    return data.map(doc => ({
+      id: doc.id,
+      subjectId: doc.subject_id,
+      name: doc.name,
+      content: doc.content,
       fileType: doc.file_type,
       fileSize: doc.file_size,
       uploadedAt: doc.uploaded_at,
-    })) || [];
+      userId: doc.user_id
+    }));
   } catch (error) {
-    console.error('Error in getDocumentsBySubjectId:', error);
+    console.error('Error getting documents by subject ID:', error);
     return [];
   }
 };
 
-// Fetch quizzes by subject ID
-export const getQuizzesBySubjectId = async (subjectId: string): Promise<Quiz[]> => {
+// Get a document by ID
+export const getDocumentById = async (id: string): Promise<Document | null> => {
   try {
-    const { data } = await supabase.auth.getSession();
-    const userId = data.session?.user?.id;
-
+    const userId = await getCurrentUserId();
     if (!userId) {
-      console.error('User ID is required but not found in session');
-      return [];
+      console.error('No user ID found, user might not be logged in');
+      return null;
     }
 
-    console.log(`Fetching quizzes for subject ID: ${subjectId} and user ID: ${userId}`);
-
-    const { data: quizzes, error } = await supabase
-      .from('quizzes')
+    const { data, error } = await supabase
+      .from('documents')
       .select('*')
-      .eq('subject_id', subjectId)
+      .eq('id', id)
       .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
+      .single();
+    
     if (error) {
-      console.error('Error fetching quizzes:', error);
-      return [];
+      console.error('Error getting document:', error);
+      return null;
+    }
+    
+    return {
+      id: data.id,
+      subjectId: data.subject_id,
+      name: data.name,
+      content: data.content,
+      fileType: data.file_type,
+      fileSize: data.file_size,
+      uploadedAt: data.uploaded_at,
+      userId: data.user_id
+    };
+  } catch (error) {
+    console.error('Error getting document:', error);
+    return null;
+  }
+};
+
+// Create a new document
+export const createDocument = async (document: Omit<Document, 'id' | 'uploadedAt' | 'userId'>): Promise<Document> => {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      console.error('No user ID found, user might not be logged in');
+      throw new Error('User not authenticated');
     }
 
-    console.log(`Quizzes fetched for subject ${subjectId}: ${quizzes.length}`);
-
-    // Ensure proper typing for the questions field
-    return quizzes.map(quiz => ({
-      id: quiz.id,
-      title: quiz.title,
-      createdAt: quiz.created_at,
-      subject_id: quiz.subject_id,
-      document_id: quiz.document_id || undefined,
-      questions: Array.isArray(quiz.questions) ? quiz.questions : [],
-      settings: quiz.settings || {},
-      results: quiz.results,
-      user_id: quiz.user_id || ''
-    })) || [];
+    const { data, error } = await supabase
+      .from('documents')
+      .insert({
+        subject_id: document.subjectId,
+        name: document.name,
+        content: document.content,
+        file_type: document.fileType,
+        file_size: document.fileSize,
+        user_id: userId
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating document:', error);
+      throw error;
+    }
+    
+    return {
+      id: data.id,
+      subjectId: data.subject_id,
+      name: data.name,
+      content: data.content,
+      fileType: data.file_type,
+      fileSize: data.file_size,
+      uploadedAt: data.uploaded_at,
+      userId: data.user_id
+    };
   } catch (error) {
-    console.error('Error in getQuizzesBySubjectId:', error);
-    return [];
+    console.error('Error creating document:', error);
+    throw error;
   }
 };
 
 // Delete a document
-export const deleteDocument = async (documentId: string): Promise<boolean> => {
+export const deleteDocument = async (id: string): Promise<boolean> => {
   try {
-    const { data } = await supabase.auth.getSession();
-    const userId = data.session?.user?.id;
-
+    const userId = await getCurrentUserId();
     if (!userId) {
-      console.error('User ID is required but not found in session');
-      return false;
+      console.error('No user ID found, user might not be logged in');
+      throw new Error('User not authenticated');
     }
 
     const { error } = await supabase
       .from('documents')
       .delete()
-      .eq('id', documentId)
+      .eq('id', id)
       .eq('user_id', userId);
-
+    
     if (error) {
       console.error('Error deleting document:', error);
       return false;
     }
-
+    
     return true;
   } catch (error) {
-    console.error('Error in deleteDocument:', error);
+    console.error('Error deleting document:', error);
     return false;
   }
 };
 
-// Fetch a document by ID
-export const getDocumentById = async (documentId: string): Promise<Document | null> => {
+// Get all quizzes
+export const getQuizzes = async (): Promise<Quiz[]> => {
   try {
-    const { data } = await supabase.auth.getSession();
-    const userId = data.session?.user?.id;
-
+    const userId = await getCurrentUserId();
     if (!userId) {
-      console.error('User ID is required but not found in session');
+      console.error('No user ID found, user might not be logged in');
+      return [];
+    }
+
+    console.log('Fetching quizzes for user ID:', userId);
+
+    const { data, error } = await supabase
+      .from('quizzes')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error getting quizzes:', error);
+      return [];
+    }
+    
+    console.log('Quizzes fetched for user:', data.length);
+    
+    return data.map(quiz => ({
+      id: quiz.id,
+      subjectId: quiz.subject_id,
+      documentId: quiz.document_id,
+      title: quiz.title,
+      questions: Array.isArray(quiz.questions) ? quiz.questions : JSON.parse(quiz.questions as string),
+      settings: quiz.settings,
+      results: quiz.results,
+      createdAt: quiz.created_at,
+      userId: quiz.user_id
+    }));
+  } catch (error) {
+    console.error('Error getting quizzes:', error);
+    return [];
+  }
+};
+
+// Get quizzes by subject ID
+export const getQuizzesBySubjectId = async (subjectId: string): Promise<Quiz[]> => {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      console.error('No user ID found, user might not be logged in');
+      return [];
+    }
+
+    console.log(`Fetching quizzes for subject ID: ${subjectId} and user ID: ${userId}`);
+
+    const { data, error } = await supabase
+      .from('quizzes')
+      .select('*')
+      .eq('subject_id', subjectId)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error getting quizzes by subject ID:', error);
+      return [];
+    }
+    
+    console.log(`Quizzes fetched for subject ${subjectId}:`, data.length);
+    
+    return data.map(quiz => ({
+      id: quiz.id,
+      subjectId: quiz.subject_id,
+      documentId: quiz.document_id,
+      title: quiz.title,
+      questions: Array.isArray(quiz.questions) ? quiz.questions : JSON.parse(quiz.questions as string),
+      settings: quiz.settings,
+      results: quiz.results,
+      createdAt: quiz.created_at,
+      userId: quiz.user_id
+    }));
+  } catch (error) {
+    console.error('Error getting quizzes by subject ID:', error);
+    return [];
+  }
+};
+
+// Get a quiz by ID
+export const getQuizById = async (id: string): Promise<Quiz | null> => {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      console.error('No user ID found, user might not be logged in');
       return null;
     }
 
-    const { data: document, error } = await supabase
-      .from('documents')
+    const { data, error } = await supabase
+      .from('quizzes')
       .select('*')
-      .eq('id', documentId)
+      .eq('id', id)
       .eq('user_id', userId)
       .single();
-
+    
     if (error) {
-      console.error('Error fetching document:', error);
+      console.error('Error getting quiz:', error);
       return null;
     }
-
+    
     return {
-      ...document,
-      fileType: document.file_type,
-      fileSize: document.file_size,
-      uploadedAt: document.uploaded_at,
+      id: data.id,
+      subjectId: data.subject_id,
+      documentId: data.document_id,
+      title: data.title,
+      questions: Array.isArray(data.questions) ? data.questions : JSON.parse(data.questions as string),
+      settings: data.settings,
+      results: data.results,
+      createdAt: data.created_at,
+      userId: data.user_id
     };
   } catch (error) {
-    console.error('Error in getDocumentById:', error);
+    console.error('Error getting quiz:', error);
     return null;
   }
 };
 
-// Create a document
-export const createDocument = async ({
-  subjectId,
-  name,
-  content,
-  fileType = 'text/plain',
-  fileSize = 0
-}: {
-  subjectId: string;
-  name: string;
-  content: string;
-  fileType?: string;
-  fileSize?: number;
-}): Promise<Document> => {
+// Create a new quiz
+export const createQuiz = async (quiz: Omit<Quiz, 'id' | 'createdAt' | 'userId'>): Promise<Quiz> => {
   try {
-    const { data } = await supabase.auth.getSession();
-    const userId = data.session?.user?.id;
-
+    const userId = await getCurrentUserId();
     if (!userId) {
-      throw new Error('User ID is required but not found in session');
+      console.error('No user ID found, user might not be logged in');
+      throw new Error('User not authenticated');
     }
 
-    const { data: newDocument, error } = await supabase
-      .from('documents')
+    console.log('Creating new quiz for user ID:', userId);
+
+    const { data, error } = await supabase
+      .from('quizzes')
       .insert({
-        subject_id: subjectId,
-        name,
-        content,
-        file_type: fileType,
-        file_size: fileSize,
+        subject_id: quiz.subjectId,
+        document_id: quiz.documentId,
+        title: quiz.title,
+        questions: quiz.questions,
+        settings: quiz.settings || {},
         user_id: userId
       })
-      .select('*')
+      .select()
       .single();
-
+    
     if (error) {
-      console.error('Error creating document:', error);
-      throw new Error('Failed to create document');
+      console.error('Error creating quiz:', error);
+      throw error;
     }
-
+    
+    console.log('Quiz created successfully with ID:', data.id);
+    
     return {
-      ...newDocument,
-      fileType: newDocument.file_type,
-      fileSize: newDocument.file_size,
-      uploadedAt: newDocument.uploaded_at,
+      id: data.id,
+      subjectId: data.subject_id,
+      documentId: data.document_id,
+      title: data.title,
+      questions: Array.isArray(data.questions) ? data.questions : JSON.parse(data.questions as string),
+      settings: data.settings,
+      results: data.results,
+      createdAt: data.created_at,
+      userId: data.user_id
     };
   } catch (error) {
-    console.error('Error in createDocument:', error);
+    console.error('Error creating quiz:', error);
     throw error;
   }
 };
 
-// Initialize default subjects if needed
-export const initializeSubjectsIfNeeded = async (): Promise<void> => {
+// Update a quiz with results
+export const updateQuizResults = async (id: string, results: any): Promise<Quiz | null> => {
   try {
-    const subjects = await fetchSubjects();
-    
-    if (subjects.length === 0) {
-      // Create a default subject if user has none
-      await createSubject(
-        'General Knowledge',
-        'Default subject for general topics',
-        '#4f46e5',
-        '📚'
-      );
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      console.error('No user ID found, user might not be logged in');
+      throw new Error('User not authenticated');
     }
+
+    const { data, error } = await supabase
+      .from('quizzes')
+      .update({ results })
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error updating quiz results:', error);
+      return null;
+    }
+    
+    return {
+      id: data.id,
+      subjectId: data.subject_id,
+      documentId: data.document_id,
+      title: data.title,
+      questions: Array.isArray(data.questions) ? data.questions : JSON.parse(data.questions as string),
+      settings: data.settings,
+      results: data.results,
+      createdAt: data.created_at,
+      userId: data.user_id
+    };
   } catch (error) {
-    console.error('Error initializing subjects:', error);
+    console.error('Error updating quiz results:', error);
+    return null;
   }
 };
 
-// Save quiz results
-export const saveQuizResults = async (quizId: string, results: any): Promise<boolean> => {
+// Delete a quiz
+export const deleteQuiz = async (id: string): Promise<boolean> => {
   try {
-    console.log(`Saving quiz results for quiz ID: ${quizId}`, results);
-    
-    const { data } = await supabase.auth.getSession();
-    const userId = data.session?.user?.id;
-    
+    const userId = await getCurrentUserId();
     if (!userId) {
-      console.error('User ID is required but not found in session');
-      return false;
+      console.error('No user ID found, user might not be logged in');
+      throw new Error('User not authenticated');
     }
-    
-    // If quizId is not provided, try to find the most recent quiz
-    if (!quizId) {
-      console.log('Quiz ID not provided, attempting to find most recent quiz');
-      const { data: recentQuizzes, error: recentError } = await supabase
-        .from('quizzes')
-        .select('id')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      
-      if (recentError || !recentQuizzes || recentQuizzes.length === 0) {
-        console.error('Could not find a recent quiz to save results to:', recentError);
-        return false;
-      }
-      
-      quizId = recentQuizzes[0].id;
-      console.log(`Using most recent quiz ID for results: ${quizId}`);
-    }
-    
-    // Ensure the results object has the required properties
-    if (typeof results === 'string') {
-      try {
-        results = JSON.parse(results);
-      } catch (e) {
-        console.error('Failed to parse results JSON string:', e);
-      }
-    }
-    
-    // Ensure we have a properly formatted results object
-    const formattedResults = {
-      ...results,
-      total_points: results.total_points || results.punteggio_totale || 0,
-      max_points: results.max_points || results.punteggio_massimo || 1,
-      timestamp: new Date().toISOString()
-    };
-    
-    // Update the quiz with the results
+
     const { error } = await supabase
       .from('quizzes')
-      .update({ results: formattedResults })
-      .eq('id', quizId)
+      .delete()
+      .eq('id', id)
       .eq('user_id', userId);
     
     if (error) {
-      console.error('Error saving quiz results:', error);
+      console.error('Error deleting quiz:', error);
       return false;
     }
     
-    console.log(`Quiz results saved successfully for quiz ${quizId}`);
     return true;
   } catch (error) {
-    console.error('Error in saveQuizResults:', error);
+    console.error('Error deleting quiz:', error);
     return false;
   }
+};
+
+// Initialize without any default subjects
+export const initializeSubjectsIfNeeded = async (): Promise<void> => {
+  console.log('No predefined subjects will be created');
+  return;
 };

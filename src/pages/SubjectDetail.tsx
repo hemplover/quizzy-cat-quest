@@ -91,29 +91,12 @@ const SubjectDetail = () => {
     console.log('All quizzes for this subject:', quizzes);
     
     // Filter quizzes with valid results
-    const quizzesWithResults = quizzes.filter(quiz => {
-      // Make sure we handle both object and string results
-      let results = quiz.results;
-      
-      // If results is a string, try to parse it
-      if (typeof results === 'string') {
-        try {
-          results = JSON.parse(results);
-        } catch (e) {
-          console.error(`Failed to parse results for quiz ${quiz.id}:`, e);
-          return false;
-        }
-      }
-      
-      // Check if this quiz has valid results in any supported format
-      return results && 
-        (typeof results.punteggio_totale === 'number' || 
-         typeof results.total_points === 'number' ||
-         (results.risultati && Array.isArray(results.risultati)) ||
-         typeof results.score === 'number') &&
-        quiz.questions && 
-        (Array.isArray(quiz.questions) ? quiz.questions.length > 0 : true);
-    });
+    const quizzesWithResults = quizzes.filter(quiz => 
+      quiz.results && 
+      typeof quiz.results.punteggio_totale === 'number' && 
+      quiz.questions && 
+      quiz.questions.length > 0
+    );
     
     console.log('Quizzes with results:', quizzesWithResults);
     
@@ -127,45 +110,8 @@ const SubjectDetail = () => {
     let totalQuestions = 0;
     
     quizzesWithResults.forEach(quiz => {
-      let results = quiz.results;
-      
-      // If results is a string, parse it
-      if (typeof results === 'string') {
-        try {
-          results = JSON.parse(results);
-        } catch (e) {
-          console.error(`Failed to parse results for quiz ${quiz.id}:`, e);
-          return;
-        }
-      }
-      
-      // Get questions count
-      const questions = Array.isArray(quiz.questions) 
-        ? quiz.questions.length 
-        : (typeof quiz.questions === 'string' 
-            ? JSON.parse(quiz.questions).length 
-            : 0);
-      
-      let correctAnswers = 0;
-      
-      // Handle different result formats
-      if (typeof results.punteggio_totale === 'number') {
-        correctAnswers = results.punteggio_totale * questions;
-      } else if (typeof results.total_points === 'number') {
-        correctAnswers = results.total_points;
-        // Use max_points instead of questions if available
-        if (typeof results.max_points === 'number' && results.max_points > 0) {
-          totalQuestions += results.max_points;
-          console.log(`Quiz "${quiz.title}": ${correctAnswers} correct out of ${results.max_points} max points`);
-          totalCorrectAnswers += correctAnswers;
-          return; // Skip adding questions again
-        }
-      } else if (results.risultati && Array.isArray(results.risultati)) {
-        // Sum up punteggio from risultati
-        correctAnswers = results.risultati.reduce((sum, r) => sum + (Number(r.punteggio) || 0), 0);
-      } else if (typeof results.score === 'number') {
-        correctAnswers = results.score * questions;
-      }
+      const correctAnswers = quiz.results.punteggio_totale;
+      const questions = quiz.questions.length;
       
       console.log(`Quiz "${quiz.title}": ${correctAnswers} correct out of ${questions} questions`);
       
@@ -176,8 +122,6 @@ const SubjectDetail = () => {
     console.log(`Total for subject: ${totalCorrectAnswers} correct answers out of ${totalQuestions} questions`);
     
     // Calculate the average percentage
-    if (totalQuestions <= 0) return 0;
-    
     const averagePercentage = Math.round((totalCorrectAnswers / totalQuestions) * 100);
     console.log(`Average score: ${averagePercentage}%`);
     return averagePercentage;
@@ -592,4 +536,3 @@ const SubjectDetail = () => {
 };
 
 export default SubjectDetail;
-

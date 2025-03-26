@@ -17,25 +17,18 @@ export interface GeneratedQuiz {
   quiz: QuizQuestion[];
 }
 
-export interface QuizResultItem {
-  domanda: string;
-  risposta_utente: string | number;
-  corretto: boolean | string;
-  punteggio: number;
-  spiegazione: string;
-  [key: string]: any; // Add index signature to make it compatible with Json type
-}
-
 export interface QuizResults {
-  risultati: QuizResultItem[];
+  risultati: Array<{
+    domanda: string;
+    risposta_utente: string | number;
+    corretto: boolean | string;
+    punteggio: number;
+    spiegazione: string;
+  }>;
   punteggio_totale: number;
   feedback_generale?: string;
-  total_points?: number;
-  max_points?: number;
-  timeSpent?: number;
-  completedAt?: string;
-  earnedXP?: number;
-  [key: string]: any; // Add index signature to make it compatible with Json type
+  total_points?: number;   // Add this property
+  max_points?: number;     // Add this property
 }
 
 export interface QuizSettings {
@@ -44,7 +37,6 @@ export interface QuizSettings {
   numQuestions: number;
   model?: string;
   previousQuizzes?: number;
-  documentId?: string;
 }
 
 export interface ProcessedFile {
@@ -59,18 +51,4 @@ export interface QuizData {
   numQuestions: number;
   createdAt: string;
   model?: string;
-  subjectId?: string;
-  documentId?: string;
-}
-
-export interface Quiz {
-  id: string;
-  title: string;
-  createdAt: string;
-  subject_id: string;
-  document_id?: string;
-  questions: any[];
-  settings: any;
-  results: QuizResults | null;
-  user_id: string;
 }

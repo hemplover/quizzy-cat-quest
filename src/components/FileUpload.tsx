@@ -1,8 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { FileUp, X, File, FileText, Image, Film, FileSpreadsheet, AlertCircle } from 'lucide-react';
+import { FileUp, X, File, FileText, Image, Film, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { supportsFileUpload, getSelectedProvider } from '@/services/aiProviderService';
 import { useLanguage } from '@/i18n/LanguageContext';
 
@@ -28,7 +28,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const [supportsUpload, setSupportsUpload] = useState(supportsFileUpload());
   const [selectedProvider, setSelectedProvider] = useState(getSelectedProvider());
   const [isProcessing, setIsProcessing] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Update supported file types when the provider changes
   useEffect(() => {
@@ -68,8 +67,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const validateAndSetFile = (file: File) => {
     console.log(`Validating file: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
     
-    // Reset any previous errors
-    setUploadError(null);
     setIsProcessing(true);
     
     try {
@@ -81,9 +78,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         type.trim().replace('.', '').toLowerCase());
       
       if (!acceptedExtensions.includes(fileExtension || '') && !acceptedExtensions.includes('*')) {
-        const errorMsg = `Invalid file type. Please upload ${accept} files.`;
-        toast.error(errorMsg);
-        setUploadError(errorMsg);
+        toast.error(`Invalid file type. Please upload ${accept} files.`);
         console.error(`Invalid file type: ${fileExtension}. Accepted types: ${acceptedExtensions.join(', ')}`);
         setIsProcessing(false);
         return;
@@ -91,9 +86,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
       
       // Check file size
       if (file.size > maxSize * 1024 * 1024) {
-        const errorMsg = `File too large. Maximum size is ${maxSize}MB.`;
-        toast.error(errorMsg);
-        setUploadError(errorMsg);
+        toast.error(`File too large. Maximum size is ${maxSize}MB.`);
         console.error(`File too large: ${file.size} bytes. Maximum size: ${maxSize * 1024 * 1024} bytes`);
         setIsProcessing(false);
         return;
@@ -111,10 +104,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
       toast.success(`${file.name} ${t('selectedFileSuccess')}`);
       console.log(`File selected successfully: ${file.name}`);
     } catch (error) {
-      const errorMsg = `Error validating file: ${error instanceof Error ? error.message : 'Unknown error'}`;
       console.error('Error validating file:', error);
-      toast.error(errorMsg);
-      setUploadError(errorMsg);
+      toast.error(`Error validating file: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsProcessing(false);
     }
@@ -122,7 +113,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
   const clearSelectedFile = () => {
     setSelectedFile(null);
-    setUploadError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -158,16 +148,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
     }
   };
 
-  // If an error occurred but we still have a file, show both
   return (
     <div className={cn("space-y-4", className)}>
-      {uploadError && (
-        <div className="border-red-300 bg-red-50 text-red-800 text-sm p-3 rounded-md flex items-start">
-          <AlertCircle className="w-5 h-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
-          <p>{uploadError}</p>
-        </div>
-      )}
-    
       {!selectedFile ? (
         <div
           className={cn(

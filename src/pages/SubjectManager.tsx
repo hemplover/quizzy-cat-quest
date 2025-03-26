@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -53,9 +52,9 @@ import {
   getDocumentsBySubjectId,
   getQuizzesBySubjectId,
   deleteDocument,
+  deleteQuiz,
   initializeSubjectsIfNeeded
 } from '@/services/subjectService';
-import { deleteQuiz } from '@/services/quizService';
 
 const SubjectManager = () => {
   const navigate = useNavigate();
