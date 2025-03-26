@@ -331,17 +331,22 @@ const Quiz = () => {
             // even if the user doesn't click "Finish Quiz"
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
+              // Create a structured results object to save to the database
+              const resultsToSave = {
+                risultati: results.risultati,
+                score: percentageScore,
+                punteggio_totale: percentageScore / 100,
+                total_points: totalPoints,
+                max_points: maxPoints,
+                timeSpent,
+                completedAt: new Date().toISOString()
+              };
+              
+              console.log('Saving structured results object:', resultsToSave);
+              
               const { error } = await supabase
                 .from('quizzes')
-                .update({ 
-                  results: {
-                    ...results,
-                    score: percentageScore,
-                    punteggio_totale: percentageScore / 100,
-                    total_points: totalPoints,
-                    max_points: maxPoints
-                  }
-                })
+                .update({ results: resultsToSave })
                 .eq('id', quizId)
                 .eq('user_id', session.user.id);
                 
@@ -413,30 +418,26 @@ const Quiz = () => {
           // Get quiz ID if it exists
           const quizId = sessionStorage.getItem('currentQuizId');
           
-          console.log('Saving quiz results to Supabase with ID:', quizId);
-          console.log('Results data:', {
-            ...aiGradingResults,
+          // Create a structured results object to save to the database
+          const resultsToSave = {
+            risultati: aiGradingResults?.risultati || [],
             score,
             punteggio_totale: score / 100,
             total_points: results.totalPoints,
             max_points: results.maxPoints,
-            timeSpent
-          });
+            timeSpent,
+            completedAt: new Date().toISOString(),
+            earnedXP
+          };
+          
+          console.log('Saving final quiz results to Supabase with ID:', quizId);
+          console.log('Results data to save:', resultsToSave);
           
           if (quizId) {
             // Update existing quiz
             const { error } = await supabase
               .from('quizzes')
-              .update({ 
-                results: {
-                  ...aiGradingResults,
-                  score,
-                  punteggio_totale: score / 100, // Normalized score (0 to 1)
-                  total_points: results.totalPoints,
-                  max_points: results.maxPoints,
-                  timeSpent
-                }
-              })
+              .update({ results: resultsToSave })
               .eq('id', quizId);
               
             if (error) {
@@ -465,16 +466,7 @@ const Quiz = () => {
               
               const { error: updateError } = await supabase
                 .from('quizzes')
-                .update({ 
-                  results: {
-                    ...aiGradingResults,
-                    score,
-                    punteggio_totale: score / 100,
-                    total_points: results.totalPoints,
-                    max_points: results.maxPoints,
-                    timeSpent
-                  }
-                })
+                .update({ results: resultsToSave })
                 .eq('id', recentQuizId);
                 
               if (updateError) {
