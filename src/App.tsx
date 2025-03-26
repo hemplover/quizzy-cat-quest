@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Upload from "./pages/Upload";
 import Quiz from "./pages/Quiz";
@@ -34,69 +34,67 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <Routes>
-              <Route 
-                path="/" 
-                element={
-                  <Layout>
-                    <Index />
-                  </Layout>
-                } 
-              />
-              <Route 
-                path="/upload" 
-                element={
-                  <Layout>
-                    <Upload />
-                  </Layout>
-                } 
-              />
-              <Route 
-                path="/quiz" 
-                element={
-                  <Layout>
-                    <Quiz />
-                  </Layout>
-                } 
-              />
-              <Route 
-                path="/dashboard" 
-                element={
-                  <Layout>
-                    <AuthRequired>
-                      <Dashboard />
-                    </AuthRequired>
-                  </Layout>
-                } 
-              />
-              <Route 
-                path="/subjects" 
-                element={
-                  <Layout>
-                    <AuthRequired>
-                      <SubjectManager />
-                    </AuthRequired>
-                  </Layout>
-                } 
-              />
-              <Route 
-                path="/subjects/:subjectId" 
-                element={
-                  <Layout>
-                    <AuthRequired>
-                      <SubjectDetail />
-                    </AuthRequired>
-                  </Layout>
-                } 
-              />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </AuthProvider>
-        </BrowserRouter>
+        <AuthProvider>
+          <Routes>
+            <Route 
+              path="/" 
+              element={
+                <Layout>
+                  <Index />
+                </Layout>
+              } 
+            />
+            <Route 
+              path="/upload" 
+              element={
+                <Layout>
+                  <Upload />
+                </Layout>
+              } 
+            />
+            <Route 
+              path="/quiz" 
+              element={
+                <Layout>
+                  <Quiz />
+                </Layout>
+              } 
+            />
+            <Route 
+              path="/dashboard" 
+              element={
+                <Layout>
+                  <AuthRequired>
+                    <Dashboard />
+                  </AuthRequired>
+                </Layout>
+              } 
+            />
+            <Route 
+              path="/subjects" 
+              element={
+                <Layout>
+                  <AuthRequired>
+                    <SubjectManager />
+                  </AuthRequired>
+                </Layout>
+              } 
+            />
+            <Route 
+              path="/subjects/:subjectId" 
+              element={
+                <Layout>
+                  <AuthRequired>
+                    <SubjectDetail />
+                  </AuthRequired>
+                </Layout>
+              } 
+            />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </TooltipProvider>
     </LanguageProvider>
   </QueryClientProvider>
