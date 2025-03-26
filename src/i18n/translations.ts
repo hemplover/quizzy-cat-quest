@@ -1,3 +1,4 @@
+
 export type Language = 'en' | 'it' | 'fr' | 'de';
 
 export interface Translations {
@@ -667,4 +668,217 @@ export const translations: Translations = {
     create: 'Erstellen',
     submit: 'Absenden',
     back: 'Zurück',
-    next: 'Weiter
+    next: 'Weiter',
+    close: 'Schließen',
+    change: 'Ändern',
+    characters: 'Zeichen',
+    language: 'Sprache',
+    languageChanged: 'Sprache erfolgreich geändert',
+    
+    // Navigation
+    home: 'Startseite',
+    upload: 'Quiz Erstellen',
+    quiz: 'Quiz Machen',
+    dashboard: 'Dashboard',
+    subjects: 'Fächer',
+    quizzes: 'Quizze',
+    
+    // User Menu
+    'My Dashboard': 'Mein Dashboard',
+    'Manage Subjects': 'Fächer Verwalten',
+    'Sign out': 'Abmelden',
+    'Sign in': 'Anmelden',
+    
+    // Homepage
+    heroTitle: 'Lerne Intelligenter mit Deinem',
+    heroTitleHighlight: 'Katzen-Tutor',
+    heroSubtitle: 'Lade deine Notizen hoch und lass unsere KI personalisierte Quizze erstellen. Lerne mit Stil, verdiene XP und steige mit Hilfe deines Katzenfreundes auf.',
+    uploadMaterials: 'Deine Materialien Hochladen',
+    seeHowItWorks: 'Schau Wie Es Funktioniert',
+    tutorWelcomeMessage: 'Hallo! Ich bin dein Katzen-Tutor. Lass mich dir helfen, diese Prüfungen zu bestehen!',
+    learningJourney: 'Deine Lernreise',
+    howItWorks: 'Wie Quizzy Cat Funktioniert',
+    platformDescription: 'Unsere intelligente, katzengesteuerte Plattform macht das Lernen effektiv und überraschend unterhaltsam',
+    readyToStart: 'Bereit, mit deinem Katzen-Tutor zu lernen?',
+    ctaDescription: 'Lade deine Lernmaterialien hoch und lass unsere KI personalisierte Quizfragen generieren. Steige vom Gelehrten Kätzchen zum Weisheitstiger auf!',
+    
+    // Features
+    aiQuizGeneration: 'KI-Quiz-Generierung',
+    aiQuizGenerationDesc: 'Lade deine Lernmaterialien hoch und unsere KI erstellt personalisierte Quizze, die auf deinen Inhalt zugeschnitten sind.',
+    felineTutor: 'Katzen-Tutor',
+    felineTutorDesc: 'Lerne mit unserem intelligenten und ironischen Katzen-Tutor, der Feedback mit einem Hauch von Humor gibt.',
+    progressTracking: 'Fortschrittsverfolgung',
+    progressTrackingDesc: 'Verfolge deinen Fortschritt und identifiziere Schwachstellen, um deine Lernbemühungen effizient zu konzentrieren.',
+    
+    // XP Levels
+    scholarlyKitten: 'Gelehrtes Kätzchen',
+    scholarlyKittenDesc: 'Du fängst gerade erst mit deiner Lernreise an',
+    curiousCat: 'Neugierige Katze',
+    curiousCatDesc: 'Wissen aufbauen und gute Fragen stellen',
+    cleverFeline: 'Kluges Kätzchen',
+    cleverFelineDesc: 'Konzepte beherrschen und Ideen verbinden',
+    academicTabby: 'Akademische Tabby',
+    academicTabbyDesc: 'Wissen in komplexen Szenarien anwenden',
+    wisdomTiger: 'Weisheitstiger',
+    wisdomTigerDesc: 'Andere unterrichten und schwierige Fächer beherrschen',
+    
+    // Fixed missing translations
+    scholarlykitten: 'Gelehrtes Kätzchen',
+    curiouscat: 'Neugierige Katze',
+    
+    // XP Bar
+    experienceProgress: 'Erfahrungsfortschritt',
+    currentLevel: 'Aktuelles Level',
+    toNextLevel: 'zum nächsten Level',
+    
+    // Upload page
+    uploadTitle: 'Quiz Erstellen',
+    uploadSubtitle: 'Materialien hochladen oder Text einfügen, um Quizfragen zu generieren',
+    chooseSource: 'Quelle Wählen',
+    configureQuiz: 'Quiz Konfigurieren',
+    apiKeyInstruction: 'Bitte zuerst deinen API-Schlüssel festlegen',
+    uploadDocument: 'Dokument Hochladen',
+    pasteText: 'Oder Füge Deinen Text Ein',
+    pasteTextPlaceholder: 'Füge hier deine Lernnotizen, Text oder Inhalt ein...',
+    processText: 'Text Verarbeiten',
+    contentReady: 'Inhalt Bereit',
+    quizSettings: 'Quiz-Einstellungen',
+    difficultyLevel: 'Schwierigkeitsgrad',
+    questionTypes: 'Fragetypen',
+    numberOfQuestions: 'Anzahl der Fragen:',
+    createQuiz: 'Quiz Erstellen',
+    generatingQuiz: 'Quiz wird generiert...',
+    textInput: 'Texteingabe',
+    uploadInstructions: 'Lade deine Notizen hoch oder füge deinen Text ein. Ich helfe dir, das perfekte Quiz zu erstellen!',
+    processingFile: 'Verarbeite "{file}"... Diese Datei wird zur Analyse direkt an die API gesendet.',
+    fileReadyForQuiz: 'Datei "{file}" bereit für Quiz-Generierung',
+    fileAnalysisReady: 'Super! "{file}" wird zur Analyse direkt an die KI gesendet. Du kannst jetzt deine Quiz-Einstellungen konfigurieren.',
+    errorProcessingFileMsg: 'Fehler bei der Verarbeitung der Datei. Bitte versuche es erneut oder füge Text direkt ein.',
+    fileProcessingError: 'Entschuldigung, ich hatte Probleme bei der Verarbeitung dieser Datei. Könntest du ein anderes Format ausprobieren oder deinen Text direkt einfügen?',
+    enoughText: 'Das ist eine gute Textmenge! Ich kann definitiv einige herausfordernde Fragen daraus erstellen.',
+    textProcessed: 'Super! Ich habe deinen Text verarbeitet. Du kannst jetzt deine Quiz-Einstellungen konfigurieren.',
+    textProcessedSuccess: 'Text erfolgreich verarbeitet!',
+    enterMoreText: 'Bitte gib mehr Text ein (mindestens 100 Zeichen).',
+    needMoreText: 'Ich brauche mehr Text zum Arbeiten. Bitte gib mindestens ein oder zwei Absätze ein.',
+    provideContent: 'Bitte stelle Inhalt bereit, um ein Quiz zu generieren',
+    needMaterialsForQuiz: 'Ich brauche Material zum Arbeiten! Bitte lade eine Datei hoch oder füge mehr Text hinzu.',
+    selectSubject: 'Bitte wähle zuerst ein Fach aus',
+    apiKeyRequiredMsg: 'Bitte lege zuerst deinen {provider} API-Schlüssel fest',
+    processingMaterials: 'Verarbeite deine Materialien... Das ist aufregend! Ich erstelle anspruchsvolle Fragen auf Universitätsniveau, die genau auf deinen Inhalt basieren.',
+    quizCreatedSuccess: 'Quiz erfolgreich erstellt!',
+    couldNotCreateQuiz: 'Ich konnte aus diesem Inhalt kein gutes Quiz erstellen. Bitte stelle detaillierteres Lernmaterial bereit.',
+    unableToGenerateQuiz: 'Quiz konnte nicht generiert werden. Bitte stelle detaillierteren Inhalt bereit oder versuche eine andere Datei.',
+    errorCreatingQuizMsg: 'Fehler beim Erstellen des Quiz. Bitte versuche es erneut.',
+    quizCreationError: 'Hoppla! Etwas ist schiefgelaufen. Versuchen wir es noch einmal, okay?',
+    creatingQuizFor: 'Erstelle ein Quiz für {subject}',
+    fileWillBeSent: 'Die Datei wird zur Analyse direkt an die KI gesendet. Dies bietet die genaueste Quiz-Generierung.',
+    textContentReady: 'Dein Textinhalt ist bereit für die Quiz-Generierung. Konfiguriere die Einstellungen unten, um dein Quiz anzupassen.',
+    documentLoaded: 'Ich habe "{document}" für dich geladen. Du kannst jetzt deine Quiz-Einstellungen konfigurieren.',
+    switchedToModel: 'Zu {model} gewechselt',
+    aiModel: 'KI-Modell',
+    selectAIModel: 'KI-Modell Auswählen',
+    selectModelDesc: 'Wähle ein Modell, um dein Quiz zu generieren',
+    usingModel: 'Verwende <span class="font-medium">{model}</span>, um Quizfragen auf Universitätsniveau zu generieren.',
+    enterTextToCreateQuiz: 'Text eingeben, um Quiz zu erstellen',
+    enterContent: 'Inhalt eingeben',
+    usingAI: 'KI verwenden',
+    
+    // Difficulty levels
+    beginner: 'Anfänger',
+    intermediate: 'Fortgeschritten',
+    advanced: 'Experte',
+    basicRecall: 'Grundlegende Erinnerungsfragen',
+    applicationConcepts: 'Anwendung von Konzepten',
+    analysisSynthesis: 'Analyse und Synthese',
+    
+    // Question types
+    multipleChoice: 'Multiple Choice',
+    trueFalse: 'Wahr/Falsch',
+    openEnded: 'Offene Frage',
+    
+    // Dashboard
+    recentQuizzes: 'Neueste Quizze',
+    skillsProgress: 'Kompetenzfortschritt',
+    quickActions: 'Schnellaktionen',
+    areasToImprove: 'Verbesserungsbereiche',
+    createNewQuiz: 'Neues Quiz Erstellen',
+    continueLearning: 'Weiterlernen',
+    viewAllQuizzes: 'Alle Quizze Anzeigen',
+    viewAllSubjects: 'Alle Fächer Anzeigen',
+    yourTopSubjects: 'Deine Top-Fächer',
+    welcomeBack: 'Willkommen zurück bei Quizzy Cat!',
+    dashboardSubtitle: 'Verfolge deinen Fortschritt, überprüfe vergangene Quizze und erstelle neue',
+    noRecentQuizzes: 'Keine aktuellen Quizze gefunden',
+    takeYourFirstQuiz: 'Mache dein erstes Quiz, um hier deine Ergebnisse zu sehen',
+    averageScore: 'Durchschnittliche Punktzahl',
+    quizzesCompleted: 'Abgeschlossene Quizze',
+    subjectsStudied: 'Studierte Fächer',
+    questionsAnswered: 'Beantwortete Fragen',
+    
+    // Subjects
+    subjectManager: 'Fach-Manager',
+    subjectManagerSubtitle: 'Erstelle, bearbeite und verwalte deine Fächer und zugehörigen Dokumente und Quizze',
+    newSubject: 'Neues Fach',
+    subjectName: 'Fachname',
+    subjectDescription: 'Beschreibung',
+    icon: 'Symbol',
+    color: 'Farbe',
+    documents: 'Dokumente',
+    noSubjectsFound: 'Keine Fächer gefunden',
+    createYourFirstSubject: 'Erstelle Dein Erstes Fach',
+    addDocument: 'Dokument Hinzufügen',
+    noDocumentsFound: 'Keine Dokumente in diesem Fach gefunden',
+    addYourFirstDocument: 'Füge Dein Erstes Dokument Hinzu',
+    
+    // Toast messages
+    subjectCreated: 'Fach erfolgreich erstellt',
+    subjectUpdated: 'Fach erfolgreich aktualisiert',
+    subjectDeleted: 'Fach erfolgreich gelöscht',
+    documentDeleted: 'Dokument erfolgreich gelöscht',
+    quizDeleted: 'Quiz erfolgreich gelöscht',
+    
+    // File upload
+    dragDropFile: 'Ziehe deine Datei hierher',
+    dropFileHere: 'Lege deine Datei hier ab',
+    selectFromComputer: 'Vom Computer auswählen',
+    maxSize: 'Maximale Größe:',
+    supportFor: 'Unterstützung für',
+    files: 'Dateien',
+    fileUploadNotSupported: 'Datei-Upload Nicht Unterstützt',
+    fileUploadNotSupportedMsg: 'Der ausgewählte KI-Anbieter unterstützt keine direkten Datei-Uploads. Bitte wechsle zu OpenAI oder füge deinen Text direkt ein.',
+    selectedFileSuccess: 'erfolgreich ausgewählt!',
+    
+    // AI Providers
+    selectAIProvider: 'KI-Anbieter Auswählen',
+    openai: 'OpenAI',
+    gemini: 'Google Gemini',
+    claude: 'Anthropic Claude',
+    mistral: 'Mistral AI',
+    apiKey: 'API-Schlüssel',
+    enterApiKey: 'Gib deinen API-Schlüssel ein',
+    apiKeyRequired: 'API-Schlüssel erforderlich',
+    
+    // Models
+    selectModel: 'Modell Auswählen',
+    defaultModel: 'Standard-Modell',
+    
+    // Quiz page
+    questionOf: 'Frage {current} von {total}',
+    submitAnswer: 'Antwort Absenden',
+    reviewQuiz: 'Quiz Überprüfen',
+    quizResults: 'Quiz-Ergebnisse',
+    correctAnswers: 'Richtige Antworten',
+    incorrectAnswers: 'Falsche Antworten',
+    yourAnswer: 'Deine Antwort',
+    correctAnswer: 'Richtige Antwort',
+    explanation: 'Erklärung',
+    score: 'Punktzahl',
+    retakeQuiz: 'Quiz Wiederholen',
+    backToDashboard: 'Zurück zum Dashboard',
+    
+    // Errors
+    errorProcessingFile: 'Fehler bei der Verarbeitung der Datei',
+    errorLoadingQuiz: 'Fehler beim Laden des Quiz',
+    errorSavingQuiz: 'Fehler beim Speichern des Quiz'
+  }
+};
