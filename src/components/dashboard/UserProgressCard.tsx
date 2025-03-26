@@ -84,14 +84,14 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
           
           // Format: {total_points: X, max_points: Y}
           if ('total_points' in results && 'max_points' in results) {
-            const totalPoints = Number(results.total_points);
-            const maxPoints = Number(results.max_points);
+            const quizTotalPoints = Number(results.total_points);
+            const quizMaxPoints = Number(results.max_points);
             
-            if (!isNaN(totalPoints) && !isNaN(maxPoints)) {
-              totalPoints += totalPoints;
-              totalMaxPoints += maxPoints;
+            if (!isNaN(quizTotalPoints) && !isNaN(quizMaxPoints)) {
+              totalPoints += quizTotalPoints;
+              totalMaxPoints += quizMaxPoints;
               validQuizCount++;
-              console.log(`Quiz ${quiz.id} has ${totalPoints}/${maxPoints} points`);
+              console.log(`Quiz ${quiz.id} has ${quizTotalPoints}/${quizMaxPoints} points`);
             }
           } 
           // Format: {punteggio_totale: X} (score as ratio)
