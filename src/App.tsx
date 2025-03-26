@@ -33,118 +33,120 @@ const queryClient = new QueryClient({
   },
 });
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <LanguageProvider>
-      <AuthProvider>
-        <TooltipProvider>
-          <Routes>
-            <Route 
-              path="/" 
-              element={
-                <Layout>
-                  <Index />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/upload" 
-              element={
-                <Layout>
-                  <Upload />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/quiz" 
-              element={
-                <Layout>
-                  <Quiz />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/quiz/session/:quizId" 
-              element={
-                <Layout>
-                  <QuizSession />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/quiz/multiplayer/host/:sessionCode" 
-              element={
-                <Layout>
-                  <AuthRequired>
-                    <MultiplayerHost />
-                  </AuthRequired>
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/quiz/multiplayer/player/:sessionCode" 
-              element={
-                <Layout>
-                  <MultiplayerPlayer />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/quiz/multiplayer/session/:sessionCode" 
-              element={
-                <Layout>
-                  <MultiplayerSession />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/quiz/multiplayer/join/:sessionCode" 
-              element={
-                <Layout>
-                  <MultiplayerJoin />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/dashboard" 
-              element={
-                <Layout>
-                  <AuthRequired>
-                    <Dashboard />
-                  </AuthRequired>
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/subjects" 
-              element={
-                <Layout>
-                  <AuthRequired>
-                    <SubjectManager />
-                  </AuthRequired>
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/subjects/:subjectId" 
-              element={
-                <Layout>
-                  <AuthRequired>
-                    <SubjectDetail />
-                  </AuthRequired>
-                </Layout>
-              } 
-            />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <Toaster />
-          <Sonner />
-        </TooltipProvider>
-      </AuthProvider>
-    </LanguageProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <LanguageProvider>
+        <AuthProvider>
+          <TooltipProvider>
+            <Routes>
+              <Route 
+                path="/" 
+                element={
+                  <Layout>
+                    <Index />
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/upload" 
+                element={
+                  <Layout>
+                    <Upload />
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/quiz" 
+                element={
+                  <Layout>
+                    <Quiz />
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/quiz/session/:quizId" 
+                element={
+                  <Layout>
+                    <QuizSession />
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/quiz/multiplayer/host/:sessionCode" 
+                element={
+                  <Layout>
+                    <AuthRequired>
+                      <MultiplayerHost />
+                    </AuthRequired>
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/quiz/multiplayer/player/:sessionCode" 
+                element={
+                  <Layout>
+                    <MultiplayerPlayer />
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/quiz/multiplayer/session/:sessionCode" 
+                element={
+                  <Layout>
+                    <MultiplayerSession />
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/quiz/multiplayer/join/:sessionCode" 
+                element={
+                  <Layout>
+                    <MultiplayerJoin />
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/dashboard" 
+                element={
+                  <Layout>
+                    <AuthRequired>
+                      <Dashboard />
+                    </AuthRequired>
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/subjects" 
+                element={
+                  <Layout>
+                    <AuthRequired>
+                      <SubjectManager />
+                    </AuthRequired>
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/subjects/:subjectId" 
+                element={
+                  <Layout>
+                    <AuthRequired>
+                      <SubjectDetail />
+                    </AuthRequired>
+                  </Layout>
+                } 
+              />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <Toaster />
+            <Sonner />
+          </TooltipProvider>
+        </AuthProvider>
+      </LanguageProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

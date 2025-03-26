@@ -4,7 +4,10 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App.tsx'
 import './index.css'
 
-createRoot(document.getElementById("root")!).render(
+// Make sure we mount the React app with the BrowserRouter properly
+const root = createRoot(document.getElementById("root")!);
+
+root.render(
   <BrowserRouter>
     <App />
   </BrowserRouter>

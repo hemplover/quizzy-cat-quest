@@ -1,78 +1,46 @@
-
-import { toast } from 'sonner';
-import { QuizQuestion, GeneratedQuiz, QuizResults, QuizSettings, Quiz } from '@/types/quiz';
 import { supabase } from '@/integrations/supabase/client';
+import { Quiz, QuizQuestion } from '@/types/quiz';
 
-// Get all quizzes for the current user
-export const getQuizzes = async (): Promise<Quiz[]> => {
+// Fetch all quizzes or quizzes by subject
+export const getQuizzes = async (subjectId?: string): Promise<Quiz[]> => {
   try {
-    const { data: session } = await supabase.auth.getSession();
-    const userId = session.session?.user?.id;
+    let query = supabase
+      .from('quizzes')
+      .select('*');
     
-    if (!userId) {
-      console.log('User not authenticated, returning demo quizzes');
-      // Return demo quizzes for non-authenticated users
-      return [
-        {
-          id: 'demo1',
-          title: 'Demo Quiz: Science Basics',
-          questions: Array(5).fill(null).map((_, i) => ({
-            id: i,
-            question: `Demo question ${i+1}`,
-            type: 'multiple-choice'
-          })),
-          created_at: new Date().toISOString()
-        },
-        {
-          id: 'demo2',
-          title: 'Demo Quiz: History 101',
-          questions: Array(7).fill(null).map((_, i) => ({
-            id: i,
-            question: `Demo history question ${i+1}`,
-            type: 'multiple-choice'
-          })),
-          created_at: new Date().toISOString()
-        }
-      ];
+    if (subjectId) {
+      query = query.eq('subject_id', subjectId);
     }
     
-    // Get user's quizzes from the database
-    const { data, error } = await supabase
-      .from('quizzes')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    const { data, error } = await query.order('created_at', { ascending: false });
     
     if (error) {
       console.error('Error fetching quizzes:', error);
-      throw new Error('Failed to fetch quizzes');
+      throw error;
     }
     
-    return data || [];
+    // Transform the data to conform to Quiz[] type by parsing JSON fields
+    return (data || []).map(quiz => ({
+      ...quiz,
+      questions: typeof quiz.questions === 'string' 
+        ? JSON.parse(quiz.questions) 
+        : quiz.questions as QuizQuestion[],
+      results: quiz.results 
+        ? (typeof quiz.results === 'string' ? JSON.parse(quiz.results) : quiz.results) 
+        : null,
+      settings: quiz.settings 
+        ? (typeof quiz.settings === 'string' ? JSON.parse(quiz.settings) : quiz.settings) 
+        : null
+    })) as Quiz[];
   } catch (error) {
     console.error('Error in getQuizzes:', error);
     return [];
   }
 };
 
-// Get a single quiz by ID
-export const getQuiz = async (quizId: string): Promise<Quiz> => {
+// Fetch a single quiz by ID
+export const getQuiz = async (quizId: string): Promise<Quiz | null> => {
   try {
-    // For demo quizzes
-    if (quizId.startsWith('demo')) {
-      return {
-        id: quizId,
-        title: quizId === 'demo1' ? 'Demo Quiz: Science Basics' : 'Demo Quiz: History 101',
-        questions: Array(5).fill(null).map((_, i) => ({
-          id: i,
-          question: `Demo question ${i+1}`,
-          type: 'multiple-choice',
-          options: ['Option A', 'Option B', 'Option C', 'Option D'],
-          correctAnswer: 0
-        }))
-      };
-    }
-    
     const { data, error } = await supabase
       .from('quizzes')
       .select('*')
@@ -81,13 +49,27 @@ export const getQuiz = async (quizId: string): Promise<Quiz> => {
     
     if (error) {
       console.error('Error fetching quiz:', error);
-      throw new Error('Failed to fetch quiz');
+      throw error;
     }
     
-    return data as Quiz;
+    if (!data) return null;
+    
+    // Transform the data to conform to Quiz type by parsing JSON fields
+    return {
+      ...data,
+      questions: typeof data.questions === 'string' 
+        ? JSON.parse(data.questions) 
+        : data.questions as QuizQuestion[],
+      results: data.results 
+        ? (typeof data.results === 'string' ? JSON.parse(data.results) : data.results) 
+        : null,
+      settings: data.settings 
+        ? (typeof data.settings === 'string' ? JSON.parse(data.settings) : data.settings) 
+        : null
+    } as Quiz;
   } catch (error) {
     console.error('Error in getQuiz:', error);
-    throw error;
+    return null;
   }
 };
 
