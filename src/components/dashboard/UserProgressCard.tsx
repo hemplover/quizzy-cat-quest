@@ -5,6 +5,7 @@ import CatTutor from '@/components/CatTutor';
 import XPBar from '@/components/XPBar';
 import { BookOpen, CheckCircle2, TrendingUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface UserProgressCardProps {
   userXP: number;
@@ -69,8 +70,8 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
       }
       
       // Calculate overall score
-      let totalPoints = 0;
-      let totalMaxPoints = 0;
+      let totalCalculatedPoints = 0;
+      let totalCalculatedMaxPoints = 0;
       let validQuizCount = 0;
       
       for (const quiz of quizzes) {
@@ -88,9 +89,9 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
               const quizTotalPoints = Number(results.total_points);
               const quizMaxPoints = Number(results.max_points);
               
-              if (!isNaN(quizTotalPoints) && !isNaN(quizMaxPoints)) {
-                totalPoints += quizTotalPoints;
-                totalMaxPoints += quizMaxPoints;
+              if (!isNaN(quizTotalPoints) && !isNaN(quizMaxPoints) && quizMaxPoints > 0) {
+                totalCalculatedPoints += quizTotalPoints;
+                totalCalculatedMaxPoints += quizMaxPoints;
                 validQuizCount++;
                 console.log(`Quiz ${quiz.id} has ${quizTotalPoints}/${quizMaxPoints} points`);
               }
@@ -105,8 +106,8 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
                 const scoreRatio = Number(results.punteggio_totale);
                 if (!isNaN(scoreRatio)) {
                   const earnedPoints = scoreRatio * questionCount;
-                  totalPoints += earnedPoints;
-                  totalMaxPoints += questionCount;
+                  totalCalculatedPoints += earnedPoints;
+                  totalCalculatedMaxPoints += questionCount;
                   validQuizCount++;
                   console.log(`Quiz ${quiz.id} has ratio score ${scoreRatio} (${earnedPoints}/${questionCount} points)`);
                 }
@@ -128,10 +129,33 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
               });
               
               if (quizMaxPoints > 0) {
-                totalPoints += quizPoints;
-                totalMaxPoints += quizMaxPoints;
+                totalCalculatedPoints += quizPoints;
+                totalCalculatedMaxPoints += quizMaxPoints;
                 validQuizCount++;
                 console.log(`Quiz ${quiz.id} has ${quizPoints}/${quizMaxPoints} points from risultati`);
+              }
+            }
+            // Attempt to directly use score if available
+            else if ('score' in results) {
+              const score = Number(results.score);
+              if (!isNaN(score)) {
+                const questionCount = Array.isArray(quiz.questions) ? quiz.questions.length : 1;
+                totalCalculatedPoints += score * questionCount;
+                totalCalculatedMaxPoints += questionCount;
+                validQuizCount++;
+                console.log(`Quiz ${quiz.id} has direct score: ${score}`);
+              }
+            }
+            // Handle results from backend grading
+            else if ('correct_count' in results && 'total_count' in results) {
+              const correctCount = Number(results.correct_count);
+              const totalCount = Number(results.total_count);
+              
+              if (!isNaN(correctCount) && !isNaN(totalCount) && totalCount > 0) {
+                totalCalculatedPoints += correctCount;
+                totalCalculatedMaxPoints += totalCount;
+                validQuizCount++;
+                console.log(`Quiz ${quiz.id} has ${correctCount}/${totalCount} correct answers`);
               }
             }
           }
@@ -140,19 +164,24 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
         }
       }
       
-      console.log(`Total calculation: ${totalPoints}/${totalMaxPoints} points from ${validQuizCount} valid quizzes`);
+      console.log(`Total calculation: ${totalCalculatedPoints}/${totalCalculatedMaxPoints} points from ${validQuizCount} valid quizzes`);
       
-      if (totalMaxPoints === 0 || validQuizCount === 0) {
+      if (totalCalculatedMaxPoints === 0 || validQuizCount === 0) {
         console.log('No valid scoring data found in quizzes');
         setAverageScore('-');
       } else {
-        const overallPercentage = Math.round((totalPoints / totalMaxPoints) * 100);
+        const overallPercentage = Math.round((totalCalculatedPoints / totalCalculatedMaxPoints) * 100);
         console.log(`Final overall percentage: ${overallPercentage}%`);
         setAverageScore(overallPercentage);
       }
     } catch (error) {
       console.error('Error calculating average score:', error);
       setAverageScore('-');
+      toast({
+        title: "Error",
+        description: "Failed to calculate average score. Please try again later.",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }

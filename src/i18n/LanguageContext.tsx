@@ -33,15 +33,35 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
 
   // Translation function
   const t = (key: string): string => {
-    if (!translations[language] || !translations[language][key]) {
+    if (!translations[language]) {
+      console.warn(`Missing translations for language: ${language}, falling back to English`);
+      return translations['en'][key] || key;
+    }
+    
+    if (!translations[language][key]) {
+      // Try lowercase version
+      const lowercaseKey = key.toLowerCase();
+      if (translations[language][lowercaseKey]) {
+        return translations[language][lowercaseKey];
+      }
+      
       // Fallback to English if translation is missing
       if (language !== 'en' && translations['en'] && translations['en'][key]) {
+        console.warn(`Translation missing for key: ${key} in language: ${language}, using English fallback`);
         return translations['en'][key];
       }
+      
+      // Also try lowercase in English
+      if (language !== 'en' && translations['en'] && translations['en'][lowercaseKey]) {
+        console.warn(`Translation missing for key: ${key} in language: ${language}, using English fallback (lowercase)`);
+        return translations['en'][lowercaseKey];
+      }
+      
       // Return the key itself if no translation found
       console.warn(`Translation missing for key: ${key} in language: ${language}`);
       return key;
     }
+    
     return translations[language][key];
   };
 
