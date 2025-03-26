@@ -1,16 +1,17 @@
 
 import React from "react";
-import { toast as sonnerToast, Toast, ToastOptions } from "sonner";
+import { toast as sonnerToast, ToastT, ToastOptions as SonnerToastOptions } from "sonner";
 
 const TOAST_LIMIT = 5;
 const TOAST_REMOVE_DELAY = 1000000;
 
-type ToasterToast = Toast & {
+type ToasterToast = {
   id: string;
   title?: React.ReactNode;
   description?: React.ReactNode;
   action?: React.ReactNode;
   dismiss?: React.ReactNode;
+  open?: boolean;
 };
 
 const actionTypes = {
@@ -133,9 +134,9 @@ function dispatch(action: Action) {
   });
 }
 
-type Toast = Omit<ToasterToast, "id">;
+type ToastProps = Omit<ToasterToast, "id">;
 
-function toast(props: Toast) {
+function toast(props: ToastProps) {
   const id = genId();
 
   // Just use sonner directly
