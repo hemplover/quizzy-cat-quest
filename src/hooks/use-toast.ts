@@ -1,11 +1,11 @@
 
 import React from "react";
-import { toast as sonnerToast } from "sonner";
+import { toast as sonnerToast, type ToastT } from "sonner";
 
 const TOAST_LIMIT = 5;
 const TOAST_REMOVE_DELAY = 1000000;
 
-type ToasterToast = {
+type ToasterToastProps = {
   id: string;
   title?: React.ReactNode;
   description?: React.ReactNode;
@@ -33,11 +33,11 @@ type ActionType = typeof actionTypes;
 type Action =
   | {
       type: ActionType["ADD_TOAST"];
-      toast: ToasterToast;
+      toast: ToasterToastProps;
     }
   | {
       type: ActionType["UPDATE_TOAST"];
-      toast: Partial<ToasterToast>;
+      toast: Partial<ToasterToastProps>;
     }
   | {
       type: ActionType["DISMISS_TOAST"];
@@ -49,7 +49,7 @@ type Action =
     };
 
 interface State {
-  toasts: ToasterToast[];
+  toasts: ToasterToastProps[];
 }
 
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
@@ -134,24 +134,49 @@ function dispatch(action: Action) {
   });
 }
 
-type ToastProps = Omit<ToasterToast, "id">;
+type ToastProps = Omit<ToasterToastProps, "id">;
 
-interface SonnerToastOptions {
-  description?: React.ReactNode;
-  [key: string]: any;
+// Extend the toast function with variants
+interface ExtendedToast extends (props: ToastProps) => string {
+  success: (message: string, options?: any) => void;
+  error: (message: string, options?: any) => void;
+  warning: (message: string, options?: any) => void;
+  info: (message: string, options?: any) => void;
 }
 
-function toast(props: ToastProps) {
+// Create and configure the toast function with variants
+const toast = ((props: ToastProps) => {
   const id = genId();
-
-  // Just use sonner directly
+  
+  // Use sonner directly
   sonnerToast(props.title as string, {
     description: props.description,
     ...props,
-  } as SonnerToastOptions);
-
+  });
+  
   return id;
-}
+}) as ExtendedToast;
+
+// Add variant methods
+toast.success = (message, options = {}) => {
+  sonnerToast.success(message, options);
+  return "";
+};
+
+toast.error = (message, options = {}) => {
+  sonnerToast.error(message, options);
+  return "";
+};
+
+toast.warning = (message, options = {}) => {
+  sonnerToast.warning(message, options);
+  return "";
+};
+
+toast.info = (message, options = {}) => {
+  sonnerToast.info(message, options);
+  return "";
+};
 
 function useToast() {
   const [state, setState] = React.useState<State>(memoryState);
