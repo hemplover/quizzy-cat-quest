@@ -43,7 +43,9 @@ const MultiplayerHost = () => {
       
       try {
         setIsLoading(true);
-        const sessionData = await getQuizSessionByCode(sessionCode);
+        console.log('Fetching host session with code:', sessionCode);
+        const formattedCode = sessionCode.trim().toUpperCase();
+        const sessionData = await getQuizSessionByCode(formattedCode);
         
         if (!sessionData) {
           toast({
@@ -59,7 +61,7 @@ const MultiplayerHost = () => {
         
         if (sessionData.status === 'active') {
           // If the session is already active, go to the quiz
-          navigate(`/quiz/multiplayer/session/${sessionCode}`);
+          navigate(`/quiz/multiplayer/session/${formattedCode}`);
           return;
         }
         

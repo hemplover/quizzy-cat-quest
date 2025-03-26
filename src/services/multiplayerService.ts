@@ -45,6 +45,7 @@ export const createQuizSession = async (quizId: string, creatorId: string | null
       throw new Error(`Failed to create quiz session: ${error.message}`);
     }
     
+    console.log('Created new quiz session with code:', sessionCode);
     return data as QuizSession;
   } catch (error) {
     console.error('Failed to create quiz session:', error);
@@ -59,6 +60,10 @@ export const joinQuizSession = async (
   userId: string | null
 ): Promise<{ session: QuizSession; participant: SessionParticipant } | null> => {
   try {
+    // Normalize the session code
+    sessionCode = sessionCode.trim().toUpperCase();
+    console.log('Joining quiz session with code:', sessionCode);
+    
     // First, get the session by code
     const session = await getQuizSessionByCode(sessionCode);
     
@@ -91,6 +96,7 @@ export const joinQuizSession = async (
       return null;
     }
     
+    console.log('Successfully joined session:', session.session_code);
     return {
       session: session,
       participant: participantData as SessionParticipant
@@ -109,27 +115,16 @@ export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSes
       return null;
     }
 
+    // Normalize the session code
     sessionCode = sessionCode.trim().toUpperCase();
     console.log('Getting quiz session with code:', sessionCode);
     
     // First try with exact match
-    let { data, error } = await supabase
+    const { data, error } = await supabase
       .from('quiz_sessions')
       .select('*')
       .eq('session_code', sessionCode)
       .maybeSingle();
-    
-    // If exact match fails, try with case-insensitive match
-    if (!data && !error) {
-      const { data: ilikeData, error: ilikeError } = await supabase
-        .from('quiz_sessions')
-        .select('*')
-        .ilike('session_code', sessionCode)
-        .maybeSingle();
-      
-      data = ilikeData;
-      error = ilikeError;
-    }
     
     if (error) {
       console.error('Error getting quiz session:', error);
@@ -138,6 +133,13 @@ export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSes
     
     if (!data) {
       console.log('No session found with code:', sessionCode);
+      // List all sessions for debugging
+      const { data: allSessions } = await supabase
+        .from('quiz_sessions')
+        .select('session_code, status')
+        .limit(10);
+      
+      console.log('Available sessions:', allSessions);
       return null;
     }
     

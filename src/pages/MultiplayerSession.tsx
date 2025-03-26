@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -57,7 +56,9 @@ const MultiplayerSession = () => {
       
       try {
         setIsLoading(true);
-        const sessionData = await getQuizSessionByCode(sessionCode);
+        console.log('Fetching session with code:', sessionCode);
+        const formattedCode = sessionCode.trim().toUpperCase();
+        const sessionData = await getQuizSessionByCode(formattedCode);
         
         if (!sessionData) {
           toast.error('Session not found');

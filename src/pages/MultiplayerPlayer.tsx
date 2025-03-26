@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -26,7 +25,9 @@ const MultiplayerPlayer = () => {
       
       try {
         setIsLoading(true);
-        const sessionData = await getQuizSessionByCode(sessionCode);
+        console.log('Fetching player session with code:', sessionCode);
+        const formattedCode = sessionCode.trim().toUpperCase();
+        const sessionData = await getQuizSessionByCode(formattedCode);
         
         if (!sessionData) {
           toast.error('Session not found');
@@ -38,7 +39,7 @@ const MultiplayerPlayer = () => {
         
         if (sessionData.status === 'active') {
           // If the session is already active, go to the quiz
-          navigate(`/quiz/multiplayer/session/${sessionCode}`);
+          navigate(`/quiz/multiplayer/session/${formattedCode}`);
           return;
         }
         
@@ -53,7 +54,7 @@ const MultiplayerPlayer = () => {
     };
     
     fetchSessionData();
-  }, [sessionCode, navigate]);
+  }, [sessionCode, navigate, toast]);
   
   // Subscribe to real-time updates
   useEffect(() => {
