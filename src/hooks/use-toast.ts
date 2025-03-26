@@ -1,9 +1,22 @@
 
 import React from "react";
-import { toast as sonnerToast, ToastT, ToastOptions as SonnerToastOptions } from "sonner";
+import { toast as sonnerToast, ToastT } from "sonner";
+// We can't import ToastOptions directly as it's not exported from sonner package
+// So we'll define our own compatible interface
 
 const TOAST_LIMIT = 5;
 const TOAST_REMOVE_DELAY = 1000000;
+
+// Define our own ToastOptions interface to match what sonner expects
+interface SonnerToastOptions {
+  description?: React.ReactNode;
+  action?: React.ReactNode;
+  dismiss?: React.ReactNode;
+  duration?: number;
+  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top-center' | 'bottom-center';
+  icon?: React.ReactNode;
+  // Add any other properties used by sonner's ToastOptions as needed
+}
 
 type ToasterToast = {
   id: string;
