@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { QuizSession, SessionParticipant } from "@/types/multiplayer";
 import { QuizQuestion } from "@/types/quiz";
@@ -26,7 +27,7 @@ export const createQuizSession = async (quizId: string, creatorId: string | null
       throw new Error(`Quiz with ID ${quizId} not found`);
     }
     
-    // Create the quiz session with proper error handling
+    // Create the quiz session
     const { data, error } = await supabase
       .from('quiz_sessions')
       .insert({

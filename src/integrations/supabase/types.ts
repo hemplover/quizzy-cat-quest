@@ -224,18 +224,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      check_session_participant_access: {
-        Args: {
-          session_id: string
-        }
-        Returns: boolean
-      }
-      get_session_participant_status: {
-        Args: {
-          session_id: string
-        }
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never
