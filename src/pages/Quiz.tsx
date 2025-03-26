@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -14,7 +15,6 @@ import CatTutor from '@/components/CatTutor';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { gradeQuiz } from '@/services/quizService';
-import { supabase } from '@/integrations/supabase/client';
 
 interface BaseQuestion {
   id: number;
@@ -341,77 +341,25 @@ const Quiz = () => {
   };
 
   const handleFinishQuiz = async () => {
-    try {
-      // Get the quiz data from session storage to update it with results
-      const quizDataStr = sessionStorage.getItem('quizData');
-      const quizData = quizDataStr ? JSON.parse(quizDataStr) : null;
-      
-      const results = {
-        score,
-        totalQuestions: questions.length,
-        timeSpent,
-        completedAt: new Date().toISOString(),
-        aiGrading: aiGradingResults,
-        totalPoints: aiGradingResults?.total_points || 0,
-        maxPoints: aiGradingResults?.max_points || 0
-      };
-      
-      // Save quiz results to session storage for history
-      const savedResults = JSON.parse(sessionStorage.getItem('quizResults') || '[]');
-      sessionStorage.setItem('quizResults', JSON.stringify([...savedResults, results]));
-      
-      // Update XP
-      const currentXP = parseInt(localStorage.getItem('userXP') || '0');
-      const earnedXP = Math.round((results.totalPoints / results.maxPoints) * (questions.length * 10));
-      localStorage.setItem('userXP', (currentXP + earnedXP).toString());
-      
-      // Update quiz results in Supabase if we have a subject ID
-      if (quizData && quizData.subjectId) {
-        // Get current user
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          // Get quiz questions from session storage
-          const storedQuestionsStr = sessionStorage.getItem('quizQuestions');
-          const quizQuestions = storedQuestionsStr ? JSON.parse(storedQuestionsStr) : questions;
-          
-          // Get quiz ID if it exists
-          const quizId = sessionStorage.getItem('currentQuizId');
-          
-          if (quizId) {
-            // Update existing quiz
-            const { error } = await supabase
-              .from('quizzes')
-              .update({ 
-                results: {
-                  ...aiGradingResults,
-                  score,
-                  punteggio_totale: score / 100, // Normalized score (0 to 1)
-                  total_points: results.totalPoints,
-                  max_points: results.maxPoints,
-                  timeSpent
-                }
-              })
-              .eq('id', quizId);
-              
-            if (error) {
-              console.error('Error updating quiz results:', error);
-            } else {
-              console.log('Quiz results saved to Supabase');
-            }
-          } else {
-            // Might be a temporary quiz without ID, but let's log it
-            console.log('No quiz ID found in session storage, results not saved to database');
-          }
-        }
-      }
-      
-      toast.success(`Quiz completed! You earned ${earnedXP} XP!`);
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Error saving quiz results:', error);
-      toast.error('There was a problem saving your results');
-      navigate('/dashboard');
-    }
+    const results = {
+      score,
+      totalQuestions: questions.length,
+      timeSpent,
+      completedAt: new Date().toISOString(),
+      aiGrading: aiGradingResults,
+      totalPoints: aiGradingResults?.total_points || 0,
+      maxPoints: aiGradingResults?.max_points || 0
+    };
+    
+    const savedResults = JSON.parse(sessionStorage.getItem('quizResults') || '[]');
+    sessionStorage.setItem('quizResults', JSON.stringify([...savedResults, results]));
+    
+    const currentXP = parseInt(localStorage.getItem('userXP') || '0');
+    const earnedXP = Math.round((results.totalPoints / results.maxPoints) * (questions.length * 10));
+    localStorage.setItem('userXP', (currentXP + earnedXP).toString());
+    
+    toast.success(`Quiz completed! You earned ${earnedXP} XP!`);
+    navigate('/dashboard');
   };
 
   if (isLoading) {
