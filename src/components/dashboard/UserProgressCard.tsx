@@ -79,44 +79,59 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
         console.log(`Processing quiz ${quiz.id} with results:`, quiz.results);
         
         // Handle different result formats
-        if (quiz.results.total_points !== undefined && quiz.results.max_points !== undefined) {
+        if (typeof quiz.results === 'object' && quiz.results !== null) {
+          const results = quiz.results as Record<string, any>;
+          
           // Format: {total_points: X, max_points: Y}
-          totalPoints += quiz.results.total_points;
-          totalMaxPoints += quiz.results.max_points;
-          validQuizCount++;
-          console.log(`Quiz ${quiz.id} has ${quiz.results.total_points}/${quiz.results.max_points} points`);
-        } 
-        else if (quiz.results.punteggio_totale !== undefined) {
-          // Format: {punteggio_totale: X} (score as ratio)
-          // Calculate points based on questions count
-          const questionCount = Array.isArray(quiz.questions) ? quiz.questions.length : 0;
-          
-          if (questionCount > 0) {
-            // For punteggio_totale (ratio), multiply by question count to get points
-            const earnedPoints = quiz.results.punteggio_totale * questionCount;
-            totalPoints += earnedPoints;
-            totalMaxPoints += questionCount;
-            validQuizCount++;
-            console.log(`Quiz ${quiz.id} has ratio score ${quiz.results.punteggio_totale} (${earnedPoints}/${questionCount} points)`);
-          }
-        }
-        else if (quiz.results.risultati && Array.isArray(quiz.results.risultati)) {
-          // Format: {risultati: [{punteggio: X}]}
-          let quizPoints = 0;
-          let quizMaxPoints = 0;
-          
-          quiz.results.risultati.forEach(result => {
-            if (result.punteggio !== undefined) {
-              quizPoints += result.punteggio;
-              quizMaxPoints += (result.tipo === 'open-ended' || result.type === 'open-ended') ? 5 : 1;
+          if ('total_points' in results && 'max_points' in results) {
+            const totalPoints = Number(results.total_points);
+            const maxPoints = Number(results.max_points);
+            
+            if (!isNaN(totalPoints) && !isNaN(maxPoints)) {
+              totalPoints += totalPoints;
+              totalMaxPoints += maxPoints;
+              validQuizCount++;
+              console.log(`Quiz ${quiz.id} has ${totalPoints}/${maxPoints} points`);
             }
-          });
-          
-          if (quizMaxPoints > 0) {
-            totalPoints += quizPoints;
-            totalMaxPoints += quizMaxPoints;
-            validQuizCount++;
-            console.log(`Quiz ${quiz.id} has ${quizPoints}/${quizMaxPoints} points from risultati`);
+          } 
+          // Format: {punteggio_totale: X} (score as ratio)
+          else if ('punteggio_totale' in results) {
+            // Calculate points based on questions count
+            const questionCount = Array.isArray(quiz.questions) ? quiz.questions.length : 0;
+            
+            if (questionCount > 0) {
+              // For punteggio_totale (ratio), multiply by question count to get points
+              const scoreRatio = Number(results.punteggio_totale);
+              if (!isNaN(scoreRatio)) {
+                const earnedPoints = scoreRatio * questionCount;
+                totalPoints += earnedPoints;
+                totalMaxPoints += questionCount;
+                validQuizCount++;
+                console.log(`Quiz ${quiz.id} has ratio score ${scoreRatio} (${earnedPoints}/${questionCount} points)`);
+              }
+            }
+          }
+          // Format: {risultati: [{punteggio: X}]}
+          else if ('risultati' in results && Array.isArray(results.risultati)) {
+            let quizPoints = 0;
+            let quizMaxPoints = 0;
+            
+            results.risultati.forEach((result: any) => {
+              if (result && typeof result === 'object' && 'punteggio' in result) {
+                const punteggio = Number(result.punteggio);
+                if (!isNaN(punteggio)) {
+                  quizPoints += punteggio;
+                  quizMaxPoints += (result.tipo === 'open-ended' || result.type === 'open-ended') ? 5 : 1;
+                }
+              }
+            });
+            
+            if (quizMaxPoints > 0) {
+              totalPoints += quizPoints;
+              totalMaxPoints += quizMaxPoints;
+              validQuizCount++;
+              console.log(`Quiz ${quiz.id} has ${quizPoints}/${quizMaxPoints} points from risultati`);
+            }
           }
         }
       });
