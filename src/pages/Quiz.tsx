@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, BookOpen, Users, RefreshCw } from 'lucide-react';
-import { QuizQuestion } from '@/types/quiz';
+import { QuizQuestion, Quiz } from '@/types/quiz';
 import { getQuiz, getQuizzes } from '@/services/quizService';
 import { useAuth } from '@/contexts/AuthContext';
 import CatTutor from '@/components/CatTutor';
@@ -13,7 +14,7 @@ import CreateQuizSession from '@/components/quiz/CreateQuizSession';
 import JoinQuizSession from '@/components/quiz/JoinQuizSession';
 
 const Quiz = () => {
-  const [quizzes, setQuizzes] = useState<any[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [selectedQuiz, setSelectedQuiz] = useState<QuizQuestion[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -53,8 +54,18 @@ const Quiz = () => {
   const handleQuizSelect = async (quizId: string) => {
     try {
       const quiz = await getQuiz(quizId);
-      setSelectedQuiz(quiz?.questions || null);
-      setIsModalOpen(true);
+      // Ensure we're setting an array of QuizQuestion objects
+      if (quiz && Array.isArray(quiz.questions)) {
+        setSelectedQuiz(quiz.questions as QuizQuestion[]);
+        setIsModalOpen(true);
+      } else {
+        console.error('Invalid quiz data structure:', quiz);
+        toast({
+          title: 'Error',
+          description: 'Invalid quiz format',
+          variant: 'destructive',
+        });
+      }
     } catch (error) {
       console.error('Error fetching quiz:', error);
       toast({

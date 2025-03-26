@@ -11,6 +11,7 @@ export interface QuizQuestion {
   correct_answer?: string | boolean;
   spiegazione?: string;
   explanation?: string;
+  correctAnswer?: number | string; // Add this property for local usage
 }
 
 export interface GeneratedQuiz {
@@ -27,8 +28,8 @@ export interface QuizResults {
   }>;
   punteggio_totale: number;
   feedback_generale?: string;
-  total_points?: number;   // Add this property
-  max_points?: number;     // Add this property
+  total_points?: number;
+  max_points?: number;
 }
 
 export interface QuizSettings {
@@ -51,4 +52,17 @@ export interface QuizData {
   numQuestions: number;
   createdAt: string;
   model?: string;
+}
+
+// Add this interface to represent a quiz from the database
+export interface Quiz {
+  id: string;
+  title: string;
+  questions: QuizQuestion[];
+  created_at?: string;
+  settings?: any;
+  results?: any;
+  subject_id?: string;
+  user_id?: string;
+  document_id?: string;
 }

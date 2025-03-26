@@ -1,10 +1,10 @@
 
 import { toast } from 'sonner';
-import { QuizQuestion, GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
+import { QuizQuestion, GeneratedQuiz, QuizResults, QuizSettings, Quiz } from '@/types/quiz';
 import { supabase } from '@/integrations/supabase/client';
 
 // Get all quizzes for the current user
-export const getQuizzes = async () => {
+export const getQuizzes = async (): Promise<Quiz[]> => {
   try {
     const { data: session } = await supabase.auth.getSession();
     const userId = session.session?.user?.id;
@@ -56,7 +56,7 @@ export const getQuizzes = async () => {
 };
 
 // Get a single quiz by ID
-export const getQuiz = async (quizId: string) => {
+export const getQuiz = async (quizId: string): Promise<Quiz> => {
   try {
     // For demo quizzes
     if (quizId.startsWith('demo')) {
@@ -84,7 +84,7 @@ export const getQuiz = async (quizId: string) => {
       throw new Error('Failed to fetch quiz');
     }
     
-    return data;
+    return data as Quiz;
   } catch (error) {
     console.error('Error in getQuiz:', error);
     throw error;
