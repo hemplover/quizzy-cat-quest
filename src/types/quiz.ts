@@ -23,6 +23,7 @@ export interface QuizResultItem {
   corretto: boolean | string;
   punteggio: number;
   spiegazione: string;
+  [key: string]: any; // Add index signature to make it compatible with Json type
 }
 
 export interface QuizResults {
@@ -34,6 +35,7 @@ export interface QuizResults {
   timeSpent?: number;
   completedAt?: string;
   earnedXP?: number;
+  [key: string]: any; // Add index signature to make it compatible with Json type
 }
 
 export interface QuizSettings {

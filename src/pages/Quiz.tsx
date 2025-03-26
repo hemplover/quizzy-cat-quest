@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { gradeQuiz } from '@/services/quizService';
 import { supabase } from '@/integrations/supabase/client';
+import { QuizResultItem } from '@/types/quiz';
 
 interface BaseQuestion {
   id: number;
@@ -332,8 +333,15 @@ const Quiz = () => {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
               // Create a structured results object to save to the database
+              // Convert to a simple object with no complex types to satisfy Supabase JSON requirements
               const resultsToSave = {
-                risultati: results.risultati,
+                risultati: results.risultati.map(r => ({
+                  domanda: r.domanda,
+                  risposta_utente: String(r.risposta_utente),
+                  corretto: typeof r.corretto === 'boolean' ? r.corretto : String(r.corretto),
+                  punteggio: Number(r.punteggio),
+                  spiegazione: String(r.spiegazione)
+                })),
                 score: percentageScore,
                 punteggio_totale: percentageScore / 100,
                 total_points: totalPoints,
@@ -418,9 +426,15 @@ const Quiz = () => {
           // Get quiz ID if it exists
           const quizId = sessionStorage.getItem('currentQuizId');
           
-          // Create a structured results object to save to the database
+          // Create a structured results object to save to the database, ensuring all properties are simple types
           const resultsToSave = {
-            risultati: aiGradingResults?.risultati || [],
+            risultati: aiGradingResults?.risultati.map(r => ({
+              domanda: String(r.domanda),
+              risposta_utente: String(r.risposta_utente),
+              corretto: typeof r.corretto === 'boolean' ? r.corretto : String(r.corretto),
+              punteggio: Number(r.punteggio),
+              spiegazione: String(r.spiegazione)
+            })) || [],
             score,
             punteggio_totale: score / 100,
             total_points: results.totalPoints,

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +17,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ListBullet, File as FileIcon, TextIcon, Clock } from 'lucide-react';
+import { List, File as FileIcon, TextIcon, Clock } from 'lucide-react';
 import { generateQuiz, transformQuizQuestions } from '@/services/quizService';
 import { saveRecentText, getRecentText } from '@/services/quizService';
 import { supabase } from '@/integrations/supabase/client';
