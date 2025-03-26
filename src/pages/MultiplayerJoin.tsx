@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
-import { Users, LogIn } from 'lucide-react';
+import { LogIn, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -40,17 +39,29 @@ const MultiplayerJoin = () => {
             navigate(`/quiz/multiplayer/session/${sessionCode}`);
             return;
           } else if (session.status === 'completed') {
-            toast.error('This quiz session has already ended');
+            toast({
+              title: 'Session ended',
+              description: 'This quiz session has already ended',
+              variant: 'destructive',
+            });
             navigate('/');
             return;
           }
         } else {
-          toast.error('Invalid session code');
+          toast({
+            title: 'Invalid session',
+            description: 'Invalid session code',
+            variant: 'destructive',
+          });
           navigate('/');
         }
       } catch (error) {
         console.error('Error checking session:', error);
-        toast.error('Failed to check session');
+        toast({
+          title: 'Error',
+          description: 'Failed to check session',
+          variant: 'destructive',
+        });
         navigate('/');
       } finally {
         setIsLoading(false);
