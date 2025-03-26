@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { QuizSession, SessionParticipant } from "@/types/multiplayer";
 import { QuizQuestion } from "@/types/quiz";
@@ -104,17 +103,31 @@ export const joinQuizSession = async (
 // Get a quiz session by code
 export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSession | null> => {
   try {
+    if (!sessionCode) {
+      console.error('No session code provided');
+      return null;
+    }
+
+    console.log('Getting quiz session with code:', sessionCode);
+    
+    // Use ilike for case-insensitive comparison to be more forgiving with session codes
     const { data, error } = await supabase
       .from('quiz_sessions')
       .select('*')
-      .eq('session_code', sessionCode)
-      .single();
+      .ilike('session_code', sessionCode)
+      .maybeSingle();
     
     if (error) {
       console.error('Error getting quiz session:', error);
       return null;
     }
     
+    if (!data) {
+      console.log('No session found with code:', sessionCode);
+      return null;
+    }
+    
+    console.log('Found session:', data);
     return data as QuizSession;
   } catch (error) {
     console.error('Failed to get quiz session:', error);

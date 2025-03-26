@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { joinQuizSession } from '@/services/multiplayerService';
+import { joinQuizSession, getQuizSessionByCode } from '@/services/multiplayerService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -51,8 +51,40 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
 
     setIsJoining(true);
     try {
+      // First check if the session exists
+      const formattedCode = sessionCode.trim().toUpperCase();
+      const session = await getQuizSessionByCode(formattedCode);
+      
+      if (!session) {
+        toast({
+          title: 'Invalid session',
+          description: 'The session code you entered is invalid or the session has ended',
+          variant: 'destructive',
+        });
+        setIsJoining(false);
+        return;
+      }
+      
+      if (session.status !== 'waiting') {
+        toast({
+          title: 'Session unavailable',
+          description: session.status === 'active' 
+            ? 'This session has already started' 
+            : 'This session has ended',
+          variant: 'destructive',
+        });
+        
+        if (session.status === 'active') {
+          navigate(`/quiz/multiplayer/session/${formattedCode}`);
+        }
+        
+        setIsJoining(false);
+        return;
+      }
+      
+      // Now try to join the session
       const result = await joinQuizSession(
-        sessionCode.trim().toUpperCase(),
+        formattedCode,
         username.trim(),
         user?.id || null
       );
@@ -63,11 +95,11 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
           description: `You've joined the quiz as ${username}`,
         });
         
-        navigate(`/quiz/multiplayer/player/${sessionCode.trim().toUpperCase()}`);
+        navigate(`/quiz/multiplayer/player/${formattedCode}`);
       } else {
         toast({
           title: 'Error',
-          description: 'Failed to join quiz session. The code may be invalid or the session has already started.',
+          description: 'Failed to join quiz session',
           variant: 'destructive',
         });
       }

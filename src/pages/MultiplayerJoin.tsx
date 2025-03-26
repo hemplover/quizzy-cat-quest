@@ -29,9 +29,11 @@ const MultiplayerJoin = () => {
       
       try {
         setIsLoading(true);
+        console.log('Checking session with code:', sessionCode);
         const session = await getQuizSessionByCode(sessionCode);
         
         if (session) {
+          console.log('Session found:', session);
           setSessionExists(true);
           
           // If the session is already active or completed, redirect to the relevant page
@@ -48,6 +50,7 @@ const MultiplayerJoin = () => {
             return;
           }
         } else {
+          console.log('No session found with code:', sessionCode);
           toast({
             title: 'Invalid session',
             description: 'Invalid session code',
