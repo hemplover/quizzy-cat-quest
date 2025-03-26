@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { QuizSession, SessionParticipant } from "@/types/multiplayer";
 import { QuizQuestion } from "@/types/quiz";
@@ -53,6 +52,12 @@ export const createQuizSession = async (quizId: string, creatorId: string | null
   }
 };
 
+// Normalize a session code by removing unwanted characters and formatting properly
+const normalizeSessionCode = (code: string): string => {
+  // Remove quotes, spaces, hyphens and any non-alphanumeric characters
+  return code.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
+};
+
 // Join a quiz session as a participant
 export const joinQuizSession = async (
   sessionCode: string, 
@@ -61,19 +66,19 @@ export const joinQuizSession = async (
 ): Promise<{ session: QuizSession; participant: SessionParticipant } | null> => {
   try {
     // Normalize the session code
-    sessionCode = sessionCode.trim().toUpperCase();
-    console.log('Joining quiz session with code:', sessionCode);
+    const cleanCode = normalizeSessionCode(sessionCode);
+    console.log('Joining quiz session with code:', cleanCode);
     
     // First, get the session by code
-    const session = await getQuizSessionByCode(sessionCode);
+    const session = await getQuizSessionByCode(cleanCode);
     
     if (!session) {
-      console.error(`No session found with code: ${sessionCode}`);
+      console.error(`No session found with code: ${cleanCode}`);
       return null;
     }
     
     if (session.status !== 'waiting') {
-      console.error(`Session with code ${sessionCode} is not in waiting status, current status: ${session.status}`);
+      console.error(`Session with code ${cleanCode} is not in waiting status, current status: ${session.status}`);
       return null;
     }
     
@@ -116,14 +121,14 @@ export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSes
     }
 
     // Normalize the session code
-    sessionCode = sessionCode.trim().toUpperCase();
-    console.log('Getting quiz session with code:', sessionCode);
+    const cleanCode = normalizeSessionCode(sessionCode);
+    console.log('Getting quiz session with code:', cleanCode);
     
-    // First try with exact match
+    // Try with exact match
     const { data, error } = await supabase
       .from('quiz_sessions')
       .select('*')
-      .eq('session_code', sessionCode)
+      .eq('session_code', cleanCode)
       .maybeSingle();
     
     if (error) {
@@ -132,7 +137,7 @@ export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSes
     }
     
     if (!data) {
-      console.log('No session found with code:', sessionCode);
+      console.log('No session found with code:', cleanCode);
       // List all sessions for debugging
       const { data: allSessions } = await supabase
         .from('quiz_sessions')

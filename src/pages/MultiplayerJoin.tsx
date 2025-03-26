@@ -30,8 +30,8 @@ const MultiplayerJoin = () => {
       try {
         setIsLoading(true);
         console.log('Checking session with code:', sessionCode);
-        const formattedCode = sessionCode.trim().toUpperCase();
-        const session = await getQuizSessionByCode(formattedCode);
+        
+        const session = await getQuizSessionByCode(sessionCode);
         
         if (session) {
           console.log('Session found:', session);
@@ -39,7 +39,7 @@ const MultiplayerJoin = () => {
           
           // If the session is already active or completed, redirect to the relevant page
           if (session.status === 'active') {
-            navigate(`/quiz/multiplayer/session/${formattedCode}`);
+            navigate(`/quiz/multiplayer/session/${session.session_code}`);
             return;
           } else if (session.status === 'completed') {
             toast({
@@ -91,9 +91,8 @@ const MultiplayerJoin = () => {
     
     setIsJoining(true);
     try {
-      const formattedCode = sessionCode.trim().toUpperCase();
       const result = await joinQuizSession(
-        formattedCode,
+        sessionCode,
         username.trim(),
         user?.id || null
       );
@@ -104,7 +103,8 @@ const MultiplayerJoin = () => {
           description: `You've joined the quiz as ${username}`,
         });
         
-        navigate(`/quiz/multiplayer/player/${formattedCode}`);
+        // Use the session code from the result to ensure we have the correct format
+        navigate(`/quiz/multiplayer/player/${result.session.session_code}`);
       } else {
         toast({
           title: 'Error',

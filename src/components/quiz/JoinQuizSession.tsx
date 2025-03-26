@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { joinQuizSession, getQuizSessionByCode } from '@/services/multiplayerService';
@@ -51,42 +50,11 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
 
     setIsJoining(true);
     try {
-      // First check if the session exists
-      const formattedCode = sessionCode.trim().toUpperCase();
-      console.log('Attempting to join session with code:', formattedCode);
+      // Try to join the session - the service will normalize the code
+      console.log('Attempting to join session with code:', sessionCode);
       
-      const session = await getQuizSessionByCode(formattedCode);
-      
-      if (!session) {
-        toast({
-          title: 'Invalid session',
-          description: 'The session code you entered is invalid or the session has ended',
-          variant: 'destructive',
-        });
-        setIsJoining(false);
-        return;
-      }
-      
-      if (session.status !== 'waiting') {
-        toast({
-          title: 'Session unavailable',
-          description: session.status === 'active' 
-            ? 'This session has already started' 
-            : 'This session has ended',
-          variant: 'destructive',
-        });
-        
-        if (session.status === 'active') {
-          navigate(`/quiz/multiplayer/session/${formattedCode}`);
-        }
-        
-        setIsJoining(false);
-        return;
-      }
-      
-      // Now try to join the session
       const result = await joinQuizSession(
-        formattedCode,
+        sessionCode,
         username.trim(),
         user?.id || null
       );
@@ -97,11 +65,12 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
           description: `You've joined the quiz as ${username}`,
         });
         
-        navigate(`/quiz/multiplayer/player/${formattedCode}`);
+        // Use the normalized code from the result
+        navigate(`/quiz/multiplayer/player/${result.session.session_code}`);
       } else {
         toast({
           title: 'Error',
-          description: 'Failed to join quiz session',
+          description: 'Failed to join quiz session. Check that the code is correct.',
           variant: 'destructive',
         });
       }
