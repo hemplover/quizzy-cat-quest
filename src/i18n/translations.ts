@@ -495,7 +495,53 @@ export const translations: Translations = {
     aiQuizGeneration: 'Génération de quiz par l\'IA',
     aiQuizGenerationDesc: 'Téléchargez vos supports d\'étude et notre IA créera des quiz personnalisés adaptés à votre contenu.',
     felineTutor: 'Tuteur Félin',
-    felineTutorDesc: 'Étudiez avec notre tuteur chat intelligent et ironique qui fournis
+    felineTutorDesc: 'Étudiez avec notre tuteur chat intelligent et ironique qui fournit des commentaires avec une touche d\'humour.',
+    progressTracking: 'Suivi de progression',
+    progressTrackingDesc: 'Suivez vos progrès et identifiez les domaines faibles pour concentrer vos efforts d\'étude efficacement.',
+    
+    // XP Levels
+    scholarlyKitten: 'Chaton Érudit',
+    scholarlyKittenDesc: 'Vous débutez tout juste votre parcours d\'apprentissage',
+    curiousCat: 'Neugierige Katze',
+    curiousCatDesc: 'Vous développez vos connaissances et posez de bonnes questions',
+    cleverFeline: 'Clevere Katze',
+    cleverFelineDesc: 'Vous maîtrisez des concepts et établissez des liens entre les idées',
+    academicTabby: 'Tabby Académique',
+    academicTabbyDesc: 'Vous appliquez vos connaissances dans des scénarios complexes',
+    wisdomTiger: 'Tigre de la Sagesse',
+    wisdomTigerDesc: 'Vous enseignez aux autres et maîtrisez des sujets difficiles',
+    
+    // Fixed missing translations
+    scholarlykitten: 'Chaton Érudit',
+    curiouscat: 'Neugierige Katze',
+    cleverFeline: 'Clevere Katze',
+    cleverfeline: 'Clevere Katze',
+    academicTabby: 'Tabby Académique',
+    academictabby: 'Tabby Académique',
+    wisdomTiger: 'Tigre de la Sagesse',
+    wisdomtiger: 'Tigre de la Sagesse',
+    
+    // Upload page
+    uploadTitle: 'Créer Quiz',
+    uploadSubtitle: 'Téléchargez des documents ou collez du texte pour générer des questions de quiz',
+    chooseSource: 'Choisir Source',
+    configureQuiz: 'Configurer Quiz',
+    apiKeyInstruction: 'Veuillez d\'abord définir votre clé API',
+    uploadDocument: 'Télécharger Document',
+    pasteText: 'Ou Collez Votre Texte',
+    pasteTextPlaceholder: 'Collez ici vos notes d\'étude, texte ou contenu...',
+    processText: 'Traiter le Texte',
+    contentReady: 'Contenu Prêt',
+    quizSettings: 'Paramètres du Quiz',
+    difficultyLevel: 'Niveau de Difficulté',
+    questionTypes: 'Types de Questions',
+    numberOfQuestions: 'Nombre de Questions:',
+    createQuiz: 'Créer Quiz',
+    generatingQuiz: 'Génération du Quiz...',
+    textInput: 'Saisie de Texte',
+    enterTextToCreateQuiz: 'Entrez du texte pour créer un quiz',
+    enterContent: 'Entrez du contenu',
+    usingAI: 'Utilisation de l\'IA'
   },
   
   de: {
@@ -633,7 +679,7 @@ export const translations: Translations = {
     // Question types
     multipleChoice: 'Multiple Choice',
     trueFalse: 'Wahr/Falsch',
-    openEnded: 'Offen' ,
+    openEnded: 'Offen',
 
     // Dashboard
     recentQuizzes: 'Letzte Quizze',
@@ -660,3 +706,18 @@ export const translations: Translations = {
     newSubject: 'Neues Fach',
     subjectName: 'Fachname',
     subjectDescription: 'Beschreibung',
+    icon: 'Symbol',
+    color: 'Farbe',
+    documents: 'Dokumente',
+    noSubjectsFound: 'Keine Fächer gefunden',
+    createYourFirstSubject: 'Erstelle dein erstes Fach',
+    addDocument: 'Dokument hinzufügen',
+    noDocumentsFound: 'Keine Dokumente in diesem Fach gefunden',
+    addYourFirstDocument: 'Füge dein erstes Dokument hinzu',
+    
+    // New missing translations
+    enterTextToCreateQuiz: 'Text eingeben, um ein Quiz zu erstellen',
+    enterContent: 'Inhalt eingeben',
+    usingAI: 'KI verwenden'
+  }
+};
