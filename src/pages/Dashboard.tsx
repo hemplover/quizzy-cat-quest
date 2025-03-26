@@ -59,25 +59,47 @@ const Dashboard = () => {
         // Calculate scores properly
         let totalCorrectAnswers = 0;
         let totalQuestions = 0;
+        let totalPoints = 0;
+        let maxPoints = 0;
         let quizzesWithResults = 0;
         
         quizzes.forEach(quiz => {
           if (quiz.results && quiz.questions && quiz.questions.length > 0) {
-            if (typeof quiz.results.punteggio_totale === 'number') {
-              console.log(`Quiz ${quiz.title || quiz.id} has results:`, quiz.results);
-              totalCorrectAnswers += quiz.results.punteggio_totale;
-              totalQuestions += quiz.questions.length;
-              quizzesWithResults++;
-              console.log(`Quiz ${quiz.id} score: ${quiz.results.punteggio_totale} correct out of ${quiz.questions.length} questions (${(quiz.results.punteggio_totale / quiz.questions.length) * 100}%)`);
+            // Count this as a completed quiz
+            quizzesWithResults++;
+            
+            // Check if we have the new points format
+            if (quiz.results.total_points !== undefined && quiz.results.max_points !== undefined) {
+              totalPoints += quiz.results.total_points;
+              maxPoints += quiz.results.max_points;
+              console.log(`Quiz ${quiz.id} has point data: ${quiz.results.total_points}/${quiz.results.max_points} points`);
+            } 
+            // Check for older punteggio_totale format (normalized 0-1 score)
+            else if (typeof quiz.results.punteggio_totale === 'number') {
+              // Convert to points based on question count
+              const quizScore = quiz.results.punteggio_totale;
+              const questionCount = quiz.questions.length;
+              
+              // Estimate points: if punteggio_totale is 0.75 and there are 4 questions,
+              // we estimate 3 points out of possible 4
+              const earnedPoints = Math.round(quizScore * questionCount);
+              
+              totalCorrectAnswers += earnedPoints;
+              totalQuestions += questionCount;
+              totalPoints += earnedPoints;
+              maxPoints += questionCount;
+              
+              console.log(`Quiz ${quiz.id} score: ${earnedPoints} out of ${questionCount} points (${quizScore * 100}%)`);
             }
           }
         });
         
         console.log(`Subject ${subject.name}: ${totalCorrectAnswers} correct answers out of ${totalQuestions} total questions`);
+        console.log(`Subject ${subject.name}: ${totalPoints} points earned out of ${maxPoints} maximum points`);
         
         // Calculate average score as a percentage
-        const averageScore = totalQuestions > 0 ? 
-          Math.round((totalCorrectAnswers / totalQuestions) * 100) : 0;
+        const averageScore = maxPoints > 0 ? 
+          Math.round((totalPoints / maxPoints) * 100) : 0;
         
         console.log(`Subject ${subject.name} average score: ${averageScore}%`);
         
@@ -86,8 +108,10 @@ const Dashboard = () => {
           quizCount: quizzes.length,
           completedQuizCount: quizzesWithResults,
           averageScore: averageScore,
-          totalQuestions: totalQuestions, // Add this for the UserProgressCard calculation
-          totalCorrectAnswers: totalCorrectAnswers // Add this for the UserProgressCard calculation
+          totalQuestions: totalQuestions,
+          totalCorrectAnswers: totalCorrectAnswers,
+          totalPoints: totalPoints,
+          maxPoints: maxPoints
         };
       }));
       

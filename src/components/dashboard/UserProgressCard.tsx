@@ -5,12 +5,6 @@ import CatTutor from '@/components/CatTutor';
 import XPBar from '@/components/XPBar';
 import { BookOpen, CheckCircle2, TrendingUp } from 'lucide-react';
 
-interface LevelInfo {
-  name: string;
-  minXP: number;
-  maxXP: number;
-}
-
 interface UserProgressCardProps {
   userXP: number;
   nextLevelXP: number;
@@ -33,7 +27,28 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
     console.log('Calculating overall average score with subjects:', subjects);
     
     // Get all subjects with completed quizzes
-    const subjectsWithScores = subjects.filter(s => s.completedQuizCount > 0);
+    const subjectsWithScores = subjects.filter(s => {
+      // A subject has scores if it has completed quizzes
+      if (s.completedQuizCount && s.completedQuizCount > 0) {
+        console.log(`Subject ${s.name} has completed quizzes: ${s.completedQuizCount}`);
+        return true;
+      }
+      
+      // Or if it has totalPoints and maxPoints defined
+      if (s.totalPoints !== undefined && s.maxPoints !== undefined && s.maxPoints > 0) {
+        console.log(`Subject ${s.name} has points: ${s.totalPoints}/${s.maxPoints}`);
+        return true;
+      }
+      
+      // Or if it has averageScore defined
+      if (s.averageScore !== undefined && s.averageScore > 0) {
+        console.log(`Subject ${s.name} has average score: ${s.averageScore}%`);
+        return true;
+      }
+      
+      return false;
+    });
+    
     console.log('Filtered subjects with scores:', subjectsWithScores);
     
     if (subjectsWithScores.length === 0) {
@@ -48,12 +63,12 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
     subjectsWithScores.forEach(subject => {
       console.log(`Subject ${subject.name}:`, subject);
       
-      if (subject.totalPoints !== undefined && subject.maxPoints !== undefined) {
+      if (subject.totalPoints !== undefined && subject.maxPoints !== undefined && subject.maxPoints > 0) {
         // If we have the new weighted point system
         totalPointsEarned += subject.totalPoints;
         totalMaxPoints += subject.maxPoints;
         console.log(`Added ${subject.totalPoints} points earned out of ${subject.maxPoints} maximum points`);
-      } else if (subject.averageScore !== undefined && subject.totalQuestions !== undefined) {
+      } else if (subject.averageScore !== undefined && subject.totalQuestions !== undefined && subject.totalQuestions > 0) {
         // Legacy calculation (pre-weighted scoring)
         // Convert percentage to points (assuming 1 point per question)
         const subjectPointsEarned = (subject.averageScore / 100) * subject.totalQuestions;
