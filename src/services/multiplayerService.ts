@@ -132,48 +132,86 @@ export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSes
     const cleanCode = normalizeSessionCode(sessionCode);
     console.log('Getting quiz session with code:', cleanCode);
     
-    // CRITICAL FIX: use the serviceRole client to bypass RLS policies
-    // This will allow us to query all sessions regardless of who created them
+    // Try to get the session with an exact match first
     const { data, error } = await supabase
+      .from('quiz_sessions')
+      .select('*')
+      .eq('session_code', cleanCode)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error getting quiz session (exact match):', error);
+      console.error('SQL query used:', `SELECT * FROM quiz_sessions WHERE session_code = '${cleanCode}'`);
+      return null;
+    }
+    
+    if (data) {
+      console.log('Found session with exact match:', data);
+      return data as QuizSession;
+    }
+    
+    // If exact match fails, try case-insensitive match
+    console.log(`No exact match found for code: ${cleanCode}, trying case-insensitive search...`);
+    const { data: caseInsensitiveData, error: caseInsensitiveError } = await supabase
       .from('quiz_sessions')
       .select('*')
       .ilike('session_code', cleanCode)
       .maybeSingle();
     
-    if (error) {
-      console.error('Error getting quiz session:', error);
+    if (caseInsensitiveError) {
+      console.error('Error getting quiz session (case-insensitive):', caseInsensitiveError);
       return null;
     }
     
-    if (!data) {
-      console.log('No session found with code:', cleanCode);
-      
-      // Try to get a list of available sessions to help with debugging
-      const { data: allSessions } = await supabase
-        .from('quiz_sessions')
-        .select('session_code, status')
-        .limit(10);
-      
+    if (caseInsensitiveData) {
+      console.log('Found session with case-insensitive match:', caseInsensitiveData);
+      return caseInsensitiveData as QuizSession;
+    }
+    
+    // If still no match, try to get a list of all available sessions for debugging
+    console.log('No session found with code (both exact and case-insensitive):', cleanCode);
+    const { data: allSessions, error: allSessionsError } = await supabase
+      .from('quiz_sessions')
+      .select('session_code, status, creator_id')
+      .order('created_at', { ascending: false })
+      .limit(10);
+    
+    if (allSessionsError) {
+      console.error('Error getting all sessions:', allSessionsError);
+    } else {
       console.log('Available sessions:', allSessions);
-      
-      // Try a case-insensitive search as a fallback
-      const { data: fuzzyMatch } = await supabase
-        .from('quiz_sessions')
-        .select('*')
-        .ilike('session_code', `%${cleanCode}%`)
-        .limit(1)
-        .maybeSingle();
-        
-      if (fuzzyMatch) {
-        console.log('Found fuzzy match session:', fuzzyMatch);
-        return fuzzyMatch as QuizSession;
+      console.log('Session codes comparison:');
+      if (allSessions && allSessions.length > 0) {
+        allSessions.forEach(session => {
+          console.log(`DB session code: "${session.session_code}" vs. Requested: "${cleanCode}"`);
+          console.log(`- Exact match: ${session.session_code === cleanCode}`);
+          console.log(`- Lowercase comparison: ${session.session_code.toLowerCase() === cleanCode.toLowerCase()}`);
+          console.log(`- Normalized DB code: "${normalizeSessionCode(session.session_code)}"`);
+        });
+      } else {
+        console.log('No active sessions found in the database');
       }
-      
-      return null;
     }
     
-    console.log('Found session:', data);
-    return data as QuizSession;
+    // As a last resort, try a partial match search
+    const { data: partialMatch, error: partialMatchError } = await supabase
+      .from('quiz_sessions')
+      .select('*')
+      .ilike('session_code', `%${cleanCode}%`)
+      .limit(1)
+      .maybeSingle();
+      
+    if (partialMatchError) {
+      console.error('Error on partial match search:', partialMatchError);
+    }
+    
+    if (partialMatch) {
+      console.log('Found partial match session:', partialMatch);
+      console.log(`WARNING: Using partial match. Requested: "${cleanCode}", Found: "${partialMatch.session_code}"`);
+      return partialMatch as QuizSession;
+    }
+    
+    return null;
   } catch (error) {
     console.error('Failed to get quiz session:', error);
     return null;

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Users, LogIn } from 'lucide-react';
+import { Users, LogIn, AlertCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -26,12 +26,17 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
   const [showDialog, setShowDialog] = useState(false);
   const [sessionCode, setSessionCode] = useState(initialCode);
   const [username, setUsername] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
 
   const handleJoinSession = async () => {
+    // Reset any previous error messages
+    setErrorMessage(null);
+    
     if (!sessionCode.trim()) {
+      setErrorMessage('Session code is required');
       toast({
         title: 'Session code required',
         description: 'Please enter a valid session code',
@@ -41,6 +46,7 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
     }
 
     if (!username.trim()) {
+      setErrorMessage('Username is required');
       toast({
         title: 'Username required',
         description: 'Please enter a username',
@@ -55,6 +61,20 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
       const normalizedCode = normalizeSessionCode(sessionCode);
       console.log('Attempting to join session with code:', normalizedCode);
       
+      // First check if session exists
+      const sessionExists = await getQuizSessionByCode(normalizedCode);
+      if (!sessionExists) {
+        setErrorMessage(`Session with code "${normalizedCode}" not found. Please check the code and try again.`);
+        toast({
+          title: 'Session not found',
+          description: 'Could not find a quiz session with that code. Please check the code and try again.',
+          variant: 'destructive',
+        });
+        setIsJoining(false);
+        return;
+      }
+      
+      // If session exists, try to join
       const result = await joinQuizSession(
         normalizedCode,
         username.trim(),
@@ -70,14 +90,16 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
         // Use the session code from the result to ensure we have the correct format
         navigate(`/quiz/multiplayer/player/${result.session.session_code}`);
       } else {
+        setErrorMessage('Failed to join quiz session. The session may have already started or ended.');
         toast({
-          title: 'Session not found',
-          description: 'Could not find a quiz session with that code. Please check the code and try again.',
+          title: 'Cannot join session',
+          description: 'The session may have already started or ended',
           variant: 'destructive',
         });
       }
     } catch (error) {
       console.error('Error joining session:', error);
+      setErrorMessage(`Error: ${error instanceof Error ? error.message : 'Something went wrong'}`);
       toast({
         title: 'Error',
         description: 'Something went wrong',
@@ -93,6 +115,8 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
     const value = e.target.value;
     // Only allow alphanumeric characters and auto convert to uppercase
     setSessionCode(value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase());
+    // Clear error message when user types
+    if (errorMessage) setErrorMessage(null);
   };
 
   return (
@@ -126,6 +150,9 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
                 className="uppercase"
                 maxLength={6}
               />
+              <p className="text-xs text-muted-foreground">
+                The 6-digit code provided by the quiz host
+              </p>
             </div>
             
             <div className="grid gap-2">
@@ -133,11 +160,21 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
               <Input
                 id="username"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  if (errorMessage) setErrorMessage(null);
+                }}
                 placeholder="Enter a username"
                 maxLength={20}
               />
             </div>
+            
+            {errorMessage && (
+              <div className="bg-destructive/15 p-3 rounded-md flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-destructive">{errorMessage}</p>
+              </div>
+            )}
           </div>
           
           <DialogFooter className="sm:justify-between">

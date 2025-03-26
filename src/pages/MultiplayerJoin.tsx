@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LogIn, Users } from 'lucide-react';
+import { LogIn, Users, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,6 +16,7 @@ const MultiplayerJoin = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [sessionExists, setSessionExists] = useState(false);
   const [normalizedCode, setNormalizedCode] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -30,6 +30,8 @@ const MultiplayerJoin = () => {
       
       try {
         setIsLoading(true);
+        setErrorMessage(null);
+        
         // Clean the session code
         const cleanCode = normalizeSessionCode(sessionCode);
         setNormalizedCode(cleanCode);
@@ -58,21 +60,25 @@ const MultiplayerJoin = () => {
           }
         } else {
           console.log('No session found with code:', cleanCode);
+          setErrorMessage(`Could not find a session with code: ${cleanCode}. The session may have been deleted or the code is incorrect.`);
           toast({
             title: 'Invalid session',
             description: `Could not find a session with code: ${cleanCode}`,
             variant: 'destructive',
           });
-          navigate('/');
+          
+          // Keep the user on the page but show the error
+          setSessionExists(false);
         }
       } catch (error) {
         console.error('Error checking session:', error);
+        setErrorMessage(`Error checking session: ${error instanceof Error ? error.message : 'Unknown error'}`);
         toast({
           title: 'Error',
           description: 'Failed to check session',
           variant: 'destructive',
         });
-        navigate('/');
+        setSessionExists(false);
       } finally {
         setIsLoading(false);
       }
@@ -96,7 +102,33 @@ const MultiplayerJoin = () => {
     }
     
     setIsJoining(true);
+    setErrorMessage(null);
+    
     try {
+      // Double check that the session still exists and is in waiting status
+      const sessionCheck = await getQuizSessionByCode(normalizedCode);
+      if (!sessionCheck) {
+        setErrorMessage(`Session with code ${normalizedCode} no longer exists. It may have been deleted.`);
+        toast({
+          title: 'Session not found',
+          description: 'The session no longer exists',
+          variant: 'destructive',
+        });
+        setIsJoining(false);
+        return;
+      }
+      
+      if (sessionCheck.status !== 'waiting') {
+        setErrorMessage(`Session is ${sessionCheck.status}. You can only join sessions that are in waiting status.`);
+        toast({
+          title: 'Cannot join session',
+          description: `The session is ${sessionCheck.status}`,
+          variant: 'destructive',
+        });
+        setIsJoining(false);
+        return;
+      }
+      
       const result = await joinQuizSession(
         normalizedCode,
         username.trim(),
@@ -112,6 +144,7 @@ const MultiplayerJoin = () => {
         // Use the session code from the result to ensure we have the correct format
         navigate(`/quiz/multiplayer/player/${result.session.session_code}`);
       } else {
+        setErrorMessage('Failed to join session. Please try again or contact the quiz host.');
         toast({
           title: 'Error',
           description: 'Failed to join quiz session',
@@ -120,6 +153,7 @@ const MultiplayerJoin = () => {
       }
     } catch (error) {
       console.error('Error joining session:', error);
+      setErrorMessage(`Error joining session: ${error instanceof Error ? error.message : 'Unknown error'}`);
       toast({
         title: 'Error',
         description: 'Something went wrong',
@@ -146,7 +180,22 @@ const MultiplayerJoin = () => {
     return (
       <div className="max-w-2xl mx-auto text-center py-12">
         <h2 className="text-2xl font-bold mb-4">Session not found</h2>
-        <p className="text-muted-foreground mb-8">The quiz session you're looking for doesn't exist</p>
+        <p className="text-muted-foreground mb-8">
+          {errorMessage || "The quiz session you're looking for doesn't exist"}
+        </p>
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8 text-amber-800 text-sm max-w-md mx-auto">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-500" />
+            <div>
+              <p className="font-medium mb-1">Troubleshooting tips:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Check if you've entered the correct session code</li>
+                <li>Ask the host to verify the session is still active</li>
+                <li>Try joining using the JoinQuizSession component from the homepage</li>
+              </ul>
+            </div>
+          </div>
+        </div>
         <Button onClick={() => navigate('/')}>Go Home</Button>
       </div>
     );
@@ -188,6 +237,13 @@ const MultiplayerJoin = () => {
               This is how other players will see you in the leaderboard
             </p>
           </div>
+          
+          {errorMessage && (
+            <div className="bg-destructive/15 p-3 rounded-md flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-destructive">{errorMessage}</p>
+            </div>
+          )}
           
           <Button
             onClick={handleJoinSession}
