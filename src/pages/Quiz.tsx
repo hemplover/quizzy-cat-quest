@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -9,12 +8,69 @@ import {
   Timer, 
   HelpCircle,
   Check,
-  X
+  X,
+  Users
 } from 'lucide-react';
 import CatTutor from '@/components/CatTutor';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { gradeQuiz } from '@/services/quizService';
+import CreateQuizSession from '@/components/quiz/CreateQuizSession';
+import JoinQuizSession from '@/components/quiz/JoinQuizSession';
+
+export interface QuizQuestion {
+  id?: number;
+  type?: string;
+  tipo?: string;
+  question?: string;
+  domanda?: string;
+  options?: string[];
+  opzioni?: string[];
+  risposta_corretta?: string | boolean;
+  correct_answer?: string | boolean;
+  spiegazione?: string;
+  explanation?: string;
+}
+
+export interface GeneratedQuiz {
+  quiz: QuizQuestion[];
+}
+
+export interface QuizResults {
+  risultati: Array<{
+    domanda: string;
+    risposta_utente: string | number;
+    corretto: boolean | string;
+    punteggio: number;
+    spiegazione: string;
+  }>;
+  punteggio_totale: number;
+  feedback_generale?: string;
+  total_points?: number;   // Add this property
+  max_points?: number;     // Add this property
+}
+
+export interface QuizSettings {
+  difficulty: string;
+  questionTypes: string[];
+  numQuestions: number;
+  model?: string;
+  previousQuizzes?: number;
+}
+
+export interface ProcessedFile {
+  file: File;
+  text?: string;
+}
+
+export interface QuizData {
+  source: string;
+  difficulty: string;
+  questionTypes: string[];
+  numQuestions: number;
+  createdAt: string;
+  model?: string;
+}
 
 interface BaseQuestion {
   id: number;
@@ -128,6 +184,7 @@ const mockQuestions: Question[] = [
 
 const Quiz = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -142,6 +199,7 @@ const Quiz = () => {
   const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
   const [isGrading, setIsGrading] = useState(false);
   const [aiGradingResults, setAiGradingResults] = useState<any>(null);
+  const [quizId, setQuizId] = useState<string | null>(null);
   
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -153,6 +211,12 @@ const Quiz = () => {
           toast.error("No quiz data found. Please create a quiz first.");
           navigate('/upload');
           return;
+        }
+        
+        const quizData = JSON.parse(quizDataStr);
+        // Store the quiz ID if it exists in the quiz data
+        if (quizData.quizId) {
+          setQuizId(quizData.quizId);
         }
         
         const storedQuestionsStr = sessionStorage.getItem('quizQuestions');
@@ -443,6 +507,16 @@ const Quiz = () => {
           >
             View Your Progress
           </button>
+          
+          {quizId && !isGrading && (
+            <div className="mt-6 pt-6 border-t">
+              <h3 className="text-lg font-medium mb-4">Want to challenge your friends?</h3>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <CreateQuizSession quizId={quizId} />
+                <JoinQuizSession />
+              </div>
+            </div>
+          )}
         </div>
         
         {aiGradingResults && (

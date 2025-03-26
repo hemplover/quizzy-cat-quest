@@ -50,6 +50,50 @@ export type Database = {
           },
         ]
       }
+      quiz_sessions: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          creator_id: string | null
+          id: string
+          quiz_id: string
+          session_code: string
+          settings: Json | null
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          creator_id?: string | null
+          id?: string
+          quiz_id: string
+          session_code: string
+          settings?: Json | null
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          creator_id?: string | null
+          id?: string
+          quiz_id?: string
+          session_code?: string
+          settings?: Json | null
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_sessions_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quizzes: {
         Row: {
           created_at: string
@@ -97,6 +141,47 @@ export type Database = {
             columns: ["subject_id"]
             isOneToOne: false
             referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_participants: {
+        Row: {
+          answers: Json | null
+          completed: boolean | null
+          id: string
+          joined_at: string
+          score: number | null
+          session_id: string
+          user_id: string | null
+          username: string
+        }
+        Insert: {
+          answers?: Json | null
+          completed?: boolean | null
+          id?: string
+          joined_at?: string
+          score?: number | null
+          session_id: string
+          user_id?: string | null
+          username: string
+        }
+        Update: {
+          answers?: Json | null
+          completed?: boolean | null
+          id?: string
+          joined_at?: string
+          score?: number | null
+          session_id?: string
+          user_id?: string | null
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_sessions"
             referencedColumns: ["id"]
           },
         ]

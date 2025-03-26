@@ -17,6 +17,10 @@ import { AuthProvider } from "./contexts/AuthContext";
 import AuthRequired from "./components/AuthRequired";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
+import MultiplayerHost from "./pages/MultiplayerHost";
+import MultiplayerPlayer from "./pages/MultiplayerPlayer";
+import MultiplayerSession from "./pages/MultiplayerSession";
+import MultiplayerJoin from "./pages/MultiplayerJoin";
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient({
@@ -57,6 +61,40 @@ const App = () => (
               element={
                 <Layout>
                   <Quiz />
+                </Layout>
+              } 
+            />
+            <Route 
+              path="/quiz/multiplayer/host/:sessionCode" 
+              element={
+                <Layout>
+                  <AuthRequired>
+                    <MultiplayerHost />
+                  </AuthRequired>
+                </Layout>
+              } 
+            />
+            <Route 
+              path="/quiz/multiplayer/player/:sessionCode" 
+              element={
+                <Layout>
+                  <MultiplayerPlayer />
+                </Layout>
+              } 
+            />
+            <Route 
+              path="/quiz/multiplayer/session/:sessionCode" 
+              element={
+                <Layout>
+                  <MultiplayerSession />
+                </Layout>
+              } 
+            />
+            <Route 
+              path="/quiz/multiplayer/join/:sessionCode" 
+              element={
+                <Layout>
+                  <MultiplayerJoin />
                 </Layout>
               } 
             />

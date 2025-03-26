@@ -50,6 +50,7 @@
     "jszip": "^3.10.1",
     "lucide-react": "^0.462.0",
     "mammoth": "^1.6.0",
+    "nanoid": "^5.1.5",
     "next-themes": "^0.3.0",
     "pdfjs-dist": "^3.9.179",
     "pptxgenjs": "^3.12.0",
