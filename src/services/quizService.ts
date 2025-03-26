@@ -1,6 +1,95 @@
+
 import { toast } from 'sonner';
 import { QuizQuestion, GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
 import { supabase } from '@/integrations/supabase/client';
+
+// Get all quizzes for the current user
+export const getQuizzes = async () => {
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    const userId = session.session?.user?.id;
+    
+    if (!userId) {
+      console.log('User not authenticated, returning demo quizzes');
+      // Return demo quizzes for non-authenticated users
+      return [
+        {
+          id: 'demo1',
+          title: 'Demo Quiz: Science Basics',
+          questions: Array(5).fill(null).map((_, i) => ({
+            id: i,
+            question: `Demo question ${i+1}`,
+            type: 'multiple-choice'
+          })),
+          created_at: new Date().toISOString()
+        },
+        {
+          id: 'demo2',
+          title: 'Demo Quiz: History 101',
+          questions: Array(7).fill(null).map((_, i) => ({
+            id: i,
+            question: `Demo history question ${i+1}`,
+            type: 'multiple-choice'
+          })),
+          created_at: new Date().toISOString()
+        }
+      ];
+    }
+    
+    // Get user's quizzes from the database
+    const { data, error } = await supabase
+      .from('quizzes')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching quizzes:', error);
+      throw new Error('Failed to fetch quizzes');
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error('Error in getQuizzes:', error);
+    return [];
+  }
+};
+
+// Get a single quiz by ID
+export const getQuiz = async (quizId: string) => {
+  try {
+    // For demo quizzes
+    if (quizId.startsWith('demo')) {
+      return {
+        id: quizId,
+        title: quizId === 'demo1' ? 'Demo Quiz: Science Basics' : 'Demo Quiz: History 101',
+        questions: Array(5).fill(null).map((_, i) => ({
+          id: i,
+          question: `Demo question ${i+1}`,
+          type: 'multiple-choice',
+          options: ['Option A', 'Option B', 'Option C', 'Option D'],
+          correctAnswer: 0
+        }))
+      };
+    }
+    
+    const { data, error } = await supabase
+      .from('quizzes')
+      .select('*')
+      .eq('id', quizId)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching quiz:', error);
+      throw new Error('Failed to fetch quiz');
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error in getQuiz:', error);
+    throw error;
+  }
+};
 
 // Transform generated questions to our app format with improved reliability
 export const transformQuizQuestions = (generatedQuiz: GeneratedQuiz) => {
