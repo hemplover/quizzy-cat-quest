@@ -1,6 +1,6 @@
 
 import React from "react";
-import { toast as sonnerToast, ToastT, ToastOptions as SonnerToastOptions } from "sonner";
+import { toast as sonnerToast } from "sonner";
 
 const TOAST_LIMIT = 5;
 const TOAST_REMOVE_DELAY = 1000000;
@@ -136,6 +136,11 @@ function dispatch(action: Action) {
 
 type ToastProps = Omit<ToasterToast, "id">;
 
+interface SonnerToastOptions {
+  description?: React.ReactNode;
+  [key: string]: any;
+}
+
 function toast(props: ToastProps) {
   const id = genId();
 
@@ -143,7 +148,7 @@ function toast(props: ToastProps) {
   sonnerToast(props.title as string, {
     description: props.description,
     ...props,
-  });
+  } as SonnerToastOptions);
 
   return id;
 }
