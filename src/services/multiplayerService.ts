@@ -15,20 +15,33 @@ export const createQuizSession = async (quizId: string, creatorId: string | null
   try {
     const sessionCode = generateSessionCode();
     
+    // Check if the quiz exists first
+    const { data: quizData, error: quizError } = await supabase
+      .from('quizzes')
+      .select('id')
+      .eq('id', quizId)
+      .single();
+    
+    if (quizError || !quizData) {
+      console.error('Error finding quiz:', quizError);
+      throw new Error(`Quiz with ID ${quizId} not found`);
+    }
+    
     const { data, error } = await supabase
       .from('quiz_sessions')
       .insert({
         quiz_id: quizId,
         creator_id: creatorId,
         session_code: sessionCode,
-        status: 'waiting'
+        status: 'waiting',
+        settings: {}
       })
       .select('*')
       .single();
     
     if (error) {
       console.error('Error creating quiz session:', error);
-      return null;
+      throw new Error(`Failed to create quiz session: ${error.message}`);
     }
     
     return data as QuizSession;

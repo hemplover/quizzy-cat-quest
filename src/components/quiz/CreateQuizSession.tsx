@@ -28,6 +28,15 @@ const CreateQuizSession: React.FC<CreateQuizSessionProps> = ({ quizId, onSuccess
   const { user } = useAuth();
 
   const handleCreateSession = async () => {
+    if (!quizId) {
+      toast({
+        title: 'Error',
+        description: 'Invalid quiz ID',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     setIsCreating(true);
     try {
       const session = await createQuizSession(quizId, user?.id || null);
@@ -54,7 +63,7 @@ const CreateQuizSession: React.FC<CreateQuizSessionProps> = ({ quizId, onSuccess
       console.error('Error creating session:', error);
       toast({
         title: 'Error',
-        description: 'Something went wrong',
+        description: error instanceof Error ? error.message : 'Something went wrong',
         variant: 'destructive',
       });
     } finally {
