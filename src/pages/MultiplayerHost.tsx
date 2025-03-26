@@ -1,7 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 import { 
   Users, 
   PlayCircle, 
@@ -21,6 +19,7 @@ import {
 } from '@/services/multiplayerService';
 import { QuizSession, SessionParticipant } from '@/types/multiplayer';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import CatTutor from '@/components/CatTutor';
 import { QuizQuestion } from '@/types/quiz';
@@ -35,6 +34,7 @@ const MultiplayerHost = () => {
   const [copySuccess, setCopySuccess] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   // Get the session and participants data
   useEffect(() => {
@@ -46,7 +46,11 @@ const MultiplayerHost = () => {
         const sessionData = await getQuizSessionByCode(sessionCode);
         
         if (!sessionData) {
-          toast.error('Session not found');
+          toast({
+            title: 'Session not found',
+            description: 'The session could not be found',
+            variant: 'destructive',
+          });
           navigate('/');
           return;
         }
@@ -67,14 +71,18 @@ const MultiplayerHost = () => {
         setQuestions(questionsData);
       } catch (error) {
         console.error('Error fetching session data:', error);
-        toast.error('Failed to load session');
+        toast({
+          title: 'Error',
+          description: 'Failed to load session',
+          variant: 'destructive',
+        });
       } finally {
         setIsLoading(false);
       }
     };
     
     fetchSessionData();
-  }, [sessionCode, navigate]);
+  }, [sessionCode, navigate, toast]);
   
   // Subscribe to real-time updates
   useEffect(() => {
@@ -102,7 +110,11 @@ const MultiplayerHost = () => {
     if (!session) return;
     
     if (participants.length === 0) {
-      toast.error('Wait for at least one participant to join');
+      toast({
+        title: 'No participants',
+        description: 'Wait for at least one participant to join',
+        variant: 'destructive',
+      });
       return;
     }
     
@@ -111,14 +123,25 @@ const MultiplayerHost = () => {
       const success = await startQuizSession(session.id);
       
       if (success) {
-        toast.success('Quiz started!');
+        toast({
+          title: 'Quiz started!',
+          description: 'The quiz has been started successfully',
+        });
         navigate(`/quiz/multiplayer/session/${sessionCode}`);
       } else {
-        toast.error('Failed to start quiz');
+        toast({
+          title: 'Error',
+          description: 'Failed to start quiz',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error starting quiz:', error);
-      toast.error('Something went wrong');
+      toast({
+        title: 'Error',
+        description: 'Something went wrong',
+        variant: 'destructive',
+      });
     } finally {
       setIsStarting(false);
     }
@@ -129,7 +152,10 @@ const MultiplayerHost = () => {
     
     navigator.clipboard.writeText(sessionCode);
     setCopySuccess(true);
-    toast.success('Session code copied to clipboard');
+    toast({
+      title: 'Copied!',
+      description: 'Session code copied to clipboard',
+    });
     
     setTimeout(() => {
       setCopySuccess(false);
@@ -150,7 +176,10 @@ const MultiplayerHost = () => {
       .catch((error) => console.error('Error sharing:', error));
     } else {
       navigator.clipboard.writeText(sessionUrl);
-      toast.success('Share link copied to clipboard');
+      toast({
+        title: 'Copied!',
+        description: 'Share link copied to clipboard',
+      });
     }
   };
   
