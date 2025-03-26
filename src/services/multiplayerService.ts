@@ -1,13 +1,12 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { QuizSession, SessionParticipant } from "@/types/multiplayer";
 import { QuizQuestion } from "@/types/quiz";
 import { nanoid } from "nanoid";
 
-// Generate a unique, readable session code
+// Generate a unique, readable session code without any special characters
 export const generateSessionCode = (): string => {
-  // Generate a 6-character alphanumeric code (uppercase only)
-  return nanoid(6).replace(/[^A-Z0-9]/g, 'A').toUpperCase();
+  // Generate a 6-character alphanumeric code (uppercase only, no special chars)
+  return nanoid(6).replace(/[^A-Z0-9]/g, '0').toUpperCase();
 };
 
 // Normalize a session code by removing unwanted characters and formatting properly
@@ -21,7 +20,7 @@ export const normalizeSessionCode = (code: string): string => {
 export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSession | null> => {
   try {
     if (!sessionCode) {
-      console.error('No session code provided');
+      console.error('[ERROR] No session code provided');
       return null;
     }
 
@@ -29,7 +28,21 @@ export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSes
     const normalizedCode = normalizeSessionCode(sessionCode);
     console.log(`[DEBUG] Looking for session with normalized code: "${normalizedCode}"`);
     
-    // Get all sessions for debugging
+    // First try: Direct exact match
+    const { data: exactMatchData, error: exactMatchError } = await supabase
+      .from('quiz_sessions')
+      .select('*')
+      .eq('session_code', normalizedCode)
+      .maybeSingle();
+    
+    if (exactMatchError) {
+      console.error('[ERROR] Failed with exact match query:', exactMatchError);
+    } else if (exactMatchData) {
+      console.log(`[DEBUG] Found exact match for code: "${normalizedCode}"`);
+      return exactMatchData as QuizSession;
+    }
+    
+    // Second try: Get all sessions and compare
     const { data: allSessions, error: allSessionsError } = await supabase
       .from('quiz_sessions')
       .select('*');
@@ -48,18 +61,6 @@ export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSes
         const dbNormalized = normalizeSessionCode(s.session_code);
         console.log(`[DEBUG] - ID: ${s.id}, Code: "${s.session_code}", Normalized: "${dbNormalized}", Status: ${s.status}`);
       });
-      
-      // Exact direct match by session_code (case sensitive)
-      const exactMatch = allSessions.find(
-        s => s.session_code === normalizedCode
-      );
-      
-      if (exactMatch) {
-        console.log(`[DEBUG] Found exact match for code: "${normalizedCode}"`);
-        return exactMatch as QuizSession;
-      }
-      
-      console.log(`[DEBUG] No exact match found, trying normalized comparison`);
       
       // Try with normalized code comparison
       const normalizedMatch = allSessions.find(
@@ -80,22 +81,6 @@ export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSes
       console.log('[DEBUG] No sessions found in the database');
     }
     
-    // Try a direct query as a last resort
-    const { data: directQueryData, error: directQueryError } = await supabase
-      .from('quiz_sessions')
-      .select('*')
-      .eq('session_code', normalizedCode)
-      .maybeSingle();
-    
-    if (directQueryError) {
-      console.error('[ERROR] Direct query error:', directQueryError);
-    } else if (directQueryData) {
-      console.log(`[DEBUG] Direct query found session: ${directQueryData.id}`);
-      return directQueryData as QuizSession;
-    } else {
-      console.log('[DEBUG] Direct query found no results');
-    }
-    
     return null;
   } catch (error) {
     console.error('[ERROR] Failed to get quiz session:', error);
@@ -103,10 +88,10 @@ export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSes
   }
 };
 
-// Create a new quiz session
+// Create a new quiz session with a consistent code format
 export const createQuizSession = async (quizId: string, creatorId: string | null): Promise<QuizSession | null> => {
   try {
-    // Generate a session code without any special characters
+    // Generate a clean 6-character session code without any special characters
     const sessionCode = generateSessionCode();
     console.log(`[DEBUG] Creating new session with code: "${sessionCode}"`);
     
@@ -122,13 +107,13 @@ export const createQuizSession = async (quizId: string, creatorId: string | null
       throw new Error(`Quiz with ID ${quizId} not found`);
     }
     
-    // Create the quiz session
+    // Create the quiz session with a clean code (no hyphens or special chars)
     const { data, error } = await supabase
       .from('quiz_sessions')
       .insert({
         quiz_id: quizId,
         creator_id: creatorId,
-        session_code: sessionCode,
+        session_code: sessionCode, // Using clean code format
         status: 'waiting',
         settings: {}
       })
@@ -142,7 +127,7 @@ export const createQuizSession = async (quizId: string, creatorId: string | null
     
     console.log(`[DEBUG] Created new quiz session with ID: ${data.id}, code: "${data.session_code}"`);
     
-    // Verify the session was created properly
+    // Verify the session can be retrieved properly
     const verifySession = await getQuizSessionByCode(sessionCode);
     if (verifySession) {
       console.log(`[DEBUG] Verified session can be retrieved with code: "${sessionCode}"`);
