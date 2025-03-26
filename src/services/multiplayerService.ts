@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { QuizSession, SessionParticipant } from "@/types/multiplayer";
 import { QuizQuestion } from "@/types/quiz";
@@ -53,8 +54,14 @@ export const createQuizSession = async (quizId: string, creatorId: string | null
 };
 
 // Normalize a session code by removing unwanted characters and formatting properly
-const normalizeSessionCode = (code: string): string => {
+export const normalizeSessionCode = (code: string): string => {
   // Remove quotes, spaces, hyphens and any non-alphanumeric characters
+  // First, check if the code has quotes around it (which can happen from logs/debugging)
+  if (code.startsWith('"') && code.endsWith('"')) {
+    code = code.substring(1, code.length - 1);
+  }
+  
+  // Then remove any non-alphanumeric characters
   return code.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
 };
 
@@ -124,7 +131,7 @@ export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSes
     const cleanCode = normalizeSessionCode(sessionCode);
     console.log('Getting quiz session with code:', cleanCode);
     
-    // Try with exact match
+    // Query with exact match on the normalized code
     const { data, error } = await supabase
       .from('quiz_sessions')
       .select('*')
@@ -138,13 +145,36 @@ export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSes
     
     if (!data) {
       console.log('No session found with code:', cleanCode);
-      // List all sessions for debugging
+      
+      // If exact match fails, try a more flexible matching approach 
+      // (for backward compatibility with existing sessions)
       const { data: allSessions } = await supabase
         .from('quiz_sessions')
         .select('session_code, status')
         .limit(10);
       
       console.log('Available sessions:', allSessions);
+      
+      // Try a case-insensitive contains approach as a fallback
+      if (allSessions && allSessions.length > 0) {
+        for (const session of allSessions) {
+          const normalizedStoredCode = normalizeSessionCode(session.session_code);
+          if (normalizedStoredCode === cleanCode) {
+            // If we found a match after normalization, get the full session data
+            const { data: matchedSession } = await supabase
+              .from('quiz_sessions')
+              .select('*')
+              .eq('session_code', session.session_code) 
+              .single();
+            
+            if (matchedSession) {
+              console.log('Found session after normalization:', matchedSession);
+              return matchedSession as QuizSession;
+            }
+          }
+        }
+      }
+      
       return null;
     }
     

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { getQuizSessionByCode, joinQuizSession } from '@/services/multiplayerService';
+import { getQuizSessionByCode, joinQuizSession, normalizeSessionCode } from '@/services/multiplayerService';
 import CatTutor from '@/components/CatTutor';
 
 const MultiplayerJoin = () => {
@@ -31,7 +31,15 @@ const MultiplayerJoin = () => {
         setIsLoading(true);
         console.log('Checking session with code:', sessionCode);
         
-        const session = await getQuizSessionByCode(sessionCode);
+        // Use the session as-is first
+        let formattedCode = sessionCode;
+        let session = await getQuizSessionByCode(formattedCode);
+        
+        if (!session) {
+          // If it failed, try to normalize the code
+          console.log('Session not found with raw code, trying normalized code');
+          session = await getQuizSessionByCode(sessionCode);
+        }
         
         if (session) {
           console.log('Session found:', session);
@@ -163,7 +171,7 @@ const MultiplayerJoin = () => {
               <h2 className="text-xl font-medium">Session Details</h2>
             </div>
             <div className="px-3 py-1 bg-cat/10 text-cat rounded-full font-medium">
-              {sessionCode?.toUpperCase()}
+              {sessionCode}
             </div>
           </div>
         </div>

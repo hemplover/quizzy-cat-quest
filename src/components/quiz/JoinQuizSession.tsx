@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { joinQuizSession, getQuizSessionByCode } from '@/services/multiplayerService';
@@ -65,7 +66,7 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
           description: `You've joined the quiz as ${username}`,
         });
         
-        // Use the normalized code from the result
+        // Use the session code from the result to ensure we have the correct format
         navigate(`/quiz/multiplayer/player/${result.session.session_code}`);
       } else {
         toast({
@@ -84,6 +85,13 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
     } finally {
       setIsJoining(false);
     }
+  };
+
+  // Handle input change for session code 
+  const handleSessionCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Only allow alphanumeric characters and auto convert to uppercase
+    setSessionCode(value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase());
   };
 
   return (
@@ -112,7 +120,7 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
               <Input
                 id="session-code"
                 value={sessionCode}
-                onChange={(e) => setSessionCode(e.target.value)}
+                onChange={handleSessionCodeChange}
                 placeholder="Enter 6-character code"
                 className="uppercase"
                 maxLength={6}
