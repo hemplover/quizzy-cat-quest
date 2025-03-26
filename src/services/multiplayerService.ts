@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { QuizSession, SessionParticipant } from "@/types/multiplayer";
 import { QuizQuestion } from "@/types/quiz";
@@ -59,15 +60,15 @@ export const joinQuizSession = async (
 ): Promise<{ session: QuizSession; participant: SessionParticipant } | null> => {
   try {
     // First, get the session by code
-    const { data: sessionData, error: sessionError } = await supabase
-      .from('quiz_sessions')
-      .select('*')
-      .eq('session_code', sessionCode)
-      .eq('status', 'waiting')
-      .single();
+    const session = await getQuizSessionByCode(sessionCode);
     
-    if (sessionError || !sessionData) {
-      console.error('Error finding quiz session:', sessionError);
+    if (!session) {
+      console.error(`No session found with code: ${sessionCode}`);
+      return null;
+    }
+    
+    if (session.status !== 'waiting') {
+      console.error(`Session with code ${sessionCode} is not in waiting status, current status: ${session.status}`);
       return null;
     }
     
@@ -75,7 +76,7 @@ export const joinQuizSession = async (
     const { data: participantData, error: participantError } = await supabase
       .from('session_participants')
       .insert({
-        session_id: sessionData.id,
+        session_id: session.id,
         user_id: userId,
         username: username,
         score: 0,
@@ -91,7 +92,7 @@ export const joinQuizSession = async (
     }
     
     return {
-      session: sessionData as QuizSession,
+      session: session,
       participant: participantData as SessionParticipant
     };
   } catch (error) {
@@ -108,14 +109,27 @@ export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSes
       return null;
     }
 
+    sessionCode = sessionCode.trim().toUpperCase();
     console.log('Getting quiz session with code:', sessionCode);
     
-    // Use ilike for case-insensitive comparison to be more forgiving with session codes
-    const { data, error } = await supabase
+    // First try with exact match
+    let { data, error } = await supabase
       .from('quiz_sessions')
       .select('*')
-      .ilike('session_code', sessionCode)
+      .eq('session_code', sessionCode)
       .maybeSingle();
+    
+    // If exact match fails, try with case-insensitive match
+    if (!data && !error) {
+      const { data: ilikeData, error: ilikeError } = await supabase
+        .from('quiz_sessions')
+        .select('*')
+        .ilike('session_code', sessionCode)
+        .maybeSingle();
+      
+      data = ilikeData;
+      error = ilikeError;
+    }
     
     if (error) {
       console.error('Error getting quiz session:', error);

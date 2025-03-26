@@ -30,7 +30,8 @@ const MultiplayerJoin = () => {
       try {
         setIsLoading(true);
         console.log('Checking session with code:', sessionCode);
-        const session = await getQuizSessionByCode(sessionCode);
+        const formattedCode = sessionCode.trim().toUpperCase();
+        const session = await getQuizSessionByCode(formattedCode);
         
         if (session) {
           console.log('Session found:', session);
@@ -38,7 +39,7 @@ const MultiplayerJoin = () => {
           
           // If the session is already active or completed, redirect to the relevant page
           if (session.status === 'active') {
-            navigate(`/quiz/multiplayer/session/${sessionCode}`);
+            navigate(`/quiz/multiplayer/session/${formattedCode}`);
             return;
           } else if (session.status === 'completed') {
             toast({
@@ -90,8 +91,9 @@ const MultiplayerJoin = () => {
     
     setIsJoining(true);
     try {
+      const formattedCode = sessionCode.trim().toUpperCase();
       const result = await joinQuizSession(
-        sessionCode,
+        formattedCode,
         username.trim(),
         user?.id || null
       );
@@ -102,7 +104,7 @@ const MultiplayerJoin = () => {
           description: `You've joined the quiz as ${username}`,
         });
         
-        navigate(`/quiz/multiplayer/player/${sessionCode}`);
+        navigate(`/quiz/multiplayer/player/${formattedCode}`);
       } else {
         toast({
           title: 'Error',
@@ -161,7 +163,7 @@ const MultiplayerJoin = () => {
               <h2 className="text-xl font-medium">Session Details</h2>
             </div>
             <div className="px-3 py-1 bg-cat/10 text-cat rounded-full font-medium">
-              {sessionCode}
+              {sessionCode?.toUpperCase()}
             </div>
           </div>
         </div>

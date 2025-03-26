@@ -53,6 +53,8 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
     try {
       // First check if the session exists
       const formattedCode = sessionCode.trim().toUpperCase();
+      console.log('Attempting to join session with code:', formattedCode);
+      
       const session = await getQuizSessionByCode(formattedCode);
       
       if (!session) {
