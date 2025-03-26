@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useLanguage } from '@/i18n/LanguageContext';
 import CatTutor from '@/components/CatTutor';
@@ -22,76 +21,65 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
 }) => {
   const { t } = useLanguage();
   
-  // Calculate the average score with a simplified, more robust approach
   const calculateOverallAverageScore = () => {
     console.log('Calculating overall average score with subjects:', subjects);
     
-    // Initial check for empty subjects array
     if (!subjects || subjects.length === 0) {
       console.log('No subjects found');
       return '-';
     }
     
-    // Track total points across all quizzes in all subjects
-    let totalPointsEarned = 0;
+    let totalPoints = 0;
     let totalMaxPoints = 0;
     let quizCount = 0;
     
-    // Process each subject to find quizzes with results
     subjects.forEach(subject => {
-      console.log(`Processing subject ${subject.name}:`, subject);
+      if (!subject.quizzes || !Array.isArray(subject.quizzes)) {
+        console.log(`Subject ${subject.name} has no quizzes array`);
+        return;
+      }
       
-      // Look for quizzes directly within the subject if available
-      if (subject.quizzes && Array.isArray(subject.quizzes)) {
-        subject.quizzes.forEach(quiz => {
-          if (quiz.results) {
-            quizCount++;
+      subject.quizzes.forEach(quiz => {
+        if (!quiz || !quiz.results) return;
+        
+        console.log(`Found quiz with results:`, quiz.id, quiz.results);
+        quizCount++;
+        
+        if (quiz.results.total_points !== undefined && quiz.results.max_points !== undefined) {
+          totalPoints += quiz.results.total_points;
+          totalMaxPoints += quiz.results.max_points;
+          console.log(`Added points: ${quiz.results.total_points}/${quiz.results.max_points}`);
+        }
+        else if (quiz.results.punteggio_totale !== undefined) {
+          if (quiz.results.risultati && Array.isArray(quiz.results.risultati)) {
+            quiz.results.risultati.forEach(result => {
+              if (result.punteggio !== undefined) {
+                totalPoints += result.punteggio;
+                totalMaxPoints += (result.tipo === 'open-ended' || result.type === 'open-ended') ? 5 : 1;
+              }
+            });
+            console.log(`Added points from risultati: ${totalPoints}`);
+          } 
+          else if (quiz.questions && Array.isArray(quiz.questions)) {
+            const questionCount = quiz.questions.length;
+            const earnedPoints = quiz.results.punteggio_totale * questionCount;
             
-            // Check for new-style point system first
-            if (quiz.results.total_points !== undefined && quiz.results.max_points !== undefined) {
-              totalPointsEarned += quiz.results.total_points;
-              totalMaxPoints += quiz.results.max_points;
-              console.log(`Quiz found with new points format: ${quiz.results.total_points}/${quiz.results.max_points}`);
-            }
-            // Then check for old-style percentage system
-            else if (quiz.results.punteggio_totale !== undefined && quiz.questions && quiz.questions.length > 0) {
-              const pointsEarned = quiz.results.punteggio_totale * quiz.questions.length;
-              totalPointsEarned += pointsEarned;
-              totalMaxPoints += quiz.questions.length;
-              console.log(`Quiz found with percentage format: ${quiz.results.punteggio_totale * 100}%`);
-            }
+            totalPoints += earnedPoints;
+            totalMaxPoints += questionCount;
+            console.log(`Added points from percentage: ${earnedPoints}/${questionCount}`);
           }
-        });
-      }
-      
-      // Also check for subject-level metrics
-      if (subject.totalPoints && subject.maxPoints && subject.maxPoints > 0) {
-        totalPointsEarned += subject.totalPoints;
-        totalMaxPoints += subject.maxPoints;
-        console.log(`Added subject-level points: ${subject.totalPoints}/${subject.maxPoints}`);
-      }
-      
-      // For old system compatibility
-      if (subject.completedQuizCount && subject.completedQuizCount > 0 && 
-          subject.averageScore !== undefined && subject.totalQuestions) {
-        const subjectPoints = (subject.averageScore / 100) * subject.totalQuestions;
-        totalPointsEarned += subjectPoints;
-        totalMaxPoints += subject.totalQuestions;
-        console.log(`Legacy calculation: Added ${subjectPoints.toFixed(2)} points from subject average`);
-      }
+        }
+      });
     });
     
-    console.log(`Total calculation: ${totalPointsEarned.toFixed(2)} points earned out of ${totalMaxPoints} maximum points`);
-    console.log(`Found ${quizCount} quizzes with results`);
+    console.log(`Total points: ${totalPoints}/${totalMaxPoints} from ${quizCount} quizzes with results`);
     
-    // If we have no valid data, return a dash
-    if (totalMaxPoints === 0) {
+    if (totalMaxPoints === 0 || quizCount === 0) {
       console.log('No valid quiz data found for scoring');
       return '-';
     }
     
-    // Calculate and return the overall average as a percentage
-    const overallPercentage = Math.round((totalPointsEarned / totalMaxPoints) * 100);
+    const overallPercentage = Math.round((totalPoints / totalMaxPoints) * 100);
     console.log(`Final overall percentage: ${overallPercentage}%`);
     return overallPercentage;
   };

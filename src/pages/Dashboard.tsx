@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { getSubjects, getQuizzesBySubjectId, getSubjectById } from '@/services/subjectService';
 import { getLevelInfo } from '@/services/experienceService';
 import { useLanguage } from '@/i18n/LanguageContext';
+import { supabase } from '@/integrations/supabase/client';
 import CreateSubjectModal from '@/components/CreateSubjectModal';
 import UserProgressCard from '@/components/dashboard/UserProgressCard';
 import QuickActionsCard from '@/components/dashboard/QuickActionsCard';
@@ -47,14 +48,39 @@ const Dashboard = () => {
   const loadSubjects = async () => {
     setIsLoading(true);
     try {
+      // Get current user
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user?.id;
+      
+      if (!userId) {
+        console.log('No user ID found, cannot load subjects');
+        setSubjects([]);
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log(`Fetching subjects for user ID: ${userId}`);
       const loadedSubjects = await getSubjects();
+      console.log(`Subjects fetched for user: ${loadedSubjects.length}`);
       console.log('Loaded subjects:', loadedSubjects);
       
-      // Calculate stats for each subject
-      const subjectsWithStats = await Promise.all(loadedSubjects.map(async (subject) => {
-        const quizzes = await getQuizzesBySubjectId(subject.id);
+      // Load quizzes for each subject
+      const subjectsWithQuizzes = await Promise.all(loadedSubjects.map(async (subject) => {
+        console.log(`Fetching quizzes for subject ID: ${subject.id} and user ID: ${userId}`);
         
-        console.log(`Subject ${subject.name} has ${quizzes.length} quizzes`);
+        // Get all quizzes for this subject
+        const { data: quizzes, error } = await supabase
+          .from('quizzes')
+          .select('*')
+          .eq('subject_id', subject.id)
+          .eq('user_id', userId);
+        
+        if (error) {
+          console.error(`Error fetching quizzes for subject ${subject.id}:`, error);
+          return { ...subject, quizzes: [], quizCount: 0 };
+        }
+        
+        console.log(`Quizzes fetched for subject ${subject.id}: ${quizzes.length}`);
         
         let totalCorrectAnswers = 0;
         let totalQuestions = 0;
@@ -62,60 +88,24 @@ const Dashboard = () => {
         let maxPoints = 0;
         let quizzesWithResults = 0;
         
-        // Process each quiz to extract score information
-        quizzes.forEach(quiz => {
-          // Make sure we attach the full quiz data
-          if (quiz.results) {
-            console.log(`Quiz ${quiz.id} has results:`, quiz.results);
-            quizzesWithResults++;
-            
-            // Handle new points format
-            if (quiz.results.total_points !== undefined && quiz.results.max_points !== undefined) {
-              totalPoints += quiz.results.total_points;
-              maxPoints += quiz.results.max_points;
-              console.log(`Quiz ${quiz.id} points: ${quiz.results.total_points}/${quiz.results.max_points}`);
-            } 
-            // Handle old percentage format
-            else if (typeof quiz.results.punteggio_totale === 'number' && quiz.questions) {
-              const questionCount = quiz.questions.length;
-              const earnedPoints = quiz.results.punteggio_totale * questionCount;
-              
-              totalCorrectAnswers += earnedPoints;
-              totalQuestions += questionCount;
-              totalPoints += earnedPoints;
-              maxPoints += questionCount;
-              
-              console.log(`Quiz ${quiz.id} score: ${earnedPoints.toFixed(2)} out of ${questionCount} points (${quiz.results.punteggio_totale * 100}%)`);
-            }
-          }
-        });
-        
-        console.log(`Subject ${subject.name}: ${totalCorrectAnswers.toFixed(2)} correct answers out of ${totalQuestions} total questions`);
-        console.log(`Subject ${subject.name}: ${totalPoints.toFixed(2)} points earned out of ${maxPoints} maximum points`);
-        
-        // Calculate average score as a percentage
-        const averageScore = maxPoints > 0 ? 
-          Math.round((totalPoints / maxPoints) * 100) : 0;
-        
-        console.log(`Subject ${subject.name} average score: ${averageScore}%`);
+        console.log(`Subject ${subject.name} has ${quizzes.length} quizzes`);
         
         return {
           ...subject,
+          quizzes: quizzes || [],
           quizCount: quizzes.length,
-          completedQuizCount: quizzesWithResults,
-          averageScore: averageScore,
-          totalQuestions: totalQuestions,
-          totalCorrectAnswers: totalCorrectAnswers,
-          totalPoints: totalPoints,
-          maxPoints: maxPoints,
-          quizzes: quizzes // Include all quizzes directly with the subject
+          completedQuizCount: quizzes.filter(q => q.results).length,
+          totalCorrectAnswers,
+          totalQuestions,
+          totalPoints,
+          maxPoints
         };
       }));
       
-      console.log('Subjects with stats:', subjectsWithStats);
-      setSubjects(subjectsWithStats);
+      setSubjects(subjectsWithQuizzes);
     } catch (error) {
       console.error("Error loading subjects:", error);
+      setSubjects([]);
     } finally {
       setIsLoading(false);
     }
