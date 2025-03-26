@@ -72,9 +72,14 @@ export const fetchSubjects = async (): Promise<Subject[]> => {
 // Alias for fetchSubjects to maintain backward compatibility
 export const getSubjects = fetchSubjects;
 
-// Create a new subject
+// Create a new subject - support both object and individual parameters
 export const createSubject = async (
-  name: string,
+  nameOrOptions: string | {
+    name: string;
+    description?: string | null;
+    color?: string | null;
+    icon?: string | null;
+  },
   description: string | null = null,
   color: string | null = null,
   icon: string | null = null
@@ -88,9 +93,30 @@ export const createSubject = async (
       return null;
     }
 
+    // Handle both formats: object or individual parameters
+    let name: string;
+    let descValue: string | null = description;
+    let colorValue: string | null = color;
+    let iconValue: string | null = icon;
+
+    if (typeof nameOrOptions === 'object') {
+      name = nameOrOptions.name;
+      descValue = nameOrOptions.description ?? null;
+      colorValue = nameOrOptions.color ?? null;
+      iconValue = nameOrOptions.icon ?? null;
+    } else {
+      name = nameOrOptions;
+    }
+
     const { data: newSubject, error } = await supabase
       .from('subjects')
-      .insert([{ name, description, color, icon, user_id: userId }])
+      .insert([{ 
+        name, 
+        description: descValue, 
+        color: colorValue, 
+        icon: iconValue, 
+        user_id: userId 
+      }])
       .select('*')
       .single();
 
@@ -239,13 +265,15 @@ export const fetchSubjectsWithQuizCounts = async (): Promise<Subject[]> => {
 
 // Create a new quiz for a subject
 export const createQuiz = async (
-  subjectId: string,
-  title: string,
-  questions: any[],
-  settings: any
+  options: {
+    subjectId: string,
+    documentId?: string,
+    title: string,
+    questions: any[]
+  }
 ): Promise<string | null> => {
   try {
-    console.log(`Creating new quiz for subject ${subjectId} with ${questions.length} questions`);
+    console.log(`Creating new quiz for subject ${options.subjectId} with ${options.questions.length} questions`);
     
     // Get the current user's ID
     const { data } = await supabase.auth.getSession();
@@ -258,11 +286,12 @@ export const createQuiz = async (
     
     // Prepare the quiz data
     const quizData = {
-      title,
-      subject_id: subjectId,
+      title: options.title,
+      subject_id: options.subjectId,
+      document_id: options.documentId,
       user_id: userId,
-      questions,
-      settings,
+      questions: options.questions,
+      settings: { documentId: options.documentId },
       results: null, // Initialize with null, will be updated after grading
       created_at: new Date().toISOString()
     };
@@ -355,9 +384,17 @@ export const getQuizzesBySubjectId = async (subjectId: string): Promise<Quiz[]> 
 
     console.log(`Quizzes fetched for subject ${subjectId}: ${quizzes.length}`);
 
+    // Ensure proper typing for the questions field
     return quizzes.map(quiz => ({
-      ...quiz,
+      id: quiz.id,
+      title: quiz.title,
       createdAt: quiz.created_at,
+      subject_id: quiz.subject_id,
+      document_id: quiz.document_id || undefined,
+      questions: Array.isArray(quiz.questions) ? quiz.questions : [],
+      settings: quiz.settings || {},
+      results: quiz.results,
+      user_id: quiz.user_id || ''
     })) || [];
   } catch (error) {
     console.error('Error in getQuizzesBySubjectId:', error);
