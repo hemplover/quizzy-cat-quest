@@ -496,23 +496,23 @@ export const getRecentText = async (subjectId: string): Promise<{
 };
 
 // Delete a quiz
-export const deleteQuiz = async (id: string): Promise<boolean> => {
+export const deleteQuiz = async (quizId: string): Promise<boolean> => {
   try {
-    // Get the current user's ID
+    const { supabase } = await import('@/integrations/supabase/client');
     const { data } = await supabase.auth.getSession();
     const userId = data.session?.user?.id;
-    
+
     if (!userId) {
-      console.error('No user ID found, user might not be logged in');
-      throw new Error('User not authenticated');
+      console.error('User ID is required but not found in session');
+      return false;
     }
 
-    console.log(`Deleting quiz with ID: ${id} for user ID: ${userId}`);
+    console.log(`Deleting quiz with ID: ${quizId} for user ID: ${userId}`);
     
     const { error } = await supabase
       .from('quizzes')
       .delete()
-      .eq('id', id)
+      .eq('id', quizId)
       .eq('user_id', userId);
     
     if (error) {
@@ -523,7 +523,7 @@ export const deleteQuiz = async (id: string): Promise<boolean> => {
     console.log('Quiz deleted successfully');
     return true;
   } catch (error) {
-    console.error('Error deleting quiz:', error);
+    console.error('Error in deleteQuiz:', error);
     return false;
   }
 };
