@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -166,7 +165,6 @@ const Upload = () => {
     }
   };
   
-  // This part needs to be fixed to use the updated createQuiz function that takes an object parameter
   const handleCreateQuiz = async () => {
     try {
       setIsGenerating(true);
@@ -186,7 +184,6 @@ const Upload = () => {
         return;
       }
       
-      // Quiz generation settings
       const settings = {
         difficulty: difficulty,
         questionTypes: selectedQuestionTypes,
@@ -194,7 +191,6 @@ const Upload = () => {
         model: getSelectedModel()
       };
       
-      // Generate quiz using the content
       const generatedQuiz = await generateQuiz(content, settings, selectedSubject, uploadedDocumentId);
       
       if (!generatedQuiz || !generatedQuiz.quiz || generatedQuiz.quiz.length === 0) {
@@ -203,7 +199,6 @@ const Upload = () => {
         return;
       }
       
-      // Transform the generated questions to our app format
       const transformedQuestions = transformQuizQuestions(generatedQuiz);
       
       if (transformedQuestions.length === 0) {
@@ -212,10 +207,8 @@ const Upload = () => {
         return;
       }
       
-      // Save the transformed questions to session storage
       sessionStorage.setItem('quizQuestions', JSON.stringify(transformedQuestions));
       
-      // Save quiz metadata
       const quizData = {
         source: uploadType === 'file' && uploadedFile ? uploadedFile.file.name : 
                (uploadType === 'recent' && recentText ? recentText.name : t("Custom text")),
@@ -228,15 +221,12 @@ const Upload = () => {
         model: getSelectedModel()
       };
       
-      // Save quiz data to session storage
       sessionStorage.setItem('quizData', JSON.stringify(quizData));
       
-      // Save quiz to the database if a subject is selected
       if (selectedSubject) {
         const quizTitle = uploadType === 'file' && uploadedFile ? uploadedFile.file.name : 
                          (uploadType === 'recent' && recentText ? recentText.name : t("Quiz") + ` ${new Date().toLocaleDateString()}`);
         
-        // Use the updated function that takes an options object
         const quizId = await createQuiz({
           subjectId: selectedSubject,
           documentId: uploadedDocumentId,
@@ -245,7 +235,6 @@ const Upload = () => {
         });
         
         if (quizId) {
-          // Save quiz ID to session storage for later use when saving results
           sessionStorage.setItem('currentQuizId', quizId);
           console.log('Saved quiz ID to session storage:', quizId);
         }
@@ -264,7 +253,6 @@ const Upload = () => {
     <div className="container max-w-3xl mx-auto py-10">
       <h1 className="text-3xl font-bold text-center mb-8">{t("Create a New Quiz")}</h1>
       
-      {/* Upload Type Selection */}
       <div className="mb-6">
         <h2 className="text-xl font-semibold mb-3">{t("Choose Upload Type")}</h2>
         <div className="flex space-x-4">
@@ -294,130 +282,5 @@ const Upload = () => {
         </div>
       </div>
       
-      {/* File Upload Section */}
-      {uploadType === 'file' && (
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold mb-3">{t("Upload File")}</h2>
-          <input
-            type="file"
-            accept=".txt,.pdf,.docx"
-            onChange={handleFileChange}
-            className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-          />
-          {uploadedFile && (
-            <p className="mt-2 text-sm text-gray-600">{t("Uploaded file")}: {uploadedFile.file.name}</p>
-          )}
-        </div>
-      )}
-      
-      {/* Text Input Section */}
-      {uploadType === 'text' && (
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold mb-3">{t("Enter Text Content")}</h2>
-          <Textarea
-            placeholder={t("Enter your text here...")}
-            className="w-full h-40 border rounded-md focus:ring-cat focus:border-cat focus:outline-none transition-colors"
-            value={textContent}
-            onChange={handleTextChange}
-          />
-        </div>
-      )}
-      
-      {/* Use Recent Text Section */}
-      {uploadType === 'recent' && recentText && (
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold mb-3">{t("Using Recent Text")}</h2>
-          <div className="p-4 border rounded-md bg-gray-50">
-            <p className="text-gray-800">{recentText.name}</p>
-            <p className="text-sm text-gray-600 mt-2">{t("Content preview")}: {recentText.content.substring(0, 100)}...</p>
-          </div>
-        </div>
-      )}
-      
-      {/* Subject Selection */}
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-3">{t("Select Subject")}</h2>
-        <Select onValueChange={handleSubjectChange}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder={t("Select a subject")} />
-          </SelectTrigger>
-          <SelectContent>
-            {subjects.map((subject) => (
-              <SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      
-      {/* Difficulty Selection */}
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-3">{t("Select Difficulty")}</h2>
-        <Select onValueChange={handleDifficultyChange}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder={t("Select difficulty")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="easy">{t("Easy")}</SelectItem>
-            <SelectItem value="medium">{t("Medium")}</SelectItem>
-            <SelectItem value="hard">{t("Hard")}</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      
-      {/* Number of Questions Selection */}
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-3">{t("Number of Questions")}</h2>
-        <Slider
-          defaultValue={[5]}
-          max={20}
-          min={1}
-          step={1}
-          onValueChange={handleNumQuestionsChange}
-        />
-        <p className="text-sm text-gray-600 mt-2">{t("Selected number of questions")}: {numQuestions}</p>
-      </div>
-      
-      {/* Question Types Selection */}
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-3">{t("Select Question Types")}</h2>
-        <div className="flex flex-col space-y-2">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="multiple-choice"
-              checked={selectedQuestionTypes.includes('multiple-choice')}
-              onCheckedChange={() => toggleQuestionType('multiple-choice')}
-            />
-            <Label htmlFor="multiple-choice">{t("Multiple Choice")}</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="true-false"
-              checked={selectedQuestionTypes.includes('true-false')}
-              onCheckedChange={() => toggleQuestionType('true-false')}
-            />
-            <Label htmlFor="true-false">{t("True/False")}</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="open-ended"
-              checked={selectedQuestionTypes.includes('open-ended')}
-              onCheckedChange={() => toggleQuestionType('open-ended')}
-            />
-            <Label htmlFor="open-ended">{t("Open-ended")}</Label>
-          </div>
-        </div>
-      </div>
-      
-      {/* Create Quiz Button */}
-      <Button
-        className="w-full bg-cat text-white hover:bg-cat/90 font-semibold py-3 rounded-md transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-        onClick={handleCreateQuiz}
-        disabled={isGenerating || !selectedSubject || (uploadType === 'file' && !uploadedFile) || (uploadType === 'text' && !textContent && !recentText)}
-      >
-        {isGenerating ? t("Generating Quiz...") : t("Generate Quiz")}
-      </Button>
-    </div>
-  );
-};
+      {
 
-export default Upload;
