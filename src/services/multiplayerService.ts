@@ -5,8 +5,75 @@ import { nanoid } from "nanoid";
 
 // Generate a unique, readable session code
 export const generateSessionCode = (): string => {
-  // Generate a 6-character alphanumeric code
+  // Generate a 6-character alphanumeric code without hyphens or special characters
   return nanoid(6).toUpperCase();
+};
+
+// Normalize a session code by removing unwanted characters and formatting properly
+export const normalizeSessionCode = (code: string): string => {
+  if (!code) return '';
+  
+  // Remove quotes, spaces, hyphens and any non-alphanumeric characters
+  // First, check if the code has quotes around it (which can happen from logs/debugging)
+  if (code.startsWith('"') && code.endsWith('"')) {
+    code = code.substring(1, code.length - 1);
+  }
+  
+  // Then remove any non-alphanumeric characters
+  return code.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
+};
+
+// Get a quiz session by code
+export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSession | null> => {
+  try {
+    if (!sessionCode) {
+      console.error('No session code provided');
+      return null;
+    }
+
+    // Normalize the session code
+    const cleanCode = normalizeSessionCode(sessionCode);
+    console.log('Getting quiz session with code:', cleanCode);
+    
+    // First try to get any session where the normalized code matches
+    const { data: sessionsData, error: sessionsError } = await supabase
+      .from('quiz_sessions')
+      .select('*');
+    
+    if (sessionsError) {
+      console.error('Error getting all quiz sessions:', sessionsError);
+      return null;
+    }
+    
+    // Try to find a match by normalizing all session codes and comparing
+    if (sessionsData && sessionsData.length > 0) {
+      console.log('Found', sessionsData.length, 'sessions in the database');
+      
+      // Log all available sessions for debugging
+      const simplifiedSessions = sessionsData.map(s => ({ 
+        session_code: s.session_code, 
+        status: s.status,
+        normalized_code: normalizeSessionCode(s.session_code)
+      }));
+      console.log('All available sessions:', simplifiedSessions);
+      
+      for (const session of sessionsData) {
+        const normalizedDbCode = normalizeSessionCode(session.session_code);
+        console.log(`Comparing: DB normalized "${normalizedDbCode}" vs Requested "${cleanCode}"`);
+        
+        if (normalizedDbCode === cleanCode) {
+          console.log('Found matching session:', session);
+          return session as QuizSession;
+        }
+      }
+    }
+    
+    console.log(`No matching session found for code: ${cleanCode}`);
+    return null;
+  } catch (error) {
+    console.error('Failed to get quiz session:', error);
+    return null;
+  }
 };
 
 // Create a new quiz session
@@ -26,13 +93,13 @@ export const createQuizSession = async (quizId: string, creatorId: string | null
       throw new Error(`Quiz with ID ${quizId} not found`);
     }
     
-    // Create the quiz session
+    // Create the quiz session with the clean session code (no hyphens or special chars)
     const { data, error } = await supabase
       .from('quiz_sessions')
       .insert({
         quiz_id: quizId,
         creator_id: creatorId,
-        session_code: sessionCode,
+        session_code: sessionCode, // Store the clean code without hyphens
         status: 'waiting',
         settings: {}
       })
@@ -50,20 +117,6 @@ export const createQuizSession = async (quizId: string, creatorId: string | null
     console.error('Failed to create quiz session:', error);
     throw error;
   }
-};
-
-// Normalize a session code by removing unwanted characters and formatting properly
-export const normalizeSessionCode = (code: string): string => {
-  if (!code) return '';
-  
-  // Remove quotes, spaces, hyphens and any non-alphanumeric characters
-  // First, check if the code has quotes around it (which can happen from logs/debugging)
-  if (code.startsWith('"') && code.endsWith('"')) {
-    code = code.substring(1, code.length - 1);
-  }
-  
-  // Then remove any non-alphanumeric characters
-  return code.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
 };
 
 // Join a quiz session as a participant
@@ -116,104 +169,6 @@ export const joinQuizSession = async (
     };
   } catch (error) {
     console.error('Failed to join quiz session:', error);
-    return null;
-  }
-};
-
-// Get a quiz session by code
-export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSession | null> => {
-  try {
-    if (!sessionCode) {
-      console.error('No session code provided');
-      return null;
-    }
-
-    // Normalize the session code
-    const cleanCode = normalizeSessionCode(sessionCode);
-    console.log('Getting quiz session with code:', cleanCode);
-    
-    // Try to get the session with an exact match first
-    const { data, error } = await supabase
-      .from('quiz_sessions')
-      .select('*')
-      .eq('session_code', cleanCode)
-      .maybeSingle();
-    
-    if (error) {
-      console.error('Error getting quiz session (exact match):', error);
-      console.error('SQL query used:', `SELECT * FROM quiz_sessions WHERE session_code = '${cleanCode}'`);
-      return null;
-    }
-    
-    if (data) {
-      console.log('Found session with exact match:', data);
-      return data as QuizSession;
-    }
-    
-    // If exact match fails, try case-insensitive match
-    console.log(`No exact match found for code: ${cleanCode}, trying case-insensitive search...`);
-    const { data: caseInsensitiveData, error: caseInsensitiveError } = await supabase
-      .from('quiz_sessions')
-      .select('*')
-      .ilike('session_code', cleanCode)
-      .maybeSingle();
-    
-    if (caseInsensitiveError) {
-      console.error('Error getting quiz session (case-insensitive):', caseInsensitiveError);
-      return null;
-    }
-    
-    if (caseInsensitiveData) {
-      console.log('Found session with case-insensitive match:', caseInsensitiveData);
-      return caseInsensitiveData as QuizSession;
-    }
-    
-    // If still no match, try to get a list of all available sessions for debugging
-    console.log('No session found with code (both exact and case-insensitive):', cleanCode);
-    const { data: allSessions, error: allSessionsError } = await supabase
-      .from('quiz_sessions')
-      .select('session_code, status, creator_id')
-      .order('created_at', { ascending: false })
-      .limit(10);
-    
-    if (allSessionsError) {
-      console.error('Error getting all sessions:', allSessionsError);
-    } else {
-      console.log('Available sessions:', allSessions);
-      console.log('Session codes comparison:');
-      if (allSessions && allSessions.length > 0) {
-        allSessions.forEach(session => {
-          console.log(`DB session code: "${session.session_code}" vs. Requested: "${cleanCode}"`);
-          console.log(`- Exact match: ${session.session_code === cleanCode}`);
-          console.log(`- Lowercase comparison: ${session.session_code.toLowerCase() === cleanCode.toLowerCase()}`);
-          console.log(`- Normalized DB code: "${normalizeSessionCode(session.session_code)}"`);
-        });
-      } else {
-        console.log('No active sessions found in the database');
-      }
-    }
-    
-    // As a last resort, try a partial match search
-    const { data: partialMatch, error: partialMatchError } = await supabase
-      .from('quiz_sessions')
-      .select('*')
-      .ilike('session_code', `%${cleanCode}%`)
-      .limit(1)
-      .maybeSingle();
-      
-    if (partialMatchError) {
-      console.error('Error on partial match search:', partialMatchError);
-    }
-    
-    if (partialMatch) {
-      console.log('Found partial match session:', partialMatch);
-      console.log(`WARNING: Using partial match. Requested: "${cleanCode}", Found: "${partialMatch.session_code}"`);
-      return partialMatch as QuizSession;
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('Failed to get quiz session:', error);
     return null;
   }
 };
