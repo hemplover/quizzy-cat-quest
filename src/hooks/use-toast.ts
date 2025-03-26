@@ -1,4 +1,3 @@
-
 import React from "react";
 import { toast as sonnerToast, type ToastT } from "sonner";
 
@@ -136,28 +135,27 @@ function dispatch(action: Action) {
 
 type ToastProps = Omit<ToasterToastProps, "id">;
 
-// Extend the toast function with variants
-interface ExtendedToast extends (props: ToastProps) => string {
+type ToastFunction = (props: ToastProps) => string;
+
+interface ToastInterface {
+  (props: ToastProps): string;
   success: (message: string, options?: any) => void;
   error: (message: string, options?: any) => void;
   warning: (message: string, options?: any) => void;
   info: (message: string, options?: any) => void;
 }
 
-// Create and configure the toast function with variants
 const toast = ((props: ToastProps) => {
   const id = genId();
   
-  // Use sonner directly
   sonnerToast(props.title as string, {
     description: props.description,
     ...props,
   });
   
   return id;
-}) as ExtendedToast;
+}) as ToastInterface;
 
-// Add variant methods
 toast.success = (message, options = {}) => {
   sonnerToast.success(message, options);
   return "";
