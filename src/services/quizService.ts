@@ -494,3 +494,36 @@ export const getRecentText = async (subjectId: string): Promise<{
     return null;
   }
 };
+
+// Delete a quiz
+export const deleteQuiz = async (id: string): Promise<boolean> => {
+  try {
+    // Get the current user's ID
+    const { data } = await supabase.auth.getSession();
+    const userId = data.session?.user?.id;
+    
+    if (!userId) {
+      console.error('No user ID found, user might not be logged in');
+      throw new Error('User not authenticated');
+    }
+
+    console.log(`Deleting quiz with ID: ${id} for user ID: ${userId}`);
+    
+    const { error } = await supabase
+      .from('quizzes')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId);
+    
+    if (error) {
+      console.error('Error deleting quiz:', error);
+      return false;
+    }
+    
+    console.log('Quiz deleted successfully');
+    return true;
+  } catch (error) {
+    console.error('Error deleting quiz:', error);
+    return false;
+  }
+};
