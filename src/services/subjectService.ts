@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
@@ -599,7 +598,7 @@ export const createQuiz = async (quiz: Omit<Quiz, 'id' | 'createdAt' | 'userId'>
   }
 };
 
-// Update a quiz with results
+// Update a quiz with results - enhanced to ensure consistent format
 export const updateQuizResults = async (id: string, results: any): Promise<Quiz | null> => {
   try {
     const userId = await getCurrentUserId();
@@ -608,9 +607,64 @@ export const updateQuizResults = async (id: string, results: any): Promise<Quiz 
       throw new Error('User not authenticated');
     }
 
+    // Ensure results is an object with consistent format
+    let formattedResults = results;
+    
+    // If results is a string, parse it
+    if (typeof formattedResults === 'string') {
+      try {
+        formattedResults = JSON.parse(formattedResults);
+      } catch (e) {
+        console.error('Failed to parse results string:', e);
+      }
+    }
+    
+    // Always ensure we have total_points and max_points for consistency
+    if (formattedResults && typeof formattedResults === 'object' && 
+        (!formattedResults.total_points || !formattedResults.max_points) && 
+        formattedResults.risultati && Array.isArray(formattedResults.risultati)) {
+      
+      // Get the quiz to count questions
+      const { data: quizData } = await supabase
+        .from('quizzes')
+        .select('questions')
+        .eq('id', id)
+        .single();
+      
+      let questionCount = 0;
+      if (quizData && quizData.questions) {
+        if (Array.isArray(quizData.questions)) {
+          questionCount = quizData.questions.length;
+        } else if (typeof quizData.questions === 'string') {
+          try {
+            questionCount = JSON.parse(quizData.questions).length;
+          } catch (e) {
+            console.error('Failed to parse questions string:', e);
+          }
+        }
+      }
+      
+      // Calculate total points
+      const totalPoints = formattedResults.risultati.reduce(
+        (sum, r) => sum + (Number(r.punteggio) || 0), 0
+      );
+      
+      const maxPoints = questionCount > 0 ? 
+        formattedResults.risultati.reduce(
+          (sum, r) => sum + ((r.tipo === 'open-ended' || r.type === 'open-ended') ? 5 : 1), 0
+        ) : formattedResults.risultati.length;
+      
+      formattedResults.total_points = totalPoints;
+      formattedResults.max_points = maxPoints;
+      
+      console.log(`Calculated total_points: ${totalPoints}, max_points: ${maxPoints}`);
+    }
+    
+    console.log('Saving quiz results:', formattedResults);
+
     const { data, error } = await supabase
       .from('quizzes')
-      .update({ results })
+      .update({ results: formattedResults })
       .eq('id', id)
       .eq('user_id', userId)
       .select()
@@ -620,6 +674,8 @@ export const updateQuizResults = async (id: string, results: any): Promise<Quiz 
       console.error('Error updating quiz results:', error);
       return null;
     }
+    
+    console.log('Quiz results updated successfully:', data);
     
     return {
       id: data.id,
@@ -635,33 +691,6 @@ export const updateQuizResults = async (id: string, results: any): Promise<Quiz 
   } catch (error) {
     console.error('Error updating quiz results:', error);
     return null;
-  }
-};
-
-// Delete a quiz
-export const deleteQuiz = async (id: string): Promise<boolean> => {
-  try {
-    const userId = await getCurrentUserId();
-    if (!userId) {
-      console.error('No user ID found, user might not be logged in');
-      throw new Error('User not authenticated');
-    }
-
-    const { error } = await supabase
-      .from('quizzes')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', userId);
-    
-    if (error) {
-      console.error('Error deleting quiz:', error);
-      return false;
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Error deleting quiz:', error);
-    return false;
   }
 };
 

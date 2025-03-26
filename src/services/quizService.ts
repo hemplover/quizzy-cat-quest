@@ -337,6 +337,17 @@ export const gradeQuiz = async (
       }
       
       console.log('Received quiz results:', data);
+      
+      // Ensure we always include total_points and max_points for consistency
+      if (!data.total_points || !data.max_points) {
+        // Calculate total points
+        const totalPoints = data.risultati.reduce((sum, r) => sum + (Number(r.punteggio) || 0), 0);
+        const maxPoints = validatedQuestions.reduce((sum, q) => sum + (q.type === 'open-ended' ? 5 : 1), 0);
+        
+        data.total_points = totalPoints;
+        data.max_points = maxPoints;
+      }
+      
       return data;
     } catch (error) {
       console.error('Error grading quiz:', error);
@@ -353,7 +364,7 @@ export const gradeQuiz = async (
   }
 };
 
-// Manual grading when AI grading fails
+// Enhanced manual grading when AI grading fails
 function createManualGradingResponse(questions: any[], userAnswers: any[]): QuizResults {
   console.log('Using manual grading as fallback');
   
