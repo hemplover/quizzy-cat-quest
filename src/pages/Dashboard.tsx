@@ -56,46 +56,42 @@ const Dashboard = () => {
         
         console.log(`Subject ${subject.name} has ${quizzes.length} quizzes`);
         
-        // Calculate scores properly
         let totalCorrectAnswers = 0;
         let totalQuestions = 0;
         let totalPoints = 0;
         let maxPoints = 0;
         let quizzesWithResults = 0;
         
+        // Process each quiz to extract score information
         quizzes.forEach(quiz => {
-          if (quiz.results && quiz.questions && quiz.questions.length > 0) {
-            // Count this as a completed quiz
+          // Make sure we attach the full quiz data
+          if (quiz.results) {
+            console.log(`Quiz ${quiz.id} has results:`, quiz.results);
             quizzesWithResults++;
             
-            // Check if we have the new points format
+            // Handle new points format
             if (quiz.results.total_points !== undefined && quiz.results.max_points !== undefined) {
               totalPoints += quiz.results.total_points;
               maxPoints += quiz.results.max_points;
-              console.log(`Quiz ${quiz.id} has point data: ${quiz.results.total_points}/${quiz.results.max_points} points`);
+              console.log(`Quiz ${quiz.id} points: ${quiz.results.total_points}/${quiz.results.max_points}`);
             } 
-            // Check for older punteggio_totale format (normalized 0-1 score)
-            else if (typeof quiz.results.punteggio_totale === 'number') {
-              // Convert to points based on question count
-              const quizScore = quiz.results.punteggio_totale;
+            // Handle old percentage format
+            else if (typeof quiz.results.punteggio_totale === 'number' && quiz.questions) {
               const questionCount = quiz.questions.length;
-              
-              // Estimate points: if punteggio_totale is 0.75 and there are 4 questions,
-              // we estimate 3 points out of possible 4
-              const earnedPoints = Math.round(quizScore * questionCount);
+              const earnedPoints = quiz.results.punteggio_totale * questionCount;
               
               totalCorrectAnswers += earnedPoints;
               totalQuestions += questionCount;
               totalPoints += earnedPoints;
               maxPoints += questionCount;
               
-              console.log(`Quiz ${quiz.id} score: ${earnedPoints} out of ${questionCount} points (${quizScore * 100}%)`);
+              console.log(`Quiz ${quiz.id} score: ${earnedPoints.toFixed(2)} out of ${questionCount} points (${quiz.results.punteggio_totale * 100}%)`);
             }
           }
         });
         
-        console.log(`Subject ${subject.name}: ${totalCorrectAnswers} correct answers out of ${totalQuestions} total questions`);
-        console.log(`Subject ${subject.name}: ${totalPoints} points earned out of ${maxPoints} maximum points`);
+        console.log(`Subject ${subject.name}: ${totalCorrectAnswers.toFixed(2)} correct answers out of ${totalQuestions} total questions`);
+        console.log(`Subject ${subject.name}: ${totalPoints.toFixed(2)} points earned out of ${maxPoints} maximum points`);
         
         // Calculate average score as a percentage
         const averageScore = maxPoints > 0 ? 
@@ -111,7 +107,8 @@ const Dashboard = () => {
           totalQuestions: totalQuestions,
           totalCorrectAnswers: totalCorrectAnswers,
           totalPoints: totalPoints,
-          maxPoints: maxPoints
+          maxPoints: maxPoints,
+          quizzes: quizzes // Include all quizzes directly with the subject
         };
       }));
       

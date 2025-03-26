@@ -22,73 +22,77 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
 }) => {
   const { t } = useLanguage();
   
-  // Calculate the average score for all subjects with completed quizzes
+  // Calculate the average score with a simplified, more robust approach
   const calculateOverallAverageScore = () => {
     console.log('Calculating overall average score with subjects:', subjects);
     
-    // Get all subjects with completed quizzes
-    const subjectsWithScores = subjects.filter(s => {
-      // A subject has scores if it has completed quizzes
-      if (s.completedQuizCount && s.completedQuizCount > 0) {
-        console.log(`Subject ${s.name} has completed quizzes: ${s.completedQuizCount}`);
-        return true;
-      }
-      
-      // Or if it has totalPoints and maxPoints defined
-      if (s.totalPoints !== undefined && s.maxPoints !== undefined && s.maxPoints > 0) {
-        console.log(`Subject ${s.name} has points: ${s.totalPoints}/${s.maxPoints}`);
-        return true;
-      }
-      
-      // Or if it has averageScore defined
-      if (s.averageScore !== undefined && s.averageScore > 0) {
-        console.log(`Subject ${s.name} has average score: ${s.averageScore}%`);
-        return true;
-      }
-      
-      return false;
-    });
-    
-    console.log('Filtered subjects with scores:', subjectsWithScores);
-    
-    if (subjectsWithScores.length === 0) {
-      console.log('No subjects with completed quizzes found');
+    // Initial check for empty subjects array
+    if (!subjects || subjects.length === 0) {
+      console.log('No subjects found');
       return '-';
     }
     
-    // Total points earned and total maximum points across all subjects
+    // Track total points across all quizzes in all subjects
     let totalPointsEarned = 0;
     let totalMaxPoints = 0;
+    let quizCount = 0;
     
-    subjectsWithScores.forEach(subject => {
-      console.log(`Subject ${subject.name}:`, subject);
+    // Process each subject to find quizzes with results
+    subjects.forEach(subject => {
+      console.log(`Processing subject ${subject.name}:`, subject);
       
-      if (subject.totalPoints !== undefined && subject.maxPoints !== undefined && subject.maxPoints > 0) {
-        // If we have the new weighted point system
+      // Look for quizzes directly within the subject if available
+      if (subject.quizzes && Array.isArray(subject.quizzes)) {
+        subject.quizzes.forEach(quiz => {
+          if (quiz.results) {
+            quizCount++;
+            
+            // Check for new-style point system first
+            if (quiz.results.total_points !== undefined && quiz.results.max_points !== undefined) {
+              totalPointsEarned += quiz.results.total_points;
+              totalMaxPoints += quiz.results.max_points;
+              console.log(`Quiz found with new points format: ${quiz.results.total_points}/${quiz.results.max_points}`);
+            }
+            // Then check for old-style percentage system
+            else if (quiz.results.punteggio_totale !== undefined && quiz.questions && quiz.questions.length > 0) {
+              const pointsEarned = quiz.results.punteggio_totale * quiz.questions.length;
+              totalPointsEarned += pointsEarned;
+              totalMaxPoints += quiz.questions.length;
+              console.log(`Quiz found with percentage format: ${quiz.results.punteggio_totale * 100}%`);
+            }
+          }
+        });
+      }
+      
+      // Also check for subject-level metrics
+      if (subject.totalPoints && subject.maxPoints && subject.maxPoints > 0) {
         totalPointsEarned += subject.totalPoints;
         totalMaxPoints += subject.maxPoints;
-        console.log(`Added ${subject.totalPoints} points earned out of ${subject.maxPoints} maximum points`);
-      } else if (subject.averageScore !== undefined && subject.totalQuestions !== undefined && subject.totalQuestions > 0) {
-        // Legacy calculation (pre-weighted scoring)
-        // Convert percentage to points (assuming 1 point per question)
-        const subjectPointsEarned = (subject.averageScore / 100) * subject.totalQuestions;
-        totalPointsEarned += subjectPointsEarned;
+        console.log(`Added subject-level points: ${subject.totalPoints}/${subject.maxPoints}`);
+      }
+      
+      // For old system compatibility
+      if (subject.completedQuizCount && subject.completedQuizCount > 0 && 
+          subject.averageScore !== undefined && subject.totalQuestions) {
+        const subjectPoints = (subject.averageScore / 100) * subject.totalQuestions;
+        totalPointsEarned += subjectPoints;
         totalMaxPoints += subject.totalQuestions;
-        console.log(`Legacy calculation: Added ${subjectPointsEarned.toFixed(2)} points earned out of ${subject.totalQuestions} maximum points`);
+        console.log(`Legacy calculation: Added ${subjectPoints.toFixed(2)} points from subject average`);
       }
     });
     
-    console.log(`Final totals: ${totalPointsEarned.toFixed(2)} points earned out of ${totalMaxPoints} maximum points`);
+    console.log(`Total calculation: ${totalPointsEarned.toFixed(2)} points earned out of ${totalMaxPoints} maximum points`);
+    console.log(`Found ${quizCount} quizzes with results`);
     
-    // If no questions were answered, return '-'
+    // If we have no valid data, return a dash
     if (totalMaxPoints === 0) {
-      console.log('No points found in any subject');
+      console.log('No valid quiz data found for scoring');
       return '-';
     }
     
     // Calculate and return the overall average as a percentage
     const overallPercentage = Math.round((totalPointsEarned / totalMaxPoints) * 100);
-    console.log(`Overall percentage: ${overallPercentage}%`);
+    console.log(`Final overall percentage: ${overallPercentage}%`);
     return overallPercentage;
   };
 
