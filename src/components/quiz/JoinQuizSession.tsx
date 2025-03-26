@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { joinQuizSession, getQuizSessionByCode } from '@/services/multiplayerService';
+import { joinQuizSession, getQuizSessionByCode, normalizeSessionCode } from '@/services/multiplayerService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,10 +52,11 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
     setIsJoining(true);
     try {
       // Try to join the session - the service will normalize the code
-      console.log('Attempting to join session with code:', sessionCode);
+      const normalizedCode = normalizeSessionCode(sessionCode);
+      console.log('Attempting to join session with code:', normalizedCode);
       
       const result = await joinQuizSession(
-        sessionCode,
+        normalizedCode,
         username.trim(),
         user?.id || null
       );
@@ -70,8 +71,8 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
         navigate(`/quiz/multiplayer/player/${result.session.session_code}`);
       } else {
         toast({
-          title: 'Error',
-          description: 'Failed to join quiz session. Check that the code is correct.',
+          title: 'Session not found',
+          description: 'Could not find a quiz session with that code. Please check the code and try again.',
           variant: 'destructive',
         });
       }

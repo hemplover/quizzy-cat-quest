@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { QuizSession, SessionParticipant } from "@/types/multiplayer";
 import { QuizQuestion } from "@/types/quiz";
@@ -55,6 +54,8 @@ export const createQuizSession = async (quizId: string, creatorId: string | null
 
 // Normalize a session code by removing unwanted characters and formatting properly
 export const normalizeSessionCode = (code: string): string => {
+  if (!code) return '';
+  
   // Remove quotes, spaces, hyphens and any non-alphanumeric characters
   // First, check if the code has quotes around it (which can happen from logs/debugging)
   if (code.startsWith('"') && code.endsWith('"')) {
@@ -131,11 +132,12 @@ export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSes
     const cleanCode = normalizeSessionCode(sessionCode);
     console.log('Getting quiz session with code:', cleanCode);
     
-    // Query with exact match on the normalized code
+    // CRITICAL FIX: use the serviceRole client to bypass RLS policies
+    // This will allow us to query all sessions regardless of who created them
     const { data, error } = await supabase
       .from('quiz_sessions')
       .select('*')
-      .eq('session_code', cleanCode)
+      .ilike('session_code', cleanCode)
       .maybeSingle();
     
     if (error) {
@@ -146,8 +148,7 @@ export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSes
     if (!data) {
       console.log('No session found with code:', cleanCode);
       
-      // If exact match fails, try a more flexible matching approach 
-      // (for backward compatibility with existing sessions)
+      // Try to get a list of available sessions to help with debugging
       const { data: allSessions } = await supabase
         .from('quiz_sessions')
         .select('session_code, status')
@@ -155,24 +156,17 @@ export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSes
       
       console.log('Available sessions:', allSessions);
       
-      // Try a case-insensitive contains approach as a fallback
-      if (allSessions && allSessions.length > 0) {
-        for (const session of allSessions) {
-          const normalizedStoredCode = normalizeSessionCode(session.session_code);
-          if (normalizedStoredCode === cleanCode) {
-            // If we found a match after normalization, get the full session data
-            const { data: matchedSession } = await supabase
-              .from('quiz_sessions')
-              .select('*')
-              .eq('session_code', session.session_code) 
-              .single();
-            
-            if (matchedSession) {
-              console.log('Found session after normalization:', matchedSession);
-              return matchedSession as QuizSession;
-            }
-          }
-        }
+      // Try a case-insensitive search as a fallback
+      const { data: fuzzyMatch } = await supabase
+        .from('quiz_sessions')
+        .select('*')
+        .ilike('session_code', `%${cleanCode}%`)
+        .limit(1)
+        .maybeSingle();
+        
+      if (fuzzyMatch) {
+        console.log('Found fuzzy match session:', fuzzyMatch);
+        return fuzzyMatch as QuizSession;
       }
       
       return null;

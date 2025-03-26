@@ -16,6 +16,7 @@ const MultiplayerJoin = () => {
   const [isJoining, setIsJoining] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [sessionExists, setSessionExists] = useState(false);
+  const [normalizedCode, setNormalizedCode] = useState('');
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -29,17 +30,14 @@ const MultiplayerJoin = () => {
       
       try {
         setIsLoading(true);
-        console.log('Checking session with code:', sessionCode);
+        // Clean the session code
+        const cleanCode = normalizeSessionCode(sessionCode);
+        setNormalizedCode(cleanCode);
         
-        // Use the session as-is first
-        let formattedCode = sessionCode;
-        let session = await getQuizSessionByCode(formattedCode);
+        console.log('Checking session with code:', cleanCode);
         
-        if (!session) {
-          // If it failed, try to normalize the code
-          console.log('Session not found with raw code, trying normalized code');
-          session = await getQuizSessionByCode(sessionCode);
-        }
+        // Try to get the session
+        const session = await getQuizSessionByCode(cleanCode);
         
         if (session) {
           console.log('Session found:', session);
@@ -59,10 +57,10 @@ const MultiplayerJoin = () => {
             return;
           }
         } else {
-          console.log('No session found with code:', sessionCode);
+          console.log('No session found with code:', cleanCode);
           toast({
             title: 'Invalid session',
-            description: 'Invalid session code',
+            description: `Could not find a session with code: ${cleanCode}`,
             variant: 'destructive',
           });
           navigate('/');
@@ -93,14 +91,14 @@ const MultiplayerJoin = () => {
       return;
     }
     
-    if (!sessionCode) {
+    if (!normalizedCode) {
       return;
     }
     
     setIsJoining(true);
     try {
       const result = await joinQuizSession(
-        sessionCode,
+        normalizedCode,
         username.trim(),
         user?.id || null
       );
@@ -171,7 +169,7 @@ const MultiplayerJoin = () => {
               <h2 className="text-xl font-medium">Session Details</h2>
             </div>
             <div className="px-3 py-1 bg-cat/10 text-cat rounded-full font-medium">
-              {sessionCode}
+              {normalizedCode}
             </div>
           </div>
         </div>
