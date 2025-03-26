@@ -179,8 +179,7 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
       setAverageScore('-');
       toast({
         title: "Error",
-        description: "Failed to calculate average score. Please try again later.",
-        variant: "destructive"
+        description: "Failed to calculate average score. Please try again later."
       });
     } finally {
       setIsLoading(false);

@@ -1,3 +1,4 @@
+
 export type Language = 'en' | 'it' | 'fr' | 'de';
 
 export interface Translations {
@@ -72,14 +73,11 @@ export const translations: Translations = {
     wisdomTiger: 'Wisdom Tiger',
     wisdomTigerDesc: 'Teaching others and mastering difficult subjects',
     
-    // Fixed missing translations - both camelCase and lowercase versions
+    // Fixed missing translations - lowercase versions
     scholarlykitten: 'Scholarly Kitten',
     curiouscat: 'Curious Cat',
-    cleverFeline: 'Clever Feline',
     cleverfeline: 'Clever Feline',
-    academicTabby: 'Academic Tabby',
     academictabby: 'Academic Tabby',
-    wisdomTiger: 'Wisdom Tiger',
     wisdomtiger: 'Wisdom Tiger',
     
     // XP Bar
@@ -502,9 +500,9 @@ export const translations: Translations = {
     // XP Levels
     scholarlyKitten: 'Chaton Érudit',
     scholarlyKittenDesc: 'Vous débutez tout juste votre parcours d\'apprentissage',
-    curiousCat: 'Neugierige Katze',
+    curiousCat: 'Chat Curieux',
     curiousCatDesc: 'Vous développez vos connaissances et posez de bonnes questions',
-    cleverFeline: 'Clevere Katze',
+    cleverFeline: 'Félin Intelligent',
     cleverFelineDesc: 'Vous maîtrisez des concepts et établissez des liens entre les idées',
     academicTabby: 'Tabby Académique',
     academicTabbyDesc: 'Vous appliquez vos connaissances dans des scénarios complexes',
@@ -513,12 +511,9 @@ export const translations: Translations = {
     
     // Fixed missing translations
     scholarlykitten: 'Chaton Érudit',
-    curiouscat: 'Neugierige Katze',
-    cleverFeline: 'Clevere Katze',
-    cleverfeline: 'Clevere Katze',
-    academicTabby: 'Tabby Académique',
+    curiouscat: 'Chat Curieux',
+    cleverfeline: 'Félin Intelligent',
     academictabby: 'Tabby Académique',
-    wisdomTiger: 'Tigre de la Sagesse',
     wisdomtiger: 'Tigre de la Sagesse',
     
     // Upload page
@@ -612,11 +607,8 @@ export const translations: Translations = {
     // Fixed missing translations
     scholarlykitten: 'Gelehrtes Kätzchen',
     curiouscat: 'Neugierige Katze',
-    cleverFeline: 'Clevere Katze',
     cleverfeline: 'Clevere Katze',
-    academicTabby: 'Akademische Tabby',
     academictabby: 'Akademische Tabby',
-    wisdomTiger: 'Weisheitstiger',
     wisdomtiger: 'Weisheitstiger',
     
     // Upload page
