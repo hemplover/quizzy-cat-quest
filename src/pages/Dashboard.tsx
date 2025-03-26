@@ -15,7 +15,6 @@ const Dashboard = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [userXP, setUserXP] = useState(0);
-  const [quizResults, setQuizResults] = useState<any[]>([]);
   const [createSubjectOpen, setCreateSubjectOpen] = useState(false);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,17 +26,6 @@ const Dashboard = () => {
     
     // Load subjects and quizzes
     loadSubjects();
-    
-    // Load quiz history from localStorage
-    const storedQuizHistory = localStorage.getItem('quizHistory');
-    if (storedQuizHistory) {
-      try {
-        setQuizResults(JSON.parse(storedQuizHistory));
-      } catch (error) {
-        console.error('Error parsing quiz history:', error);
-        setQuizResults([]);
-      }
-    }
   }, []);
 
   // Calculate level information
@@ -62,32 +50,15 @@ const Dashboard = () => {
       console.log(`Fetching subjects for user ID: ${userId}`);
       const loadedSubjects = await getSubjects();
       console.log(`Subjects fetched for user: ${loadedSubjects.length}`);
-      console.log('Loaded subjects:', loadedSubjects);
       
       // Load quizzes for each subject
       const subjectsWithQuizzes = await Promise.all(loadedSubjects.map(async (subject) => {
         console.log(`Fetching quizzes for subject ID: ${subject.id} and user ID: ${userId}`);
         
         // Get all quizzes for this subject
-        const { data: quizzes, error } = await supabase
-          .from('quizzes')
-          .select('*')
-          .eq('subject_id', subject.id)
-          .eq('user_id', userId);
-        
-        if (error) {
-          console.error(`Error fetching quizzes for subject ${subject.id}:`, error);
-          return { ...subject, quizzes: [], quizCount: 0 };
-        }
+        const quizzes = await getQuizzesBySubjectId(subject.id);
         
         console.log(`Quizzes fetched for subject ${subject.id}: ${quizzes.length}`);
-        
-        let totalCorrectAnswers = 0;
-        let totalQuestions = 0;
-        let totalPoints = 0;
-        let maxPoints = 0;
-        let quizzesWithResults = 0;
-        
         console.log(`Subject ${subject.name} has ${quizzes.length} quizzes`);
         
         return {
@@ -95,10 +66,6 @@ const Dashboard = () => {
           quizzes: quizzes || [],
           quizCount: quizzes.length,
           completedQuizCount: quizzes.filter(q => q.results).length,
-          totalCorrectAnswers,
-          totalQuestions,
-          totalPoints,
-          maxPoints
         };
       }));
       

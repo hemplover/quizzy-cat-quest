@@ -1,8 +1,10 @@
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '@/i18n/LanguageContext';
 import CatTutor from '@/components/CatTutor';
 import XPBar from '@/components/XPBar';
 import { BookOpen, CheckCircle2, TrendingUp } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UserProgressCardProps {
   userXP: number;
@@ -20,68 +22,121 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
   subjects
 }) => {
   const { t } = useLanguage();
+  const [averageScore, setAverageScore] = useState<number | string>('-');
+  const [isLoading, setIsLoading] = useState(true);
   
-  const calculateOverallAverageScore = () => {
-    console.log('Calculating overall average score with subjects:', subjects);
-    
-    if (!subjects || subjects.length === 0) {
-      console.log('No subjects found');
-      return '-';
-    }
-    
-    let totalPoints = 0;
-    let totalMaxPoints = 0;
-    let quizCount = 0;
-    
-    subjects.forEach(subject => {
-      if (!subject.quizzes || !Array.isArray(subject.quizzes)) {
-        console.log(`Subject ${subject.name} has no quizzes array`);
+  useEffect(() => {
+    fetchQuizResults();
+  }, [subjects]);
+  
+  const fetchQuizResults = async () => {
+    try {
+      setIsLoading(true);
+      console.log('Fetching all quiz results directly from database...');
+      
+      // Get current user ID
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user?.id;
+      
+      if (!userId) {
+        console.log('No user ID found, cannot fetch quiz results');
+        setAverageScore('-');
+        setIsLoading(false);
         return;
       }
       
-      subject.quizzes.forEach(quiz => {
-        if (!quiz || !quiz.results) return;
+      // Direct query to get all quizzes with results
+      const { data: quizzes, error } = await supabase
+        .from('quizzes')
+        .select('*')
+        .eq('user_id', userId)
+        .not('results', 'is', null);
+      
+      if (error) {
+        console.error('Error fetching quizzes with results:', error);
+        setAverageScore('-');
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log(`Found ${quizzes?.length || 0} quizzes with results`);
+      
+      if (!quizzes || quizzes.length === 0) {
+        console.log('No quizzes with results found');
+        setAverageScore('-');
+        setIsLoading(false);
+        return;
+      }
+      
+      // Calculate overall score
+      let totalPoints = 0;
+      let totalMaxPoints = 0;
+      let validQuizCount = 0;
+      
+      quizzes.forEach(quiz => {
+        if (!quiz.results) return;
         
-        console.log(`Found quiz with results:`, quiz.id, quiz.results);
-        quizCount++;
+        console.log(`Processing quiz ${quiz.id} with results:`, quiz.results);
         
+        // Handle different result formats
         if (quiz.results.total_points !== undefined && quiz.results.max_points !== undefined) {
+          // Format: {total_points: X, max_points: Y}
           totalPoints += quiz.results.total_points;
           totalMaxPoints += quiz.results.max_points;
-          console.log(`Added points: ${quiz.results.total_points}/${quiz.results.max_points}`);
-        }
+          validQuizCount++;
+          console.log(`Quiz ${quiz.id} has ${quiz.results.total_points}/${quiz.results.max_points} points`);
+        } 
         else if (quiz.results.punteggio_totale !== undefined) {
-          if (quiz.results.risultati && Array.isArray(quiz.results.risultati)) {
-            quiz.results.risultati.forEach(result => {
-              if (result.punteggio !== undefined) {
-                totalPoints += result.punteggio;
-                totalMaxPoints += (result.tipo === 'open-ended' || result.type === 'open-ended') ? 5 : 1;
-              }
-            });
-            console.log(`Added points from risultati: ${totalPoints}`);
-          } 
-          else if (quiz.questions && Array.isArray(quiz.questions)) {
-            const questionCount = quiz.questions.length;
+          // Format: {punteggio_totale: X} (score as ratio)
+          // Calculate points based on questions count
+          const questionCount = Array.isArray(quiz.questions) ? quiz.questions.length : 0;
+          
+          if (questionCount > 0) {
+            // For punteggio_totale (ratio), multiply by question count to get points
             const earnedPoints = quiz.results.punteggio_totale * questionCount;
-            
             totalPoints += earnedPoints;
             totalMaxPoints += questionCount;
-            console.log(`Added points from percentage: ${earnedPoints}/${questionCount}`);
+            validQuizCount++;
+            console.log(`Quiz ${quiz.id} has ratio score ${quiz.results.punteggio_totale} (${earnedPoints}/${questionCount} points)`);
+          }
+        }
+        else if (quiz.results.risultati && Array.isArray(quiz.results.risultati)) {
+          // Format: {risultati: [{punteggio: X}]}
+          let quizPoints = 0;
+          let quizMaxPoints = 0;
+          
+          quiz.results.risultati.forEach(result => {
+            if (result.punteggio !== undefined) {
+              quizPoints += result.punteggio;
+              quizMaxPoints += (result.tipo === 'open-ended' || result.type === 'open-ended') ? 5 : 1;
+            }
+          });
+          
+          if (quizMaxPoints > 0) {
+            totalPoints += quizPoints;
+            totalMaxPoints += quizMaxPoints;
+            validQuizCount++;
+            console.log(`Quiz ${quiz.id} has ${quizPoints}/${quizMaxPoints} points from risultati`);
           }
         }
       });
-    });
-    
-    console.log(`Total points: ${totalPoints}/${totalMaxPoints} from ${quizCount} quizzes with results`);
-    
-    if (totalMaxPoints === 0 || quizCount === 0) {
-      console.log('No valid quiz data found for scoring');
-      return '-';
+      
+      console.log(`Total calculation: ${totalPoints}/${totalMaxPoints} points from ${validQuizCount} valid quizzes`);
+      
+      if (totalMaxPoints === 0 || validQuizCount === 0) {
+        console.log('No valid scoring data found in quizzes');
+        setAverageScore('-');
+      } else {
+        const overallPercentage = Math.round((totalPoints / totalMaxPoints) * 100);
+        console.log(`Final overall percentage: ${overallPercentage}%`);
+        setAverageScore(overallPercentage);
+      }
+    } catch (error) {
+      console.error('Error calculating average score:', error);
+      setAverageScore('-');
+    } finally {
+      setIsLoading(false);
     }
-    
-    const overallPercentage = Math.round((totalPoints / totalMaxPoints) * 100);
-    console.log(`Final overall percentage: ${overallPercentage}%`);
-    return overallPercentage;
   };
 
   return (
@@ -131,8 +186,8 @@ const UserProgressCard: React.FC<UserProgressCardProps> = ({
             <span className="text-sm font-medium">{t('averageScore')}</span>
           </div>
           <p className="text-2xl font-bold">
-            {calculateOverallAverageScore()}
-            {calculateOverallAverageScore() !== '-' ? '%' : ''}
+            {isLoading ? '...' : averageScore}
+            {!isLoading && averageScore !== '-' ? '%' : ''}
           </p>
         </div>
       </div>
