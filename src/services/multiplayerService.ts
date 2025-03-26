@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { QuizSession, SessionParticipant } from "@/types/multiplayer";
 import { QuizQuestion } from "@/types/quiz";
@@ -5,25 +6,18 @@ import { nanoid } from "nanoid";
 
 // Generate a unique, readable session code
 export const generateSessionCode = (): string => {
-  // Generate a 6-character alphanumeric code without hyphens or special characters
-  return nanoid(6).toUpperCase();
+  // Generate a 6-character alphanumeric code (uppercase only)
+  return nanoid(6).replace(/[^A-Z0-9]/g, 'A').toUpperCase();
 };
 
 // Normalize a session code by removing unwanted characters and formatting properly
 export const normalizeSessionCode = (code: string): string => {
   if (!code) return '';
-  
-  // Remove quotes, spaces, hyphens and any non-alphanumeric characters
-  // First, check if the code has quotes around it (which can happen from logs/debugging)
-  if (code.startsWith('"') && code.endsWith('"')) {
-    code = code.substring(1, code.length - 1);
-  }
-  
-  // Then remove any non-alphanumeric characters
-  return code.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
+  // Remove any non-alphanumeric characters and convert to uppercase
+  return code.replace(/[^A-Z0-9]/g, '').toUpperCase();
 };
 
-// Get a quiz session by code
+// Get a quiz session by code - completely rewritten for reliability
 export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSession | null> => {
   try {
     if (!sessionCode) {
@@ -31,47 +25,80 @@ export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSes
       return null;
     }
 
-    // Normalize the session code
-    const cleanCode = normalizeSessionCode(sessionCode);
-    console.log('Getting quiz session with code:', cleanCode);
+    // Clean up the code first
+    const normalizedCode = normalizeSessionCode(sessionCode);
+    console.log(`[DEBUG] Looking for session with normalized code: "${normalizedCode}"`);
     
-    // First try to get any session where the normalized code matches
-    const { data: sessionsData, error: sessionsError } = await supabase
+    // Get all sessions for debugging
+    const { data: allSessions, error: allSessionsError } = await supabase
       .from('quiz_sessions')
       .select('*');
     
-    if (sessionsError) {
-      console.error('Error getting all quiz sessions:', sessionsError);
+    if (allSessionsError) {
+      console.error('[ERROR] Failed to get all sessions:', allSessionsError);
       return null;
     }
+
+    console.log(`[DEBUG] Total sessions in database: ${allSessions?.length || 0}`);
     
-    // Try to find a match by normalizing all session codes and comparing
-    if (sessionsData && sessionsData.length > 0) {
-      console.log('Found', sessionsData.length, 'sessions in the database');
+    if (allSessions && allSessions.length > 0) {
+      // Debug log all sessions
+      console.log('[DEBUG] All available sessions:');
+      allSessions.forEach(s => {
+        const dbNormalized = normalizeSessionCode(s.session_code);
+        console.log(`[DEBUG] - ID: ${s.id}, Code: "${s.session_code}", Normalized: "${dbNormalized}", Status: ${s.status}`);
+      });
       
-      // Log all available sessions for debugging
-      const simplifiedSessions = sessionsData.map(s => ({ 
-        session_code: s.session_code, 
-        status: s.status,
-        normalized_code: normalizeSessionCode(s.session_code)
-      }));
-      console.log('All available sessions:', simplifiedSessions);
+      // Exact direct match by session_code (case sensitive)
+      const exactMatch = allSessions.find(
+        s => s.session_code === normalizedCode
+      );
       
-      for (const session of sessionsData) {
-        const normalizedDbCode = normalizeSessionCode(session.session_code);
-        console.log(`Comparing: DB normalized "${normalizedDbCode}" vs Requested "${cleanCode}"`);
-        
-        if (normalizedDbCode === cleanCode) {
-          console.log('Found matching session:', session);
-          return session as QuizSession;
-        }
+      if (exactMatch) {
+        console.log(`[DEBUG] Found exact match for code: "${normalizedCode}"`);
+        return exactMatch as QuizSession;
       }
+      
+      console.log(`[DEBUG] No exact match found, trying normalized comparison`);
+      
+      // Try with normalized code comparison
+      const normalizedMatch = allSessions.find(
+        s => normalizeSessionCode(s.session_code) === normalizedCode
+      );
+      
+      if (normalizedMatch) {
+        console.log(`[DEBUG] Found normalized match: DB "${normalizedMatch.session_code}" vs. Requested "${normalizedCode}"`);
+        return normalizedMatch as QuizSession;
+      }
+      
+      console.log(`[DEBUG] No session found with normalized code: "${normalizedCode}"`);
+      console.log('[DEBUG] Available normalized codes in DB:');
+      allSessions.forEach(s => {
+        console.log(`[DEBUG] - "${normalizeSessionCode(s.session_code)}"`);
+      });
+    } else {
+      console.log('[DEBUG] No sessions found in the database');
     }
     
-    console.log(`No matching session found for code: ${cleanCode}`);
+    // Try a direct query as a last resort
+    const { data: directQueryData, error: directQueryError } = await supabase
+      .from('quiz_sessions')
+      .select('*')
+      .eq('session_code', normalizedCode)
+      .maybeSingle();
+    
+    if (directQueryError) {
+      console.error('[ERROR] Direct query error:', directQueryError);
+    } else if (directQueryData) {
+      console.log(`[DEBUG] Direct query found session: ${directQueryData.id}`);
+      return directQueryData as QuizSession;
+    } else {
+      console.log('[DEBUG] Direct query found no results');
+    }
+    
     return null;
   } catch (error) {
-    console.error('Failed to get quiz session:', error);
+    console.error('[ERROR] Failed to get quiz session:', error);
     return null;
   }
 };
@@ -79,7 +106,9 @@ export const getQuizSessionByCode = async (sessionCode: string): Promise<QuizSes
 // Create a new quiz session
 export const createQuizSession = async (quizId: string, creatorId: string | null): Promise<QuizSession | null> => {
   try {
+    // Generate a session code without any special characters
     const sessionCode = generateSessionCode();
+    console.log(`[DEBUG] Creating new session with code: "${sessionCode}"`);
     
     // Check if the quiz exists first
     const { data: quizData, error: quizError } = await supabase
@@ -89,17 +118,17 @@ export const createQuizSession = async (quizId: string, creatorId: string | null
       .single();
     
     if (quizError || !quizData) {
-      console.error('Error finding quiz:', quizError);
+      console.error('[ERROR] Error finding quiz:', quizError);
       throw new Error(`Quiz with ID ${quizId} not found`);
     }
     
-    // Create the quiz session with the clean session code (no hyphens or special chars)
+    // Create the quiz session
     const { data, error } = await supabase
       .from('quiz_sessions')
       .insert({
         quiz_id: quizId,
         creator_id: creatorId,
-        session_code: sessionCode, // Store the clean code without hyphens
+        session_code: sessionCode,
         status: 'waiting',
         settings: {}
       })
@@ -107,14 +136,23 @@ export const createQuizSession = async (quizId: string, creatorId: string | null
       .single();
     
     if (error) {
-      console.error('Error creating quiz session:', error);
+      console.error('[ERROR] Error creating quiz session:', error);
       throw new Error(`Failed to create quiz session: ${error.message}`);
     }
     
-    console.log('Created new quiz session with code:', sessionCode);
+    console.log(`[DEBUG] Created new quiz session with ID: ${data.id}, code: "${data.session_code}"`);
+    
+    // Verify the session was created properly
+    const verifySession = await getQuizSessionByCode(sessionCode);
+    if (verifySession) {
+      console.log(`[DEBUG] Verified session can be retrieved with code: "${sessionCode}"`);
+    } else {
+      console.error(`[ERROR] WARNING: Created session could not be retrieved with code: "${sessionCode}"`);
+    }
+    
     return data as QuizSession;
   } catch (error) {
-    console.error('Failed to create quiz session:', error);
+    console.error('[ERROR] Failed to create quiz session:', error);
     throw error;
   }
 };
@@ -127,19 +165,21 @@ export const joinQuizSession = async (
 ): Promise<{ session: QuizSession; participant: SessionParticipant } | null> => {
   try {
     // Normalize the session code
-    const cleanCode = normalizeSessionCode(sessionCode);
-    console.log('Joining quiz session with code:', cleanCode);
+    const normalizedCode = normalizeSessionCode(sessionCode);
+    console.log(`[DEBUG] Joining quiz session with normalized code: "${normalizedCode}"`);
     
     // First, get the session by code
-    const session = await getQuizSessionByCode(cleanCode);
+    const session = await getQuizSessionByCode(normalizedCode);
     
     if (!session) {
-      console.error(`No session found with code: ${cleanCode}`);
+      console.error(`[ERROR] No session found with code: "${normalizedCode}"`);
       return null;
     }
     
+    console.log(`[DEBUG] Found session ${session.id} with code: "${session.session_code}"`);
+    
     if (session.status !== 'waiting') {
-      console.error(`Session with code ${cleanCode} is not in waiting status, current status: ${session.status}`);
+      console.error(`[ERROR] Session ${session.id} is not in waiting status, current status: ${session.status}`);
       return null;
     }
     
@@ -158,17 +198,17 @@ export const joinQuizSession = async (
       .single();
     
     if (participantError) {
-      console.error('Error joining quiz session:', participantError);
+      console.error('[ERROR] Error joining quiz session:', participantError);
       return null;
     }
     
-    console.log('Successfully joined session:', session.session_code);
+    console.log(`[DEBUG] Successfully joined session with ID: ${session.id}, code: "${session.session_code}"`);
     return {
       session: session,
       participant: participantData as SessionParticipant
     };
   } catch (error) {
-    console.error('Failed to join quiz session:', error);
+    console.error('[ERROR] Failed to join quiz session:', error);
     return null;
   }
 };
@@ -183,13 +223,13 @@ export const getSessionParticipants = async (sessionId: string): Promise<Session
       .order('score', { ascending: false });
     
     if (error) {
-      console.error('Error getting session participants:', error);
+      console.error('[ERROR] Error getting session participants:', error);
       return [];
     }
     
     return data as SessionParticipant[];
   } catch (error) {
-    console.error('Failed to get session participants:', error);
+    console.error('[ERROR] Failed to get session participants:', error);
     return [];
   }
 };
@@ -206,13 +246,13 @@ export const startQuizSession = async (sessionId: string): Promise<boolean> => {
       .eq('id', sessionId);
     
     if (error) {
-      console.error('Error starting quiz session:', error);
+      console.error('[ERROR] Error starting quiz session:', error);
       return false;
     }
     
     return true;
   } catch (error) {
-    console.error('Failed to start quiz session:', error);
+    console.error('[ERROR] Failed to start quiz session:', error);
     return false;
   }
 };
@@ -240,13 +280,13 @@ export const updateParticipantProgress = async (
       .eq('id', participantId);
     
     if (error) {
-      console.error('Error updating participant progress:', error);
+      console.error('[ERROR] Error updating participant progress:', error);
       return false;
     }
     
     return true;
   } catch (error) {
-    console.error('Failed to update participant progress:', error);
+    console.error('[ERROR] Failed to update participant progress:', error);
     return false;
   }
 };
@@ -263,13 +303,13 @@ export const completeQuizSession = async (sessionId: string): Promise<boolean> =
       .eq('id', sessionId);
     
     if (error) {
-      console.error('Error completing quiz session:', error);
+      console.error('[ERROR] Error completing quiz session:', error);
       return false;
     }
     
     return true;
   } catch (error) {
-    console.error('Failed to complete quiz session:', error);
+    console.error('[ERROR] Failed to complete quiz session:', error);
     return false;
   }
 };
@@ -284,13 +324,13 @@ export const getQuizQuestions = async (quizId: string): Promise<QuizQuestion[]> 
       .single();
     
     if (error || !data) {
-      console.error('Error getting quiz questions:', error);
+      console.error('[ERROR] Error getting quiz questions:', error);
       return [];
     }
     
     return data.questions as QuizQuestion[];
   } catch (error) {
-    console.error('Failed to get quiz questions:', error);
+    console.error('[ERROR] Failed to get quiz questions:', error);
     return [];
   }
 };

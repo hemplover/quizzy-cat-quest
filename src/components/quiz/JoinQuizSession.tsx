@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Users, LogIn, AlertCircle, InfoIcon } from 'lucide-react';
+import { Users, LogIn, AlertCircle, InfoIcon, RefreshCw } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -23,14 +23,56 @@ interface JoinQuizSessionProps {
 
 const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) => {
   const [isJoining, setIsJoining] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
   const [sessionCode, setSessionCode] = useState(initialCode);
   const [username, setUsername] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
+  const [sessionCheckResult, setSessionCheckResult] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  const checkSessionExists = async () => {
+    if (!sessionCode.trim()) {
+      setErrorMessage('Please enter a session code first');
+      return;
+    }
+
+    setIsChecking(true);
+    setErrorMessage(null);
+    setDebugInfo(null);
+    setSessionCheckResult(null);
+
+    try {
+      const normalizedCode = normalizeSessionCode(sessionCode);
+      console.log(`[DEBUG] Checking if session exists: "${normalizedCode}"`);
+      
+      const sessionExists = await getQuizSessionByCode(normalizedCode);
+      
+      if (sessionExists) {
+        setSessionCheckResult(`Session found! Status: ${sessionExists.status}`);
+        toast({
+          title: 'Session exists',
+          description: `Found session with code ${normalizedCode}`,
+        });
+      } else {
+        setErrorMessage(`Session with code "${normalizedCode}" was not found.`);
+        setSessionCheckResult(`No session found with code: ${normalizedCode}`);
+        toast({
+          title: 'Session not found',
+          description: 'Could not find a session with that code.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('[ERROR] Error checking session:', error);
+      setErrorMessage(`Error checking session: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsChecking(false);
+    }
+  };
 
   const handleJoinSession = async () => {
     // Reset any previous error messages
@@ -61,7 +103,7 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
     try {
       // Try to join the session - the service will normalize the code
       const normalizedCode = normalizeSessionCode(sessionCode);
-      console.log('Attempting to join session with code:', normalizedCode);
+      console.log(`[DEBUG] Attempting to join session with code: "${normalizedCode}"`);
       
       // First check if session exists
       const sessionExists = await getQuizSessionByCode(normalizedCode);
@@ -101,7 +143,7 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
         });
       }
     } catch (error) {
-      console.error('Error joining session:', error);
+      console.error('[ERROR] Error joining session:', error);
       setErrorMessage(`Error: ${error instanceof Error ? error.message : 'Something went wrong'}`);
       toast({
         title: 'Error',
@@ -121,6 +163,7 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
     // Clear error message when user types
     if (errorMessage) setErrorMessage(null);
     if (debugInfo) setDebugInfo(null);
+    if (sessionCheckResult) setSessionCheckResult(null);
   };
 
   return (
@@ -146,18 +189,44 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
           <div className="flex flex-col gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="session-code">Session Code</Label>
-              <Input
-                id="session-code"
-                value={sessionCode}
-                onChange={handleSessionCodeChange}
-                placeholder="Enter 6-character code"
-                className="uppercase"
-                maxLength={6}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="session-code"
+                  value={sessionCode}
+                  onChange={handleSessionCodeChange}
+                  placeholder="Enter 6-character code"
+                  className="uppercase"
+                  maxLength={6}
+                />
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={checkSessionExists}
+                  disabled={isChecking || !sessionCode.trim()}
+                >
+                  {isChecking ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground">
-                The 6-digit code provided by the quiz host
+                The 6-digit code provided by the quiz host (no hyphens or special characters)
               </p>
             </div>
+            
+            {sessionCheckResult && (
+              <div className={`p-3 rounded-md flex items-start gap-2 ${
+                sessionCheckResult.includes('found') && !sessionCheckResult.includes('No session') 
+                  ? 'bg-green-50 text-green-800 border border-green-200' 
+                  : 'bg-amber-50 text-amber-800 border border-amber-200'
+              }`}>
+                <InfoIcon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <p className="text-sm">{sessionCheckResult}</p>
+              </div>
+            )}
             
             <div className="grid gap-2">
               <Label htmlFor="username">Your Name</Label>
@@ -187,6 +256,19 @@ const JoinQuizSession: React.FC<JoinQuizSessionProps> = ({ initialCode = '' }) =
                 <p>{debugInfo}</p>
               </div>
             )}
+            
+            <div className="bg-amber-50 border border-amber-100 rounded-md p-3">
+              <h4 className="font-medium text-amber-800 flex items-center gap-1 mb-1">
+                <InfoIcon className="w-4 h-4" />
+                Troubleshooting Tips
+              </h4>
+              <ul className="text-sm text-amber-700 list-disc pl-5 space-y-1">
+                <li>Make sure the session code is exactly 6 characters</li>
+                <li>Check that the quiz creator has started the session but not ended it</li>
+                <li>Ensure you're entering the code exactly as shown by the host</li>
+                <li>The code should only contain letters and numbers (no spaces or special characters)</li>
+              </ul>
+            </div>
           </div>
           
           <DialogFooter className="sm:justify-between">

@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LogIn, Users, AlertCircle, HelpCircle } from 'lucide-react';
+import { LogIn, Users, AlertCircle, HelpCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,6 +14,7 @@ const MultiplayerJoin = () => {
   const [username, setUsername] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [sessionExists, setSessionExists] = useState(false);
   const [normalizedCode, setNormalizedCode] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -23,73 +23,81 @@ const MultiplayerJoin = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  useEffect(() => {
-    const checkSession = async () => {
-      if (!sessionCode) {
-        navigate('/');
-        return;
-      }
+  const checkSession = async (code: string) => {
+    if (!code) {
+      navigate('/');
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      setErrorMessage(null);
+      setDebugInfo(null);
       
-      try {
-        setIsLoading(true);
-        setErrorMessage(null);
-        setDebugInfo(null);
+      // Clean the session code
+      const cleanCode = normalizeSessionCode(code);
+      setNormalizedCode(cleanCode);
+      
+      console.log(`[DEBUG] Checking session with code: "${cleanCode}"`);
+      
+      // Try to get the session
+      const session = await getQuizSessionByCode(cleanCode);
+      
+      if (session) {
+        console.log(`[DEBUG] Session found: ID=${session.id}, code="${session.session_code}", status=${session.status}`);
+        setSessionExists(true);
         
-        // Clean the session code
-        const cleanCode = normalizeSessionCode(sessionCode);
-        setNormalizedCode(cleanCode);
-        
-        console.log('Checking session with code:', cleanCode);
-        
-        // Try to get the session
-        const session = await getQuizSessionByCode(cleanCode);
-        
-        if (session) {
-          console.log('Session found:', session);
-          setSessionExists(true);
-          
-          // If the session is already active or completed, redirect to the relevant page
-          if (session.status === 'active') {
-            navigate(`/quiz/multiplayer/session/${session.session_code}`);
-            return;
-          } else if (session.status === 'completed') {
-            toast({
-              title: 'Session ended',
-              description: 'This quiz session has already ended',
-              variant: 'destructive',
-            });
-            navigate('/');
-            return;
-          }
-        } else {
-          console.log('No session found with code:', cleanCode);
-          setDebugInfo(`We tried connecting with code "${cleanCode}" using multiple matching strategies but couldn't find an active session.`);
-          setErrorMessage(`Could not find a session with code: ${cleanCode}. The session may have been deleted or the code is incorrect.`);
+        // If the session is already active or completed, redirect to the relevant page
+        if (session.status === 'active') {
+          navigate(`/quiz/multiplayer/session/${session.session_code}`);
+          return;
+        } else if (session.status === 'completed') {
           toast({
-            title: 'Invalid session',
-            description: `Could not find a session with code: ${cleanCode}`,
+            title: 'Session ended',
+            description: 'This quiz session has already ended',
             variant: 'destructive',
           });
-          
-          // Keep the user on the page but show the error
-          setSessionExists(false);
+          navigate('/');
+          return;
         }
-      } catch (error) {
-        console.error('Error checking session:', error);
-        setErrorMessage(`Error checking session: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } else {
+        console.log(`[DEBUG] No session found with code: "${cleanCode}"`);
+        setDebugInfo(`We tried connecting with code "${cleanCode}" but couldn't find an active session.`);
+        setErrorMessage(`Could not find a session with code: ${cleanCode}. The session may have been deleted or the code is incorrect.`);
         toast({
-          title: 'Error',
-          description: 'Failed to check session',
+          title: 'Invalid session',
+          description: `Could not find a session with code: ${cleanCode}`,
           variant: 'destructive',
         });
+        
+        // Keep the user on the page but show the error
         setSessionExists(false);
-      } finally {
-        setIsLoading(false);
       }
-    };
-    
-    checkSession();
+    } catch (error) {
+      console.error('[ERROR] Error checking session:', error);
+      setErrorMessage(`Error checking session: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast({
+        title: 'Error',
+        description: 'Failed to check session',
+        variant: 'destructive',
+      });
+      setSessionExists(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  useEffect(() => {
+    if (sessionCode) {
+      checkSession(sessionCode);
+    }
   }, [sessionCode, navigate, toast]);
+  
+  const handleRefreshSession = async () => {
+    setIsRefreshing(true);
+    await checkSession(normalizedCode || sessionCode || '');
+    setIsRefreshing(false);
+  };
   
   const handleJoinSession = async () => {
     if (!username.trim()) {
@@ -135,6 +143,8 @@ const MultiplayerJoin = () => {
         return;
       }
       
+      console.log(`[DEBUG] Joining session: ID=${sessionCheck.id}, code="${sessionCheck.session_code}"`);
+      
       const result = await joinQuizSession(
         normalizedCode,
         username.trim(),
@@ -147,6 +157,7 @@ const MultiplayerJoin = () => {
           description: `You've joined the quiz as ${username}`,
         });
         
+        console.log(`[DEBUG] Successfully joined, redirecting to player view with code: "${result.session.session_code}"`);
         // Use the session code from the result to ensure we have the correct format
         navigate(`/quiz/multiplayer/player/${result.session.session_code}`);
       } else {
@@ -159,7 +170,7 @@ const MultiplayerJoin = () => {
         });
       }
     } catch (error) {
-      console.error('Error joining session:', error);
+      console.error('[ERROR] Error joining session:', error);
       setErrorMessage(`Error joining session: ${error instanceof Error ? error.message : 'Unknown error'}`);
       toast({
         title: 'Error',
@@ -209,12 +220,33 @@ const MultiplayerJoin = () => {
                 <li>Check if you've entered the correct session code</li>
                 <li>Ask the host to verify the session is still active</li>
                 <li>Try joining using the JoinQuizSession component from the homepage</li>
-                <li>Ensure you're using the same Supabase instance (development/production) as the host</li>
+                <li>Make sure the code doesn't contain any special characters (letters and numbers only)</li>
+                <li>Session codes are 6 characters long and case-insensitive</li>
               </ul>
             </div>
           </div>
         </div>
-        <Button onClick={() => navigate('/')}>Go Home</Button>
+        
+        <div className="flex justify-center gap-4 mb-8">
+          <Button onClick={() => navigate('/')}>Go Home</Button>
+          <Button 
+            variant="outline" 
+            onClick={handleRefreshSession}
+            disabled={isRefreshing}
+          >
+            {isRefreshing ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Refreshing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Try Again
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     );
   }
@@ -277,6 +309,16 @@ const MultiplayerJoin = () => {
           >
             {isJoining ? 'Joining...' : 'Join Session'}
             <LogIn className="w-4 h-4" />
+          </Button>
+          
+          <Button
+            variant="outline"
+            onClick={handleRefreshSession}
+            disabled={isRefreshing}
+            className="w-full flex items-center justify-center gap-2"
+          >
+            {isRefreshing ? 'Refreshing...' : 'Refresh Session Status'}
+            <RefreshCw className="w-4 h-4" />
           </Button>
         </div>
       </div>
