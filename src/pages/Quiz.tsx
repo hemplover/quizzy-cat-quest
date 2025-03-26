@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, BookOpen, Users, RefreshCw } from 'lucide-react';
+import { PlusCircle, BookOpen, Users, RefreshCw, Play } from 'lucide-react';
 import { QuizQuestion, Quiz } from '@/types/quiz';
 import { getQuiz, getQuizzes } from '@/services/quizService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,7 +13,7 @@ import CatTutor from '@/components/CatTutor';
 import CreateQuizSession from '@/components/quiz/CreateQuizSession';
 import JoinQuizSession from '@/components/quiz/JoinQuizSession';
 
-const Quiz = () => {
+const QuizPage = () => {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [selectedQuiz, setSelectedQuiz] = useState<QuizQuestion[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -54,6 +54,7 @@ const Quiz = () => {
   const handleQuizSelect = async (quizId: string) => {
     try {
       const quiz = await getQuiz(quizId);
+      
       // Ensure we're setting an array of QuizQuestion objects
       if (quiz && Array.isArray(quiz.questions)) {
         setSelectedQuiz(quiz.questions as QuizQuestion[]);
@@ -79,6 +80,11 @@ const Quiz = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedQuiz(null);
+  };
+  
+  const startQuiz = (quizId: string) => {
+    // Redirect to the quiz session page directly
+    navigate(`/quiz/session/${quizId}`);
   };
 
   return (
@@ -141,7 +147,6 @@ const Quiz = () => {
                   <div 
                     key={quiz.id} 
                     className="glass-card p-6 rounded-xl cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => handleQuizSelect(quiz.id)}
                   >
                     <CardTitle className="mb-2 line-clamp-1">{quiz.title}</CardTitle>
                     <div className="text-sm text-muted-foreground mb-4">
@@ -152,12 +157,21 @@ const Quiz = () => {
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleQuizSelect(quiz.id);
-                        }}
+                        onClick={() => startQuiz(quiz.id)}
+                        className="flex items-center gap-1"
                       >
+                        <Play className="h-4 w-4" />
                         Take Quiz
+                      </Button>
+                      
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex items-center gap-1"
+                        onClick={() => handleQuizSelect(quiz.id)}
+                      >
+                        <Users className="h-4 w-4" />
+                        View Questions
                       </Button>
                       
                       <CreateQuizSession 
@@ -189,15 +203,31 @@ const Quiz = () => {
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
             <div className="glass-card p-8 rounded-xl max-w-3xl w-full">
               <h2 className="text-2xl font-bold mb-4">Quiz Questions</h2>
-              <ul>
+              <ul className="space-y-4">
                 {selectedQuiz.map((question, index) => (
-                  <li key={index} className="mb-4">
-                    <strong>Question {index + 1}:</strong> {question.question}
+                  <li key={index} className="p-4 bg-card rounded-lg border">
+                    <p className="font-medium mb-2">Question {index + 1}: {question.question}</p>
+                    {question.options && question.options.length > 0 && (
+                      <div className="pl-4 mt-2">
+                        <p className="text-sm text-muted-foreground mb-1">Options:</p>
+                        <ul className="list-disc pl-4">
+                          {question.options.map((option, i) => (
+                            <li key={i} className="text-sm">{option}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
-              <div className="text-center mt-6">
-                <Button onClick={closeModal}>Close</Button>
+              <div className="flex justify-between mt-6">
+                <Button variant="outline" onClick={closeModal}>Close</Button>
+                <Button onClick={() => {
+                  closeModal();
+                  startQuiz(searchParams.get('quizId') || '');
+                }}>
+                  Take Quiz
+                </Button>
               </div>
             </div>
           </div>
@@ -207,4 +237,4 @@ const Quiz = () => {
   );
 };
 
-export default Quiz;
+export default QuizPage;

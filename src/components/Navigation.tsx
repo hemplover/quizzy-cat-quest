@@ -2,7 +2,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/i18n/LanguageContext';
-import { Home, BookOpen, Upload, BarChart2 } from 'lucide-react';
+import { Home, BookOpen, Upload, BarChart2, Users } from 'lucide-react';
 import LanguageSwitcher from './LanguageSwitcher';
 import UserMenu from './UserMenu';
 import { useAuth } from '@/contexts/AuthContext';
@@ -45,6 +45,18 @@ const Navigation = () => {
               <Link to="/upload">
                 <Upload className="h-4 w-4 mr-1" />
                 {t('Create Quiz')}
+              </Link>
+            </Button>
+            
+            <Button
+              asChild
+              variant={isActive('/quiz') ? 'default' : 'ghost'}
+              className="text-sm"
+              size="sm"
+            >
+              <Link to="/quiz">
+                <Users className="h-4 w-4 mr-1" />
+                Multiplayer
               </Link>
             </Button>
             

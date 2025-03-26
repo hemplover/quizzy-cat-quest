@@ -21,6 +21,7 @@ import MultiplayerHost from "./pages/MultiplayerHost";
 import MultiplayerPlayer from "./pages/MultiplayerPlayer";
 import MultiplayerSession from "./pages/MultiplayerSession";
 import MultiplayerJoin from "./pages/MultiplayerJoin";
+import QuizSession from "./pages/QuizSession";
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient({
@@ -59,6 +60,14 @@ const App = () => (
               element={
                 <Layout>
                   <Quiz />
+                </Layout>
+              } 
+            />
+            <Route 
+              path="/quiz/session/:quizId" 
+              element={
+                <Layout>
+                  <QuizSession />
                 </Layout>
               } 
             />
