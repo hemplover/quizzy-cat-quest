@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { QuizSession, SessionParticipant } from "@/types/multiplayer";
 import { QuizQuestion } from "@/types/quiz";
@@ -27,27 +26,33 @@ export const createQuizSession = async (quizId: string, creatorId: string | null
       throw new Error(`Quiz with ID ${quizId} not found`);
     }
     
-    const { data, error } = await supabase
-      .from('quiz_sessions')
-      .insert({
-        quiz_id: quizId,
-        creator_id: creatorId,
-        session_code: sessionCode,
-        status: 'waiting',
-        settings: {}
-      })
-      .select('*')
-      .single();
-    
-    if (error) {
-      console.error('Error creating quiz session:', error);
-      throw new Error(`Failed to create quiz session: ${error.message}`);
+    // Create the quiz session with a try/catch block to handle any Supabase errors
+    try {
+      const { data, error } = await supabase
+        .from('quiz_sessions')
+        .insert({
+          quiz_id: quizId,
+          creator_id: creatorId,
+          session_code: sessionCode,
+          status: 'waiting',
+          settings: {}
+        })
+        .select('*')
+        .single();
+      
+      if (error) {
+        console.error('Error creating quiz session:', error);
+        throw new Error(`Failed to create quiz session: ${error.message}`);
+      }
+      
+      return data as QuizSession;
+    } catch (supabaseError) {
+      console.error('Supabase error creating quiz session:', supabaseError);
+      throw supabaseError;
     }
-    
-    return data as QuizSession;
   } catch (error) {
     console.error('Failed to create quiz session:', error);
-    return null;
+    throw error;
   }
 };
 
