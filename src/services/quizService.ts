@@ -1,5 +1,7 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { Quiz, QuizQuestion } from '@/types/quiz';
+import { Quiz, QuizQuestion, GeneratedQuiz, QuizResults, QuizSettings } from '@/types/quiz';
+import { toast } from 'sonner';
 
 // Fetch all quizzes or quizzes by subject
 export const getQuizzes = async (subjectId?: string): Promise<Quiz[]> => {
