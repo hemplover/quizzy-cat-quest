@@ -15,7 +15,8 @@ import {
   getSessionParticipants, 
   startQuizSession, 
   subscribeToSessionUpdates,
-  getQuizQuestions
+  getQuizQuestions,
+  joinQuizSession
 } from '@/services/multiplayerService';
 import { QuizSession, SessionParticipant } from '@/types/multiplayer';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import CatTutor from '@/components/CatTutor';
 import { QuizQuestion } from '@/types/quiz';
+import { supabase } from '@/integrations/supabase/client';
 
 const MultiplayerHost = () => {
   const { sessionCode } = useParams<{ sessionCode: string }>();
@@ -36,8 +38,37 @@ const MultiplayerHost = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   
+  // Funzione semplice per aggiungere l'host come partecipante
+  const addHostAsParticipant = async (sessionId: string) => {
+    if (!sessionId || !user) return;
+    
+    // Generiamo un username semplice
+    const hostUsername = user.email?.split('@')[0] || 'Host';
+    
+    try {
+      const { error } = await supabase.from('session_participants').insert({
+        session_id: sessionId,
+        user_id: user.id,
+        username: hostUsername,
+        score: 0,
+        completed: false,
+        answers: []
+      });
+      
+      if (error) {
+        console.error('Errore aggiungendo host:', error);
+      } else {
+        console.log('Host aggiunto con successo!');
+      }
+    } catch (err) {
+      console.error('Eccezione aggiungendo host:', err);
+    }
+  };
+  
   // Get the session and participants data
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchSessionData = async () => {
       if (!sessionCode) return;
       
@@ -57,7 +88,7 @@ const MultiplayerHost = () => {
           return;
         }
         
-        setSession(sessionData);
+        if (isMounted) setSession(sessionData);
         
         if (sessionData.status === 'active') {
           // If the session is already active, go to the quiz
@@ -65,12 +96,16 @@ const MultiplayerHost = () => {
           return;
         }
         
+        // Aggiungiamo l'host come partecipante
+        await addHostAsParticipant(sessionData.id);
+        
+        // Ora recuperiamo i partecipanti (dovrebbe includere l'host)
         const participantsData = await getSessionParticipants(sessionData.id);
-        setParticipants(participantsData);
+        if (isMounted) setParticipants(participantsData);
         
         // Get quiz questions
         const questionsData = await getQuizQuestions(sessionData.quiz_id);
-        setQuestions(questionsData);
+        if (isMounted) setQuestions(questionsData);
       } catch (error) {
         console.error('Error fetching session data:', error);
         toast({
@@ -79,12 +114,17 @@ const MultiplayerHost = () => {
           variant: 'destructive',
         });
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
     
     fetchSessionData();
-  }, [sessionCode, navigate, toast]);
+    
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
+  }, [sessionCode, navigate, toast, user]);
   
   // Subscribe to real-time updates
   useEffect(() => {
@@ -107,6 +147,23 @@ const MultiplayerHost = () => {
     
     return cleanup;
   }, [session, sessionCode, navigate]);
+  
+  // Aggiunta: ricarica automatica della lista partecipanti ogni 3 secondi
+  useEffect(() => {
+    if (!session) return;
+    
+    const intervalId = setInterval(async () => {
+      try {
+        const refreshedParticipants = await getSessionParticipants(session.id);
+        setParticipants(refreshedParticipants);
+        console.log("[REFRESH] Participants list refreshed automatically");
+      } catch (err) {
+        console.error("Error refreshing participants:", err);
+      }
+    }, 3000);
+    
+    return () => clearInterval(intervalId);
+  }, [session]);
   
   const handleStartQuiz = async () => {
     if (!session) return;
@@ -265,6 +322,73 @@ const MultiplayerHost = () => {
                 </div>
               )}
             </div>
+            
+            {session && (
+              <div className="flex justify-between mt-3">
+                <Button 
+                  variant="outline"
+                  size="sm" 
+                  className="w-1/2 mr-1"
+                  onClick={async () => {
+                    if (!session) return;
+                    const participantsData = await getSessionParticipants(session.id);
+                    setParticipants(participantsData);
+                    toast({
+                      title: 'Aggiornato',
+                      description: `${participantsData.length} partecipanti trovati`,
+                    });
+                  }}
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Aggiorna Lista
+                </Button>
+                
+                <Button 
+                  variant="default"
+                  size="sm" 
+                  className="w-1/2 ml-1 bg-cat hover:bg-cat/90 text-white"
+                  onClick={async () => {
+                    if (!session) return;
+                    
+                    try {
+                      const hostUsername = user?.email?.split('@')[0] || 'Host';
+                      
+                      const { data, error } = await supabase
+                        .from('session_participants')
+                        .insert({
+                          session_id: session.id,
+                          user_id: user?.id,
+                          username: hostUsername,
+                          score: 0,
+                          completed: false,
+                          answers: []
+                        });
+                      
+                      if (error) {
+                        console.error('Errore:', error);
+                        toast({
+                          title: 'Errore',
+                          description: error.message,
+                          variant: 'destructive',
+                        });
+                      } else {
+                        toast({
+                          title: 'Successo',
+                          description: 'Aggiunto come host',
+                        });
+                        
+                        const participantsData = await getSessionParticipants(session.id);
+                        setParticipants(participantsData);
+                      }
+                    } catch (err) {
+                      console.error('Errore:', err);
+                    }
+                  }}
+                >
+                  Unisciti Come Host
+                </Button>
+              </div>
+            )}
           </div>
           
           <div>

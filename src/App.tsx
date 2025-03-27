@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -22,6 +21,7 @@ import MultiplayerPlayer from "./pages/MultiplayerPlayer";
 import MultiplayerSession from "./pages/MultiplayerSession";
 import MultiplayerJoin from "./pages/MultiplayerJoin";
 import QuizSession from "./pages/QuizSession";
+import DebugUtils from "./pages/DebugUtils";
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient({
@@ -138,6 +138,14 @@ const App = () => {
               />
               <Route path="/auth" element={<Auth />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route 
+                path="/debug" 
+                element={
+                  <Layout>
+                    <DebugUtils />
+                  </Layout>
+                } 
+              />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <Toaster />

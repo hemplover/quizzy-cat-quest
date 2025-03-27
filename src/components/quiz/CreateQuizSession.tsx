@@ -1,11 +1,10 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createQuizSession } from '@/services/multiplayerService';
+import { createQuizSession, testDatabaseAccess } from '@/services/multiplayerService';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Share2, Users } from 'lucide-react';
+import { Share2, Users, Database } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -22,10 +21,39 @@ interface CreateQuizSessionProps {
 
 const CreateQuizSession: React.FC<CreateQuizSessionProps> = ({ quizId, onSuccess }) => {
   const [isCreating, setIsCreating] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  const handleTestDatabase = async () => {
+    setIsTesting(true);
+    try {
+      const success = await testDatabaseAccess();
+      if (success) {
+        toast({
+          title: 'Database access successful',
+          description: 'Successfully connected to the database',
+        });
+      } else {
+        toast({
+          title: 'Database access failed',
+          description: 'Could not connect to the database',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error testing database:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to test database connection',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   const handleCreateSession = async () => {
     if (!quizId) {
@@ -102,12 +130,23 @@ const CreateQuizSession: React.FC<CreateQuizSessionProps> = ({ quizId, onSuccess
           </div>
           
           <DialogFooter className="flex sm:justify-between">
-            <Button
-              variant="ghost"
-              onClick={() => setShowDialog(false)}
-            >
-              Cancel
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setShowDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleTestDatabase}
+                disabled={isTesting}
+                className="flex items-center gap-2"
+              >
+                <Database className="w-4 h-4" />
+                {isTesting ? 'Testing...' : 'Test DB'}
+              </Button>
+            </div>
             <Button
               onClick={handleCreateSession}
               disabled={isCreating}
