@@ -2,6 +2,25 @@ import { supabase } from "@/integrations/supabase/client";
 import { QuizSession, SessionParticipant } from "@/types/multiplayer";
 import { QuizQuestion } from "@/types/quiz";
 import { nanoid } from "nanoid";
+import { createClient } from "@supabase/supabase-js";
+
+// Create a Supabase client with service role key for admin operations
+const supabaseAdmin = createClient(
+  'https://lsozzejwfkuexbyynnom.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxzb3p6ZWp3Zmt1ZXhieXlubm9tIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MjYzMjQ3OSwiZXhwIjoyMDU4MjA4NDc5fQ.suw5bZaWyWvJlp3AsX6oE1FLg5P3C0bpq_GszykLznc'
+);
+
+// Define the return type for the join_quiz_session RPC function
+type JoinQuizSessionResponse = {
+  session: QuizSession;
+  participant: SessionParticipant;
+};
+
+type JoinQuizSessionParams = {
+  p_session_code: string;
+  p_username: string;
+  p_user_id: string | null;
+};
 
 // Generate a unique, readable session code without any special characters
 export const generateSessionCode = (): string => {
@@ -96,6 +115,7 @@ export const createQuizSession = async (quizId: string, creatorId: string | null
     console.log(`[DEBUG] Creating new session with code: "${sessionCode}"`);
     
     // Check if the quiz exists first
+    console.log(`[DEBUG] Checking if quiz with ID ${quizId} exists`);
     const { data: quizData, error: quizError } = await supabase
       .from('quizzes')
       .select('id')
@@ -107,13 +127,15 @@ export const createQuizSession = async (quizId: string, creatorId: string | null
       throw new Error(`Quiz with ID ${quizId} not found`);
     }
     
-    // Create the quiz session with a clean code (no hyphens or special chars)
+    console.log(`[DEBUG] Quiz found, creating session with creatorId: ${creatorId}`);
+    
+    // Attempt to create the quiz session
     const { data, error } = await supabase
       .from('quiz_sessions')
       .insert({
         quiz_id: quizId,
         creator_id: creatorId,
-        session_code: sessionCode, // Using clean code format
+        session_code: sessionCode,
         status: 'waiting',
         settings: {}
       })
@@ -121,19 +143,56 @@ export const createQuizSession = async (quizId: string, creatorId: string | null
       .single();
     
     if (error) {
-      console.error('[ERROR] Error creating quiz session:', error);
+      console.error('[ERROR] Error creating quiz session:', error.message);
+      if (error.details) console.error('[ERROR] Details:', error.details);
+      if (error.hint) console.error('[ERROR] Hint:', error.hint);
+      console.error('[DEBUG] Full error object:', JSON.stringify(error, null, 2));
+      
       throw new Error(`Failed to create quiz session: ${error.message}`);
     }
     
     console.log(`[DEBUG] Created new quiz session with ID: ${data.id}, code: "${data.session_code}"`);
     
-    // Verify the session can be retrieved properly
-    const verifySession = await getQuizSessionByCode(sessionCode);
-    if (verifySession) {
-      console.log(`[DEBUG] Verified session can be retrieved with code: "${sessionCode}"`);
-    } else {
-      console.error(`[ERROR] WARNING: Created session could not be retrieved with code: "${sessionCode}"`);
-    }
+    // METODO ALTERNATIVO: Aggiungi l'host come partecipante usando una funzione separata e asincrona
+    // Non aspettiamo che finisca per non bloccare la creazione della sessione
+    setTimeout(async () => {
+      try {
+        // Prima controlliamo se l'host è già presente
+        const { data: existingParticipants, error: fetchError } = await supabase
+          .from('session_participants')
+          .select('*')
+          .eq('session_id', data.id)
+          .eq('user_id', creatorId);
+        
+        if (fetchError) {
+          console.error('[ERROR] Error checking existing participants:', fetchError);
+        } else if (existingParticipants && existingParticipants.length > 0) {
+          console.log('[INFO] Host is already a participant, skipping addition');
+          return;
+        }
+        
+        console.log(`[DEBUG] Adding host as participant (delayed) for session ${data.id}`);
+        
+        const { data: participantData, error: participantError } = await supabase
+          .from('session_participants')
+          .insert({
+            session_id: data.id,
+            user_id: creatorId,
+            username: 'Host',
+            score: 0,
+            completed: false,
+            answers: []
+          });
+          
+        if (participantError) {
+          console.error('[ERROR] Failed to add host as participant:', participantError);
+        } else {
+          console.log('[SUCCESS] Host added as participant successfully');
+        }
+      } catch (err) {
+        console.error('[ERROR] Exception while adding host as participant:', err);
+      }
+    }, 1000); // Aggiungiamo l'host come partecipante dopo 1 secondo
     
     return data as QuizSession;
   } catch (error) {
@@ -250,6 +309,22 @@ export const updateParticipantProgress = async (
   completed: boolean = false
 ): Promise<boolean> => {
   try {
+    console.log(`[INFO] Updating participant ${participantId} - score: ${score}, answers: ${answers.length}, completed: ${completed}`);
+    
+    // Prima, verifichiamo che il partecipante esista
+    const { data: participantData, error: fetchError } = await supabase
+      .from('session_participants')
+      .select('id, username, user_id, session_id')
+      .eq('id', participantId)
+      .single();
+      
+    if (fetchError || !participantData) {
+      console.error(`[ERROR] Participant ${participantId} not found:`, fetchError);
+      return false;
+    }
+    
+    console.log(`[INFO] Found participant: ${participantData.username} (user_id: ${participantData.user_id}) in session ${participantData.session_id}`);
+    
     const updates: any = {
       score,
       answers
@@ -267,6 +342,41 @@ export const updateParticipantProgress = async (
     if (error) {
       console.error('[ERROR] Error updating participant progress:', error);
       return false;
+    }
+    
+    console.log(`[SUCCESS] Updated participant ${participantId} successfully`);
+    
+    // Se il partecipante ha completato, controlliamo se tutti hanno completato
+    if (completed) {
+      try {
+        // Utilizziamo l'ID sessione già ottenuto dalla verifica iniziale
+        const sessionId = participantData.session_id;
+        
+        // Ora controlliamo se tutti i partecipanti hanno completato
+        const { data: allParticipants } = await supabase
+          .from('session_participants')
+          .select('*')
+          .eq('session_id', sessionId);
+          
+        if (allParticipants && allParticipants.length > 0) {
+          console.log(`[INFO] Checking completion status for all ${allParticipants.length} participants in session ${sessionId}`);
+          
+          const allCompleted = allParticipants.every(p => p.completed);
+          const completedCount = allParticipants.filter(p => p.completed).length;
+          
+          console.log(`[INFO] ${completedCount}/${allParticipants.length} participants have completed the quiz`);
+          
+          // Se tutti hanno completato, marca la sessione come completata
+          if (allCompleted) {
+            console.log('[INFO] All participants completed, marking session as completed');
+            await completeQuizSession(sessionId);
+          } else {
+            console.log('[INFO] Not all participants completed yet, session remains active');
+          }
+        }
+      } catch (err) {
+        console.error('[ERROR] Error checking completion status:', err);
+      }
     }
     
     return true;
@@ -366,4 +476,42 @@ export const subscribeToSessionUpdates = (
     supabase.removeChannel(participantsChannel);
     supabase.removeChannel(sessionChannel);
   };
+};
+
+// Test database access
+export const testDatabaseAccess = async (): Promise<boolean> => {
+  try {
+    // Try to get all quizzes
+    const { data: quizzes, error: quizzesError } = await supabase
+      .from('quizzes')
+      .select('*')
+      .limit(1);
+    
+    if (quizzesError) {
+      console.error('[ERROR] Failed to access quizzes:', quizzesError);
+      return false;
+    }
+    
+    console.log('[DEBUG] Successfully accessed quizzes table');
+    console.log('[DEBUG] Number of quizzes:', quizzes?.length || 0);
+    
+    // Try to get all sessions
+    const { data: sessions, error: sessionsError } = await supabase
+      .from('quiz_sessions')
+      .select('*')
+      .limit(1);
+    
+    if (sessionsError) {
+      console.error('[ERROR] Failed to access quiz_sessions:', sessionsError);
+      return false;
+    }
+    
+    console.log('[DEBUG] Successfully accessed quiz_sessions table');
+    console.log('[DEBUG] Number of sessions:', sessions?.length || 0);
+    
+    return true;
+  } catch (error) {
+    console.error('[ERROR] Failed to test database access:', error);
+    return false;
+  }
 };

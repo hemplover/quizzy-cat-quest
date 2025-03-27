@@ -76,15 +76,40 @@ const MultiplayerSession = () => {
         const participantsData = await getSessionParticipants(sessionData.id);
         setParticipants(participantsData);
         
-        // Find my participant
-        const me = participantsData.find(p => p.user_id === user?.id) || participantsData[0];
-        if (me) {
-          setMyParticipant(me);
-          
-          // If I've already completed the quiz, go to the results
-          if (me.completed) {
-            setQuizCompleted(true);
+        // Se non ci sono partecipanti nella sessione, qualcosa non va
+        if (participantsData.length === 0) {
+          console.error('[ERROR] No participants found in session');
+          return;
+        }
+        
+        // Trova il partecipante corrispondente all'utente corrente
+        // Se user.id è presente, proviamo a trovare un partecipante con quell'ID
+        let participant = null;
+        
+        if (user?.id) {
+          participant = participantsData.find(p => p.user_id === user.id);
+          if (participant) {
+            console.log(`[INFO] Found participant matching user ID: ${participant.username} (ID: ${participant.id})`);
           }
+        }
+        
+        // Se non abbiamo trovato un partecipante con l'ID dell'utente o l'utente non è autenticato
+        // Utilizziamo l'ultimo partecipante aggiunto nella sessione (di solito quello appena unito)
+        if (!participant) {
+          // Ordina i partecipanti per data di iscrizione (decrescente)
+          const sortedParticipants = [...participantsData].sort(
+            (a, b) => new Date(b.joined_at).getTime() - new Date(a.joined_at).getTime()
+          );
+          
+          participant = sortedParticipants[0];
+          console.log(`[INFO] Using most recent participant: ${participant.username} (ID: ${participant.id})`);
+        }
+        
+        setMyParticipant(participant);
+        
+        // If I've already completed the quiz, go to the results
+        if (participant && participant.completed) {
+          setQuizCompleted(true);
         }
         
         // Get quiz questions
@@ -110,11 +135,30 @@ const MultiplayerSession = () => {
       (updatedParticipants) => {
         setParticipants(updatedParticipants);
         
-        // Update my participant
-        const me = updatedParticipants.find(p => p.user_id === user?.id) || updatedParticipants[0];
-        if (me) {
-          setMyParticipant(me);
+        // Se non ci sono partecipanti, non possiamo fare nulla
+        if (updatedParticipants.length === 0) return;
+        
+        // Aggiorniamo il nostro partecipante, mantenendo lo stesso di prima se possibile
+        if (myParticipant) {
+          // Cerca di trovare lo stesso partecipante di prima
+          const sameParticipant = updatedParticipants.find(p => p.id === myParticipant.id);
+          if (sameParticipant) {
+            setMyParticipant(sameParticipant);
+            return;
+          }
         }
+        
+        // Se non abbiamo più il nostro partecipante, proviamo a trovarne uno nuovo per ID utente
+        if (user?.id) {
+          const participant = updatedParticipants.find(p => p.user_id === user.id);
+          if (participant) {
+            setMyParticipant(participant);
+            return;
+          }
+        }
+        
+        // Fallback: usa il primo partecipante della lista
+        setMyParticipant(updatedParticipants[0]);
       },
       (updatedSession) => {
         setSession(updatedSession);
@@ -127,7 +171,7 @@ const MultiplayerSession = () => {
     );
     
     return cleanup;
-  }, [session, user?.id, quizCompleted]);
+  }, [session, user?.id, quizCompleted, myParticipant]);
   
   // Start the quiz timer when everything is loaded
   useEffect(() => {
@@ -183,7 +227,20 @@ const MultiplayerSession = () => {
   };
 
   const handleSubmitAnswer = async (isTimeUp = false) => {
-    if (!currentQuestion || !myParticipant) return;
+    if (!currentQuestion || !myParticipant) {
+      console.error('[ERROR] Cannot submit answer: no current question or participant found');
+      return;
+    }
+    
+    // Verifica che l'utente abbia un partecipante valido
+    // Per utenti autenticati, controlliamo che corrispondano gli ID
+    // Per utenti anonimi, accettiamo qualsiasi partecipante assegnato
+    if (user?.id && myParticipant.user_id && myParticipant.user_id !== user.id) {
+      console.error(`[WARNING] User ID mismatch: participant ID (${myParticipant.user_id}) doesn't match current user (${user.id})`);
+      console.log('[INFO] Proceeding anyway as this could be an anonymous participant');
+    }
+    
+    console.log(`[INFO] Submitting answer for participant: ${myParticipant.username} (ID: ${myParticipant.id})`);
     
     // Clear the timer
     if (timerRef.current) {
@@ -248,6 +305,8 @@ const MultiplayerSession = () => {
     // Save progress to the server
     try {
       const isLastQuestion = currentQuestionIndex === questions.length - 1;
+      console.log(`[INFO] Updating progress for participant ${myParticipant.id} (${myParticipant.username}), completed: ${isLastQuestion}`);
+      
       await updateParticipantProgress(
         myParticipant.id,
         newScore,
@@ -257,10 +316,13 @@ const MultiplayerSession = () => {
       
       // If this is the last question, complete the quiz for this user
       if (isLastQuestion) {
-        // If I'm the host, also mark the session as completed when I finish
-        if (session?.creator_id === user?.id) {
-          await completeQuizSession(session.id);
-        }
+        // RIMOSSO: Non forziamo più il completamento della sessione quando l'host finisce
+        // Ora la sessione verrà completata solo quando tutti i partecipanti avranno finito
+        // (logica implementata in updateParticipantProgress)
+        // 
+        // if (session?.creator_id === user?.id) {
+        //   await completeQuizSession(session.id);
+        // }
         
         // Set completed locally
         setTimeout(() => {
@@ -268,7 +330,7 @@ const MultiplayerSession = () => {
         }, 2000);
       }
     } catch (error) {
-      console.error('Error updating progress:', error);
+      console.error('[ERROR] Error updating progress:', error);
     }
   };
 
@@ -316,12 +378,27 @@ const MultiplayerSession = () => {
     );
   }
   
-  if (!session || !myParticipant) {
+  if (!session) {
     return (
       <div className="max-w-2xl mx-auto text-center py-12">
         <h2 className="text-2xl font-bold mb-4">Session not found</h2>
         <p className="text-muted-foreground mb-8">The quiz session you're looking for doesn't exist</p>
         <Button onClick={() => navigate('/')}>Go Home</Button>
+      </div>
+    );
+  }
+  
+  if (!myParticipant) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-12">
+        <h2 className="text-2xl font-bold mb-4">In attesa dei partecipanti</h2>
+        <p className="text-muted-foreground mb-4">
+          Caricamento dei dati della sessione in corso...
+        </p>
+        <div className="w-12 h-12 border-4 border-cat border-t-transparent rounded-full animate-spin mx-auto mb-8"></div>
+        <Button variant="outline" onClick={() => window.location.reload()}>
+          Ricarica pagina
+        </Button>
       </div>
     );
   }
