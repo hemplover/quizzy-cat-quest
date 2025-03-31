@@ -130,7 +130,7 @@ export const createQuizSession = async (quizId: string, creatorId: string | null
     console.log(`[DEBUG] Quiz found, creating session with creatorId: ${creatorId}`);
     
     // Attempt to create the quiz session
-    const { data, error } = await supabase
+    const { data: sessionData, error: sessionError } = await supabase
       .from('quiz_sessions')
       .insert({
         quiz_id: quizId,
@@ -142,59 +142,65 @@ export const createQuizSession = async (quizId: string, creatorId: string | null
       .select('*')
       .single();
     
-    if (error) {
-      console.error('[ERROR] Error creating quiz session:', error.message);
-      if (error.details) console.error('[ERROR] Details:', error.details);
-      if (error.hint) console.error('[ERROR] Hint:', error.hint);
-      console.error('[DEBUG] Full error object:', JSON.stringify(error, null, 2));
+    if (sessionError) {
+      console.error('[ERROR] Error creating quiz session:', sessionError.message);
+      if (sessionError.details) console.error('[ERROR] Details:', sessionError.details);
+      if (sessionError.hint) console.error('[ERROR] Hint:', sessionError.hint);
+      console.error('[DEBUG] Full error object:', JSON.stringify(sessionError, null, 2));
       
-      throw new Error(`Failed to create quiz session: ${error.message}`);
+      throw new Error(`Failed to create quiz session: ${sessionError.message}`);
     }
     
-    console.log(`[DEBUG] Created new quiz session with ID: ${data.id}, code: "${data.session_code}"`);
+    console.log(`[DEBUG] Created new quiz session with ID: ${sessionData.id}, code: "${sessionData.session_code}"`);
     
-    // METODO ALTERNATIVO: Aggiungi l'host come partecipante usando una funzione separata e asincrona
-    // Non aspettiamo che finisca per non bloccare la creazione della sessione
-    setTimeout(async () => {
+    // --- INIZIO MODIFICA: Aggiunta Host Sincrona --- 
+    if (creatorId) { // Aggiungi l'host solo se creatorId è valido
+      console.log(`[DEBUG] Attempting to add host (${creatorId}) as participant synchronously for session ${sessionData.id}`);
       try {
-        // Prima controlliamo se l'host è già presente
-        const { data: existingParticipants, error: fetchError } = await supabase
+        // Controlla se l'host esiste GIÀ per questa sessione
+        const { data: existingParticipant, error: checkError } = await supabase
           .from('session_participants')
-          .select('*')
-          .eq('session_id', data.id)
-          .eq('user_id', creatorId);
-        
-        if (fetchError) {
-          console.error('[ERROR] Error checking existing participants:', fetchError);
-        } else if (existingParticipants && existingParticipants.length > 0) {
-          console.log('[INFO] Host is already a participant, skipping addition');
-          return;
-        }
-        
-        console.log(`[DEBUG] Adding host as participant (delayed) for session ${data.id}`);
-        
-        const { data: participantData, error: participantError } = await supabase
-          .from('session_participants')
-          .insert({
-            session_id: data.id,
-            user_id: creatorId,
-            username: 'Host',
-            score: 0,
-            completed: false,
-            answers: []
-          });
-          
-        if (participantError) {
-          console.error('[ERROR] Failed to add host as participant:', participantError);
+          .select('id') // Seleziona solo l'ID, è più leggero
+          .eq('session_id', sessionData.id)
+          .eq('user_id', creatorId)
+          .maybeSingle(); // Usiamo maybeSingle per gestire il caso in cui non esista
+
+        if (checkError) {
+          console.error('[ERROR] Error checking for existing host participant:', checkError);
+          // Non blocchiamo la creazione della sessione per questo, ma logghiamo l'errore
+        } else if (existingParticipant) {
+          console.log('[INFO] Host is already a participant in this session. Skipping addition.');
         } else {
-          console.log('[SUCCESS] Host added as participant successfully');
+          // Se non esiste, proviamo ad inserirlo
+          console.log(`[DEBUG] Host not found, inserting host (${creatorId}) as participant...`);
+          const { error: insertError } = await supabase
+            .from('session_participants')
+            .insert({
+              session_id: sessionData.id,
+              user_id: creatorId,
+              username: 'Host', // Potremmo voler usare un username reale se disponibile
+              score: 0,
+              completed: false,
+              answers: []
+            });
+
+          if (insertError) {
+            console.error('[ERROR] Failed to insert host as participant:', insertError);
+            // Anche qui, logghiamo ma non blocchiamo necessariamente
+          } else {
+            console.log('[SUCCESS] Host added as participant successfully.');
+          }
         }
-      } catch (err) {
-        console.error('[ERROR] Exception while adding host as participant:', err);
+      } catch (addHostError) {
+        console.error('[ERROR] Exception during synchronous host addition:', addHostError);
+        // Loggare l'errore ma continuare
       }
-    }, 1000); // Aggiungiamo l'host come partecipante dopo 1 secondo
+    }
+    // --- FINE MODIFICA --- 
     
-    return data as QuizSession;
+    // Restituisce i dati della sessione creata
+    return sessionData as QuizSession;
+    
   } catch (error) {
     console.error('[ERROR] Failed to create quiz session:', error);
     throw error;

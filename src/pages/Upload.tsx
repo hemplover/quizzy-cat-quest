@@ -334,12 +334,26 @@ const Upload = () => {
             />
           </div>
           
+          {subjectName && (
+            <p className="text-sm text-muted-foreground">Selected Subject: {subjectName}</p>
+          )}
+
+          {/* Aggiunta Avviso PDF */}
+          <div className="mb-6 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 rounded-md">
+            <div className="flex items-start">
+              <AlertCircle className="h-5 w-5 mr-3 flex-shrink-0" />
+              <div>
+                <p className="font-semibold">PDF Files</p>
+                <p>Direct PDF uploads are not supported for quiz creation. Please copy the text from your PDF document and paste it into the "Paste Text" tab below.</p>
+              </div>
+            </div>
+          </div>
+
           <div className="mt-6">
-            <Tabs defaultValue="text" className="w-full" onValueChange={(value) => setUploadMethod(value as 'text' | 'file')}>
-              <TabsList className="mb-6 grid w-full grid-cols-2">
+            <Tabs defaultValue={uploadMethod} onValueChange={(value) => setUploadMethod(value as 'text' | 'file')} className="mb-8">
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="text" className="flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  <span>{t('pasteText')}</span>
+                  <Pencil className="w-4 h-4" /> Paste Text
                 </TabsTrigger>
                 <TabsTrigger value="file" className="flex items-center gap-2">
                   <UploadIcon className="w-4 h-4" />

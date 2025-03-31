@@ -1,0 +1,9 @@
+{
+  "name": "extract-pdf-text-function",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "dependencies": {
+    "pdf-parse": "^1.1.1",
+    "@supabase/functions-js": "^2"
+  }
+} 

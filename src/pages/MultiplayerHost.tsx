@@ -38,33 +38,6 @@ const MultiplayerHost = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // Funzione semplice per aggiungere l'host come partecipante
-  const addHostAsParticipant = async (sessionId: string) => {
-    if (!sessionId || !user) return;
-    
-    // Generiamo un username semplice
-    const hostUsername = user.email?.split('@')[0] || 'Host';
-    
-    try {
-      const { error } = await supabase.from('session_participants').insert({
-        session_id: sessionId,
-        user_id: user.id,
-        username: hostUsername,
-        score: 0,
-        completed: false,
-        answers: []
-      });
-      
-      if (error) {
-        console.error('Errore aggiungendo host:', error);
-      } else {
-        console.log('Host aggiunto con successo!');
-      }
-    } catch (err) {
-      console.error('Eccezione aggiungendo host:', err);
-    }
-  };
-  
   // Get the session and participants data
   useEffect(() => {
     let isMounted = true;
@@ -96,10 +69,8 @@ const MultiplayerHost = () => {
           return;
         }
         
-        // Aggiungiamo l'host come partecipante
-        await addHostAsParticipant(sessionData.id);
-        
-        // Ora recuperiamo i partecipanti (dovrebbe includere l'host)
+        // Ora recuperiamo i partecipanti (dovrebbe includere l'host aggiunto dal service)
+        console.log(`[DEBUG] Fetching participants for session ${sessionData.id} after ensuring host was added during creation.`);
         const participantsData = await getSessionParticipants(sessionData.id);
         if (isMounted) setParticipants(participantsData);
         

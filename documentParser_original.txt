@@ -1,3 +1,4 @@
+
 import { toast } from 'sonner';
 
 /**
@@ -15,14 +16,22 @@ export async function parseDocument(file: File): Promise<string | null> {
       return await readTextFile(file);
     }
     
-    // PDF files - NON SUPPORTATI - Mostra avviso e ritorna null
+    // PDF files
     else if (fileType.includes('application/pdf') || fileName.endsWith('.pdf')) {
-      console.warn('PDF files are not supported for direct upload.');
-      toast.warning('PDF Upload Not Supported', {
-        description: 'Please copy the text from your PDF and paste it directly into the text box.',
-        duration: 10000, // Mostra più a lungo
-      });
-      return null; // Indica che l'upload non è andato a buon fine
+      console.log('Detected PDF file, beginning extraction...');
+      try {
+        return await extractTextFromPdf(file);
+      } catch (pdfError) {
+        console.error('PDF extraction failed, falling back to text extraction:', pdfError);
+        toast.error('PDF extraction failed. Some content may be missing.');
+        // Try to extract as plain text as fallback
+        try {
+          return await readTextFile(file);
+        } catch (textError) {
+          console.error('Text fallback also failed:', textError);
+          throw new Error('Could not extract text from this PDF file.');
+        }
+      }
     }
     
     // Word documents
@@ -108,6 +117,80 @@ async function readTextFile(file: File): Promise<string> {
     
     reader.readAsText(file);
   });
+}
+
+// Extract text from PDF using PDF.js with more detailed logging and better error handling
+async function extractTextFromPdf(file: File): Promise<string> {
+  try {
+    console.log('Starting PDF text extraction process...', file.name, file.size);
+    
+    // Import PDF.js dynamically with explicit version to avoid potential conflicts
+    console.log('Loading PDF.js library...');
+    const pdfjsLib = await import('pdfjs-dist');
+    console.log('PDF.js library loaded successfully');
+    
+    // Set worker source path - Using URL for the worker to avoid issues
+    console.log('Configuring PDF.js worker...');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+    console.log('PDF.js worker configured successfully with CDN worker');
+    
+    // Read file as ArrayBuffer
+    console.log('Loading file as ArrayBuffer...');
+    const arrayBuffer = await file.arrayBuffer();
+    console.log(`File loaded as ArrayBuffer, size: ${arrayBuffer.byteLength} bytes`);
+    
+    // Load PDF document with proper error handling
+    console.log('Creating PDF loading task...');
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    
+    loadingTask.onProgress = (progressData) => {
+      console.log(`PDF loading progress: ${progressData.loaded} of ${progressData.total}`);
+    };
+    
+    console.log('Waiting for PDF document to load...');
+    const pdf = await loadingTask.promise;
+    console.log(`PDF document loaded successfully with ${pdf.numPages} pages`);
+    
+    let textContent = '';
+    
+    // Extract text from each page
+    for (let i = 1; i <= pdf.numPages; i++) {
+      console.log(`Processing page ${i} of ${pdf.numPages}...`);
+      try {
+        const page = await pdf.getPage(i);
+        console.log(`Extracting text content from page ${i}...`);
+        const content = await page.getTextContent();
+        
+        // Concatenate text items with spaces
+        const pageText = content.items
+          .map((item: any) => item.str)
+          .join(' ');
+        
+        textContent += pageText + '\n\n';
+        console.log(`Extracted ${pageText.length} characters from page ${i}`);
+      } catch (pageError) {
+        console.error(`Error extracting text from page ${i}:`, pageError);
+        // Continue with next page instead of failing the entire process
+      }
+    }
+    
+    const result = textContent.trim();
+    console.log(`Total extracted text: ${result.length} characters`);
+    
+    if (result.length === 0) {
+      throw new Error('No text could be extracted from this PDF');
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error extracting text from PDF:', error);
+    // Provide more detailed error information
+    const errorMessage = error instanceof Error 
+      ? `Failed to extract text from PDF: ${error.message}` 
+      : 'Failed to extract text from PDF: Unknown error';
+    console.error('PDF extraction error details:', errorMessage);
+    throw new Error(errorMessage);
+  }
 }
 
 // Extract text from Word documents using mammoth.js with improved error handling
