@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 
 /**
@@ -119,77 +118,108 @@ async function readTextFile(file: File): Promise<string> {
   });
 }
 
-// Extract text from PDF using PDF.js with more detailed logging and better error handling
+// Extract text from PDF using PDF.js with a simpler, more reliable approach
 async function extractTextFromPdf(file: File): Promise<string> {
   try {
-    console.log('Starting PDF text extraction process...', file.name, file.size);
+    console.log('Starting PDF text extraction with simplified approach...', file.name, file.size);
     
-    // Import PDF.js dynamically with explicit version to avoid potential conflicts
-    console.log('Loading PDF.js library...');
-    const pdfjsLib = await import('pdfjs-dist');
+    // Importa la libreria PDF.js
+    const pdfjs = await import('pdfjs-dist');
     console.log('PDF.js library loaded successfully');
     
-    // Set worker source path - Using URL for the worker to avoid issues
-    console.log('Configuring PDF.js worker...');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
-    console.log('PDF.js worker configured successfully with CDN worker');
+    // Specifica un worker valido usando un CDN pubblico che sicuramente funziona
+    const cdnWorkerUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.9.179/pdf.worker.min.js';
     
-    // Read file as ArrayBuffer
-    console.log('Loading file as ArrayBuffer...');
+    if (pdfjs.default && typeof pdfjs.default.getDocument === 'function') {
+      // Per PDF.js v3.x
+      pdfjs.default.GlobalWorkerOptions.workerSrc = cdnWorkerUrl;
+      console.log('PDF.js v3.x - Worker configurato con CDN:', cdnWorkerUrl);
+    } else {
+      // Per PDF.js v2.x
+      pdfjs.GlobalWorkerOptions.workerSrc = cdnWorkerUrl;
+      console.log('PDF.js v2.x - Worker configurato con CDN:', cdnWorkerUrl);
+    }
+    
+    // Leggi il file come ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
     console.log(`File loaded as ArrayBuffer, size: ${arrayBuffer.byteLength} bytes`);
     
-    // Load PDF document with proper error handling
-    console.log('Creating PDF loading task...');
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    // Crea il loading task in base alla versione
+    const getDocument = pdfjs.default?.getDocument || pdfjs.getDocument;
+    const loadingTask = getDocument({ data: arrayBuffer });
     
-    loadingTask.onProgress = (progressData) => {
-      console.log(`PDF loading progress: ${progressData.loaded} of ${progressData.total}`);
-    };
-    
-    console.log('Waiting for PDF document to load...');
+    // Carica il documento PDF
     const pdf = await loadingTask.promise;
     console.log(`PDF document loaded successfully with ${pdf.numPages} pages`);
     
-    let textContent = '';
+    // Array di termini da escludere (metadati tecnici e termini in altre lingue)
+    const blacklist = [
+      // PDF specifici
+      '/ProcSet', '/PDF', '/Text', '/ImageB', '/ImageC', '/MediaBox', '/Resources',
+      '/Font', '/XObject', 'endobj', 'obj', 'startxref', '/Type', '/Filter',
+      'BitsPerComponent', 'ColorSpace',
+      
+      // Francese e spagnolo
+      'composante', 'résolution', 'espace', 'compresión', 'página', 'objeto',
+      'longitud', 'altura', 'anchura', 'espacio', 'color', 'imagen', 'DeviceGray',
+      'DeviceRGB', 'DeviceCMYK', 'Composante', 'Résolution',
+      
+      // Termini aggiuntivi frequenti nei metadati
+      'bit', 'pixel', 'filter', 'byte', 'compression', 'image', 'object'
+    ];
     
-    // Extract text from each page
+    // Estrai il testo pagina per pagina
+    let fullText = '';
+    
     for (let i = 1; i <= pdf.numPages; i++) {
-      console.log(`Processing page ${i} of ${pdf.numPages}...`);
       try {
+        console.log(`Processing page ${i} of ${pdf.numPages}`);
         const page = await pdf.getPage(i);
-        console.log(`Extracting text content from page ${i}...`);
+        
+        // Metodo 1: Usa getTextContent() - più affidabile
         const content = await page.getTextContent();
         
-        // Concatenate text items with spaces
-        const pageText = content.items
-          .map((item: any) => item.str)
-          .join(' ');
+        // Filtra e unisci gli elementi di testo
+        const filteredItems = content.items
+          .map((item: any) => (item.str || item.text || '').trim())
+          .filter((text: string) => 
+            text.length > 1 && // Salta elementi troppo brevi
+            !blacklist.some(term => text.includes(term)) // Escludi metadati
+          );
         
-        textContent += pageText + '\n\n';
-        console.log(`Extracted ${pageText.length} characters from page ${i}`);
-      } catch (pageError) {
-        console.error(`Error extracting text from page ${i}:`, pageError);
-        // Continue with next page instead of failing the entire process
+        // Aggiungi il testo filtrato
+        if (filteredItems.length > 0) {
+          fullText += filteredItems.join(' ') + '\n\n';
+          console.log(`Extracted ${filteredItems.length} text items from page ${i}`);
+        }
+      } catch (error) {
+        console.error(`Error extracting text from page ${i}:`, error);
+        // Continua con le altre pagine
       }
     }
     
-    const result = textContent.trim();
-    console.log(`Total extracted text: ${result.length} characters`);
+    // Pulisci il testo
+    let cleanedText = fullText
+      .replace(/\s+/g, ' ') // Rimuovi spazi multipli
+      .trim();
     
-    if (result.length === 0) {
+    console.log(`Extracted ${cleanedText.length} characters of text`);
+    
+    // Ultimo passo di pulizia per rimuovere caratteri problematici
+    cleanedText = cleanedText
+      .replace(/[\x00-\x1F\x7F-\x9F]/g, '') // Rimuovi caratteri di controllo
+      .replace(/\\u[0-9a-fA-F]{4}/g, '') // Rimuovi sequenze Unicode escape
+      .replace(/\\/g, '') // Rimuovi backslash
+      .replace(/\u0000/g, ''); // Rimuovi caratteri nulli
+    
+    if (cleanedText.length === 0) {
       throw new Error('No text could be extracted from this PDF');
     }
     
-    return result;
+    return cleanedText;
   } catch (error) {
     console.error('Error extracting text from PDF:', error);
-    // Provide more detailed error information
-    const errorMessage = error instanceof Error 
-      ? `Failed to extract text from PDF: ${error.message}` 
-      : 'Failed to extract text from PDF: Unknown error';
-    console.error('PDF extraction error details:', errorMessage);
-    throw new Error(errorMessage);
+    throw new Error(`Failed to extract text from PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 

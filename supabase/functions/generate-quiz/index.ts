@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -355,51 +354,63 @@ ${previousQuestions.map((q, i) => `${i+1}. ${q}`).join('\n')}
 `;
   }
   
-  return `You are a university professor responsible for creating exams for students. Based only on the provided study material, generate a realistic university-level exam.
+  // Avvertimento sui metadati PDF in italiano
+  const pdfMetadataWarning = `
+### ATTENZIONE - METADATI TECNICI:
+Se nel testo trovi riferimenti a '/ProcSet', '/PDF', '/Text', '/ImageB', '/MediaBox', '/Resources', '/XObject', '/Font', 'interpolation', 'obj', 'endobj' o termini simili, questi sono metadati tecnici del file PDF e NON sono parte del materiale di studio. Ignora completamente questi termini durante la creazione delle domande.
+`;
+  
+  return `Sei un professore universitario che sta creando esami per gli studenti. Crea un esame basandoti SOLO sul materiale di studio fornito.
+${pdfMetadataWarning}
 
-### Rules:
-- Only use information from the provided document.
-- Do not create generic or overly simplistic questions.
-- Structure the quiz like a real university exam.
-- Ensure a variety of question types as specified below.
-- Adjust difficulty according to the selected level: ${settings.difficulty}
-- The quiz must feel like an official test, not a casual practice exercise.
-- Return ONLY valid JSON with no additional text.
-${languagePrompt ? `- ${languagePrompt}` : ''}
-${settings.previousQuizzes && settings.previousQuizzes > 0 ? `- This is quiz number ${settings.previousQuizzes + 1} on this content. Make sure to create questions that explore different aspects than previous quizzes.` : ''}
+### Regole:
+- Utilizza SOLO informazioni dal documento fornito.
+- NON creare domande generiche o troppo semplici.
+- Struttura il quiz come un vero esame universitario.
+- Assicurati di utilizzare le tipologie di domanda specificate di seguito.
+- Regola la difficoltà in base al livello selezionato: ${settings.difficulty}
+- Il quiz deve sembrare un test ufficiale, non un esercizio casuale.
+- IMPORTANTE: Restituisci SOLO JSON valido senza testo aggiuntivo.
+- IMPORTANTE: Rileva la lingua del contenuto e crea il quiz nella stessa lingua. Se il documento è in italiano, crea domande in italiano, se è in inglese, crea domande in inglese.
+${settings.previousQuizzes && settings.previousQuizzes > 0 ? `- Questo è il quiz numero ${settings.previousQuizzes + 1} su questo contenuto. Assicurati di creare domande che esplorino aspetti diversi rispetto ai quiz precedenti.` : ''}
 
 ${previousQuestionsPrompt}
 
-### Question Types to Include:
-${settings.questionTypes.map(type => `- ${type}`).join('\n')}
+### Tipologie di domande da includere:
+${settings.questionTypes.map(type => {
+  if (type === 'multiple-choice') return '- scelta_multipla';
+  if (type === 'true-false') return '- vero_falso';
+  if (type === 'open-ended') return '- risposta_aperta';
+  return `- ${type}`;
+}).join('\n')}
 
-### Number of Questions:
+### Numero di domande:
 ${settings.numQuestions}
 
-### Study Material:
+### Materiale di studio:
 ${content}
 
-### Output Format (JSON):
+### Formato di output (JSON):
 {
   "quiz": [
     {
-      "type": "multiple_choice",
-      "question": "According to the study material, what is the main cause of X?",
-      "options": ["A", "B", "C", "D"],
-      "correct_answer": "B",
-      "explanation": "Explanation of why B is correct"
+      "tipo": "scelta_multipla",
+      "domanda": "Secondo il materiale di studio, qual è la causa principale di X?",
+      "opzioni": ["A", "B", "C", "D"],
+      "risposta_corretta": "B",
+      "spiegazione": "Spiegazione del perché B è corretto"
     },
     {
-      "type": "true_false",
-      "question": "Statement based on the document content.",
-      "correct_answer": "True",
-      "explanation": "Explanation of why this is true"
+      "tipo": "vero_falso",
+      "domanda": "Affermazione basata sul contenuto del documento.",
+      "risposta_corretta": "Vero",
+      "spiegazione": "Spiegazione del perché è vero"
     },
     {
-      "type": "open_ended",
-      "question": "Explain concept Y in detail.",
-      "correct_answer": "Expected answer format or key points",
-      "explanation": "Detailed explanation"
+      "tipo": "risposta_aperta",
+      "domanda": "Spiega il concetto Y in dettaglio.",
+      "risposta_corretta": "Formato di risposta previsto o punti chiave",
+      "spiegazione": "Spiegazione dettagliata"
     }
   ]
 }`;

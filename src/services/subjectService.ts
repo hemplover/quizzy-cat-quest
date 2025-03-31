@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
@@ -360,6 +359,51 @@ export const getDocumentById = async (id: string): Promise<Document | null> => {
   }
 };
 
+// Funzione per sanitizzare il testo prima di salvarlo in PostgreSQL
+export const sanitizeTextForDatabase = (text: string): string => {
+  if (!text) return '';
+  
+  try {
+    console.log('Starting database sanitization, input length:', text.length);
+    
+    // Rimuovi caratteri nulli e di controllo
+    let sanitized = text.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+    
+    // Rimuovi sequenze di escape Unicode
+    sanitized = sanitized.replace(/\\u([0-9a-fA-F]{4})/g, '');
+    
+    // Rimuovi tutti i backslash (possono causare problemi di escape)
+    sanitized = sanitized.replace(/\\/g, '');
+    
+    // Rimuovi caratteri non stampabili o problematici per PostgreSQL
+    sanitized = sanitized.replace(/[^\x20-\x7E\xA0-\xFF\u0100-\uFFFF]/g, '');
+    
+    // Rimuovi qualsiasi carattere nullo rimanente
+    sanitized = sanitized.replace(/\0/g, '');
+    
+    // Rimuovi sequenze problematiche per PostgreSQL
+    sanitized = sanitized.replace(/\u0000/g, '')
+                         .replace(/\uFFFD/g, '')
+                         .replace(/\u0080-\u009F/g, '');
+    
+    // Come test, verifica che il testo possa essere serializzato come JSON
+    try {
+      JSON.stringify(sanitized);
+    } catch (jsonError) {
+      console.error('JSON serialization error, applying more aggressive sanitization');
+      // Riduce a soli caratteri ASCII base (molto più aggressivo ma garantito sicuro)
+      sanitized = sanitized.replace(/[^\x20-\x7E]/g, '');
+    }
+    
+    console.log('Sanitization completed, output length:', sanitized.length);
+    return sanitized;
+  } catch (e) {
+    console.error('Error during text sanitization for database:', e);
+    // Ultimo fallback: riduci a solo ASCII standard
+    return text.replace(/[^\x20-\x7E]/g, '');
+  }
+};
+
 // Create a new document
 export const createDocument = async (document: Omit<Document, 'id' | 'uploadedAt' | 'userId'>): Promise<Document> => {
   try {
@@ -368,13 +412,22 @@ export const createDocument = async (document: Omit<Document, 'id' | 'uploadedAt
       console.error('No user ID found, user might not be logged in');
       throw new Error('User not authenticated');
     }
+    
+    // Sanitizza il contenuto prima di salvarlo in database
+    const sanitizedContent = sanitizeTextForDatabase(document.content);
+    console.log(`Original content length: ${document.content.length}, Sanitized content length: ${sanitizedContent.length}`);
+    
+    // Verifica che il contenuto non sia vuoto dopo la sanitizzazione
+    if (!sanitizedContent || sanitizedContent.trim().length === 0) {
+      throw new Error('Content is empty after sanitization');
+    }
 
     const { data, error } = await supabase
       .from('documents')
       .insert({
         subject_id: document.subjectId,
         name: document.name,
-        content: document.content,
+        content: sanitizedContent, // Usa il contenuto sanitizzato
         file_type: document.fileType,
         file_size: document.fileSize,
         user_id: userId
