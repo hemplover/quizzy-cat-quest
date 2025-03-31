@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -116,6 +115,21 @@ const QuizSession = () => {
       
       if (quizResults) {
         setResults(quizResults);
+        
+        // Salva i risultati nel database
+        try {
+          const { updateQuizResults } = await import('@/services/subjectService');
+          const updatedQuiz = await updateQuizResults(quiz.id, quizResults);
+          
+          if (updatedQuiz) {
+            console.log('Quiz results saved to database:', updatedQuiz);
+          } else {
+            console.error('Failed to save quiz results to database');
+          }
+        } catch (saveError) {
+          console.error('Error saving quiz results:', saveError);
+        }
+        
         toast({
           title: 'Quiz completed!',
           description: 'Your quiz has been submitted successfully',
