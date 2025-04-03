@@ -1,4 +1,3 @@
-
 export interface QuizSession {
   id: string;
   creator_id: string | null;
@@ -20,16 +19,16 @@ export interface SessionParticipant {
   session_id: string;
   user_id: string | null;
   username: string;
-  score: number;
-  completed: boolean;
-  answers: Array<{
-    question_id: number;
-    answer: string | number;
-    correct: boolean;
-    time_taken?: number;
-    points: number;
-  }>;
+  score: number | null;
+  completed: boolean | null;
+  answers: ParticipantAnswer[] | null;
   joined_at: string;
+}
+
+export interface ParticipantAnswer {
+  questionIndex: number;
+  answer: any;
+  isCorrect: boolean;
 }
 
 export interface LeaderboardEntry {
