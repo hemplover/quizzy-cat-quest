@@ -183,7 +183,7 @@ async function generateGeminiQuiz(content: string, settings: QuizSettings, previ
           }
         ],
         generationConfig: {
-          temperature: 0.3, // Slightly higher temperature for more variety in questions
+          temperature: 0.6, // Aumentata leggermente per più varietà
           maxOutputTokens: 2000  // Increased token limit for better quiz generation
         }
       })
@@ -365,9 +365,11 @@ ${pdfMetadataWarning}
 
 ### Regole:
 - Utilizza SOLO informazioni dal documento fornito.
+- **IMPORTANTE: Seleziona argomenti e dettagli in modo casuale da QUALSIASI PARTE del materiale di studio. NON seguire l'ordine sequenziale del documento.**
 - NON creare domande generiche o troppo semplici.
 - Struttura il quiz come un vero esame universitario.
 - Assicurati di utilizzare le tipologie di domanda specificate di seguito.
+- **IMPORTANTE: Ogni volta che generi un quiz per questo materiale, crea domande VERAMENTE NUOVE. Cambia gli argomenti principali trattati, il livello di dettaglio richiesto e la formulazione. Non limitarti a riformulare domande precedenti o a chiedere dello stesso concetto specifico.**
 - Regola la difficoltà in base al livello selezionato: ${settings.difficulty}
 - Il quiz deve sembrare un test ufficiale, non un esercizio casuale.
 - IMPORTANTE: Restituisci SOLO JSON valido senza testo aggiuntivo.

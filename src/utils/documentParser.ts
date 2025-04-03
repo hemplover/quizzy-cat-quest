@@ -15,22 +15,14 @@ export async function parseDocument(file: File): Promise<string | null> {
       return await readTextFile(file);
     }
     
-    // PDF files
+    // PDF files - NON SUPPORTATI - Mostra avviso e ritorna null
     else if (fileType.includes('application/pdf') || fileName.endsWith('.pdf')) {
-      console.log('Detected PDF file, beginning extraction...');
-      try {
-        return await extractTextFromPdf(file);
-      } catch (pdfError) {
-        console.error('PDF extraction failed, falling back to text extraction:', pdfError);
-        toast.error('PDF extraction failed. Some content may be missing.');
-        // Try to extract as plain text as fallback
-        try {
-          return await readTextFile(file);
-        } catch (textError) {
-          console.error('Text fallback also failed:', textError);
-          throw new Error('Could not extract text from this PDF file.');
-        }
-      }
+      console.warn('PDF files are not supported for direct upload.');
+      toast.warning('PDF Upload Not Supported', {
+        description: 'Please copy the text from your PDF and paste it directly into the text box.',
+        duration: 10000, // Mostra più a lungo
+      });
+      return null; // Indica che l'upload non è andato a buon fine
     }
     
     // Word documents
@@ -116,111 +108,6 @@ async function readTextFile(file: File): Promise<string> {
     
     reader.readAsText(file);
   });
-}
-
-// Extract text from PDF using PDF.js with a simpler, more reliable approach
-async function extractTextFromPdf(file: File): Promise<string> {
-  try {
-    console.log('Starting PDF text extraction with simplified approach...', file.name, file.size);
-    
-    // Importa la libreria PDF.js
-    const pdfjs = await import('pdfjs-dist');
-    console.log('PDF.js library loaded successfully');
-    
-    // Specifica un worker valido usando un CDN pubblico che sicuramente funziona
-    const cdnWorkerUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.9.179/pdf.worker.min.js';
-    
-    if (pdfjs.default && typeof pdfjs.default.getDocument === 'function') {
-      // Per PDF.js v3.x
-      pdfjs.default.GlobalWorkerOptions.workerSrc = cdnWorkerUrl;
-      console.log('PDF.js v3.x - Worker configurato con CDN:', cdnWorkerUrl);
-    } else {
-      // Per PDF.js v2.x
-      pdfjs.GlobalWorkerOptions.workerSrc = cdnWorkerUrl;
-      console.log('PDF.js v2.x - Worker configurato con CDN:', cdnWorkerUrl);
-    }
-    
-    // Leggi il file come ArrayBuffer
-    const arrayBuffer = await file.arrayBuffer();
-    console.log(`File loaded as ArrayBuffer, size: ${arrayBuffer.byteLength} bytes`);
-    
-    // Crea il loading task in base alla versione
-    const getDocument = pdfjs.default?.getDocument || pdfjs.getDocument;
-    const loadingTask = getDocument({ data: arrayBuffer });
-    
-    // Carica il documento PDF
-    const pdf = await loadingTask.promise;
-    console.log(`PDF document loaded successfully with ${pdf.numPages} pages`);
-    
-    // Array di termini da escludere (metadati tecnici e termini in altre lingue)
-    const blacklist = [
-      // PDF specifici
-      '/ProcSet', '/PDF', '/Text', '/ImageB', '/ImageC', '/MediaBox', '/Resources',
-      '/Font', '/XObject', 'endobj', 'obj', 'startxref', '/Type', '/Filter',
-      'BitsPerComponent', 'ColorSpace',
-      
-      // Francese e spagnolo
-      'composante', 'résolution', 'espace', 'compresión', 'página', 'objeto',
-      'longitud', 'altura', 'anchura', 'espacio', 'color', 'imagen', 'DeviceGray',
-      'DeviceRGB', 'DeviceCMYK', 'Composante', 'Résolution',
-      
-      // Termini aggiuntivi frequenti nei metadati
-      'bit', 'pixel', 'filter', 'byte', 'compression', 'image', 'object'
-    ];
-    
-    // Estrai il testo pagina per pagina
-    let fullText = '';
-    
-    for (let i = 1; i <= pdf.numPages; i++) {
-      try {
-        console.log(`Processing page ${i} of ${pdf.numPages}`);
-        const page = await pdf.getPage(i);
-        
-        // Metodo 1: Usa getTextContent() - più affidabile
-        const content = await page.getTextContent();
-        
-        // Filtra e unisci gli elementi di testo
-        const filteredItems = content.items
-          .map((item: any) => (item.str || item.text || '').trim())
-          .filter((text: string) => 
-            text.length > 1 && // Salta elementi troppo brevi
-            !blacklist.some(term => text.includes(term)) // Escludi metadati
-          );
-        
-        // Aggiungi il testo filtrato
-        if (filteredItems.length > 0) {
-          fullText += filteredItems.join(' ') + '\n\n';
-          console.log(`Extracted ${filteredItems.length} text items from page ${i}`);
-        }
-      } catch (error) {
-        console.error(`Error extracting text from page ${i}:`, error);
-        // Continua con le altre pagine
-      }
-    }
-    
-    // Pulisci il testo
-    let cleanedText = fullText
-      .replace(/\s+/g, ' ') // Rimuovi spazi multipli
-      .trim();
-    
-    console.log(`Extracted ${cleanedText.length} characters of text`);
-    
-    // Ultimo passo di pulizia per rimuovere caratteri problematici
-    cleanedText = cleanedText
-      .replace(/[\x00-\x1F\x7F-\x9F]/g, '') // Rimuovi caratteri di controllo
-      .replace(/\\u[0-9a-fA-F]{4}/g, '') // Rimuovi sequenze Unicode escape
-      .replace(/\\/g, '') // Rimuovi backslash
-      .replace(/\u0000/g, ''); // Rimuovi caratteri nulli
-    
-    if (cleanedText.length === 0) {
-      throw new Error('No text could be extracted from this PDF');
-    }
-    
-    return cleanedText;
-  } catch (error) {
-    console.error('Error extracting text from PDF:', error);
-    throw new Error(`Failed to extract text from PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
 }
 
 // Extract text from Word documents using mammoth.js with improved error handling
