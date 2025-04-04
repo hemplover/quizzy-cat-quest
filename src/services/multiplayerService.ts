@@ -16,7 +16,7 @@ type JoinQuizSessionParams = {
 };
 
 // Helper function to normalize session codes (remove spaces, uppercase)
-const normalizeSessionCode = (code: string): string => {
+export const normalizeSessionCode = (code: string): string => {
   return code.replace(/\s+/g, '').toUpperCase();
 };
 
