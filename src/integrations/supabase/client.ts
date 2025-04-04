@@ -4,7 +4,7 @@ import { Database } from './types';
 
 // *** TEST TEMPORANEO: URL Hardcoded ***
 const supabaseUrl = "https://lsozzejwfkuexbyynnom.supabase.co";
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxzb3p6ZWp3Zmt1ZXhieXlubm9tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI2MzI0NzksImV4cCI6MjA1ODIwODQ3OX0.IODR5GgDDEiBhF27X36eqGUVeH_KU68vCyGtv_8e7Os';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxzb3p6ZWp3Zmt1ZXhieXlubm9tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM2ODgwNDcsImV4cCI6MjA1OTI2NDA0N30.IRsMynS7WcgDketdZ4DjpSWo1z4hFupvbKydXrLKir4';
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
