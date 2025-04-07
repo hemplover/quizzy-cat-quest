@@ -2,10 +2,25 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://lsozzejwfkuexbyynnom.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxzb3p6ZWp3Zmt1ZXhieXlubm9tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI2MzI0NzksImV4cCI6MjA1ODIwODQ3OX0.IODR5GgDDEiBhF27X36eqGUVeH_KU68vCyGtv_8e7Os";
+// Leggi le variabili d'ambiente (definite nel file .env o dall'hosting)
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
+// *** LOG TEMPORANEO PER DEBUG ***
+console.log("[Supabase Client Init] Reading VITE_SUPABASE_URL:", supabaseUrl ? supabaseUrl.substring(0, 20) + '...' : 'NOT FOUND');
+console.log("[Supabase Client Init] Reading VITE_SUPABASE_ANON_KEY:", supabaseAnonKey ? supabaseAnonKey.substring(0, 10) + '...' : 'NOT FOUND');
+// *** FINE LOG TEMPORANEO ***
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+// Verifica che le variabili siano state caricate correttamente
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Supabase URL or Anon Key is missing. Make sure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your environment.');
+  // Potresti voler lanciare un errore qui o gestire il caso in modo diverso
+  // throw new Error("Supabase URL or Anon Key is missing from environment variables.");
+}
+
+// Esporta il client Supabase inizializzato
+// Assicurati che le variabili siano definite prima di creare il client
+export const supabase = createClient<Database>(
+  supabaseUrl || '', // Usa stringa vuota come fallback se non definite (ma il check sopra dovrebbe prevenirlo)
+  supabaseAnonKey || ''
+);
