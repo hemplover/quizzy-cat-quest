@@ -415,23 +415,32 @@ export const completeQuizSession = async (sessionId: string): Promise<boolean> =
   }
 };
 
-// Get quiz questions for a session
+// Get quiz questions for a session - *** USA RPC PER BYPASSARE RLS ***
 export const getQuizQuestions = async (quizId: string): Promise<QuizQuestion[]> => {
   try {
-    const { data, error } = await supabase
-      .from('quizzes')
-      .select('questions')
-      .eq('id', quizId)
-      .single();
-    
-    if (error || !data) {
-      console.error('[ERROR] Error getting quiz questions:', error);
+    console.log(`[RPC] Calling get_quiz_questions_for_session for quiz ID: ${quizId}`);
+
+    const { data, error, status } = await supabase.rpc('get_quiz_questions_for_session', {
+      p_quiz_id: quizId
+    });
+
+    if (error) {
+      console.error(`[ERROR] RPC get_quiz_questions_for_session failed with status ${status}:`, error);
       return [];
     }
-    
-    return data.questions as QuizQuestion[];
+
+    const questions = data ? data as unknown as QuizQuestion[] : [];
+
+    if (questions && questions.length > 0) {
+       console.log(`[RPC] Successfully fetched ${questions.length} questions.`);
+       return questions;
+    } else {
+       console.warn(`[WARN] RPC returned no questions or empty array for quiz ID: ${quizId}. Data received:`, data);
+       return [];
+    }
+
   } catch (error) {
-    console.error('[ERROR] Failed to get quiz questions:', error);
+    console.error('[ERROR] Unexpected error in getQuizQuestions via RPC:', error);
     return [];
   }
 };
