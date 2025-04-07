@@ -129,17 +129,14 @@ const Auth = () => {
     
     try {
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
+        provider: 'google'
       });
       
       if (error) {
         throw error;
       }
       
-      // Redirect happens automatically
+      // Redirect happens automatically to the Site URL
     } catch (error: any) {
       console.error('Error signing in with Google:', error);
       toast.error(error.message || t('Error signing in with Google'));
