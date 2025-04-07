@@ -53,6 +53,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
+        console.log(`[AuthContext Listener] Event: ${event}, Session User: ${currentSession?.user?.email}`);
+        if (currentSession) {
+          console.log('[AuthContext Listener] Full Session Object:', currentSession);
+        }
+
         if (isMounted) {
             setSession(currentSession);
             setUser(currentSession?.user ?? null);

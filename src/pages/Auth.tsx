@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Loader2, ArrowLeft } from 'lucide-react';
+import { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 const Auth = () => {
   const { t } = useLanguage();
