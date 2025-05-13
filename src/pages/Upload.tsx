@@ -207,6 +207,9 @@ const Upload = () => {
       const fileType = selectedFile ? selectedFile.type : 'text/plain';
       const fileSize = selectedFile ? selectedFile.size : new Blob([textInput]).size;
       
+      // Log the content before saving
+      console.log("Content to be saved:", processedContent);
+      
       const document = await createDocument({
         subjectId: selectedSubject,
         name: docName,

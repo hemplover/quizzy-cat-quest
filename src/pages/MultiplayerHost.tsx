@@ -25,6 +25,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import CatTutor from '@/components/CatTutor';
 import { QuizQuestion } from '@/types/quiz';
 import { supabase } from '@/integrations/supabase/client';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 
 const MultiplayerHost = () => {
   const { sessionCode } = useParams<{ sessionCode: string }>();
@@ -37,6 +39,8 @@ const MultiplayerHost = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  const sessionUrl = sessionCode ? `${window.location.origin}/quiz/multiplayer/join/${sessionCode}` : '';
   
   // Get the session and participants data
   useEffect(() => {
@@ -193,9 +197,7 @@ const MultiplayerHost = () => {
   };
   
   const shareSessionLink = () => {
-    if (!sessionCode) return;
-    
-    const sessionUrl = `${window.location.origin}/quiz/multiplayer/join/${sessionCode}`;
+    if (!sessionUrl) return;
     
     if (navigator.share) {
       navigator.share({
@@ -371,17 +373,48 @@ const MultiplayerHost = () => {
             <div className="space-y-3">
               <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
                 <p className="text-sm text-blue-700">
-                  Players can join by entering the code or using the direct link
+                  Players can join by entering the code or using the direct link below.
                 </p>
               </div>
+
+              {/* Direct Link Display and Copy Button */}
+              {sessionUrl && (
+                <div className="space-y-2">
+                  <Label htmlFor="session-link-display">Direct Join Link:</Label>
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      id="session-link-display"
+                      type="text" 
+                      value={sessionUrl} 
+                      readOnly 
+                      className="bg-gray-100 border-gray-300"
+                    />
+                    <Button 
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        navigator.clipboard.writeText(sessionUrl);
+                        toast({
+                          title: 'Link Copied!',
+                          description: 'The join link has been copied to your clipboard.',
+                        });
+                      }}
+                      aria-label="Copy join link"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
               
+              {/* Existing Share Button (uses navigator.share or fallback to copy link) */}
               <Button 
                 variant="outline" 
-                className="w-full flex justify-between items-center" 
-                onClick={shareSessionLink}
+                className="w-full flex justify-center items-center gap-2" // Centered content
+                onClick={shareSessionLink} // This function already handles navigator.share and fallback
               >
-                <span>Share Link</span>
                 <Share2 className="h-4 w-4" />
+                <span>Share via... (Recommended)</span>
               </Button>
               
               <div className="flex gap-2 items-center">
